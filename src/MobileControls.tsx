@@ -92,9 +92,9 @@ export default function MobileControls({
         style={{
           position: "absolute",
           left: 0,
-          bottom: "12vh",
+          bottom: "100px",
           width: "50%",
-          height: "calc(100% - 12vh)",
+          height: "calc(100% - 100px)",
           zIndex: 15,
           touchAction: "none",
         }}
@@ -148,9 +148,9 @@ export default function MobileControls({
         style={{
           position: "absolute",
           right: 0,
-          bottom: "12vh",
+          bottom: "100px",
           width: "50%",
-          height: "calc(100% - 12vh)",
+          height: "calc(100% - 100px)",
           zIndex: 15,
           touchAction: "none",
         }}
@@ -183,7 +183,7 @@ export default function MobileControls({
         style={{
           position: "absolute",
           right: 20,
-          bottom: "calc(12vh + 20px)",
+          bottom: "calc(100px + 20px)",
           width: 80,
           height: 80,
           borderRadius: "50%",

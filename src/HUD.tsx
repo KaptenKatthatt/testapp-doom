@@ -147,11 +147,10 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
       height={80}
       style={{
         position: "absolute",
-        bottom: 0,
+        bottom: "env(safe-area-inset-bottom, 0px)",
         left: 0,
         width: "100%",
-        height: "12vh",
-        minHeight: "80px",
+        height: "80px",
         imageRendering: "pixelated" as const,
         pointerEvents: "none",
         zIndex: 10,

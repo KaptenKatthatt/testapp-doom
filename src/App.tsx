@@ -43,7 +43,7 @@ export default function App(): React.JSX.Element {
       <div
         style={{
           width: "100vw",
-          height: "100vh",
+          height: "100dvh",
           background: "#000",
           display: "flex",
           flexDirection: "column",
@@ -52,6 +52,7 @@ export default function App(): React.JSX.Element {
           fontFamily: "monospace",
           color: "#c00",
           cursor: "pointer",
+          overflow: "hidden",
         }}
         onClick={handleStart}
       >
@@ -85,7 +86,7 @@ export default function App(): React.JSX.Element {
   }
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#000", position: "relative" }}>
+    <div style={{ width: "100vw", height: "100dvh", background: "#000", position: "relative", overflow: "hidden" }}>
       <Canvas camera={{ fov: 75, near: 0.1, far: 100 }} gl={{ alpha: false, antialias: true }}>
         <color attach="background" args={["#2a1f10"]} />
         <fog attach="fog" args={["#2a1f10", 5, 80]} />
