@@ -17,6 +17,8 @@ const COLLISION_MARGIN = 0.4;
 interface GameProps {
   readonly onPlayerState: (state: PlayerState) => void;
   readonly onGameOver: () => void;
+  readonly mobileMoveRef: React.MutableRefObject<[number, number]>;
+  readonly mobileLookRef: React.MutableRefObject<number>;
 }
 
 interface PlayerData {
@@ -70,7 +72,7 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   zombieman: 2.5,
 };
 
-export default function Game({ onPlayerState, onGameOver }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
     rotation: 0,
@@ -126,17 +128,25 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
       }
     };
 
+    // Mobile shoot events
+    const handleGameShoot = ((e: Event): void => {
+      const detail = (e as CustomEvent<{ shooting: boolean }>).detail;
+      playerRef.current.shooting = detail.shooting;
+    }) as EventListener;
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("mousedown", handleMouseDown);
     window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("game-shoot", handleGameShoot);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("mousedown", handleMouseDown);
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("game-shoot", handleGameShoot);
     };
   }, []);
 
@@ -181,6 +191,20 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
     if (keys["KeyS"] ?? false) move.sub(forward);
     if (keys["KeyA"] ?? false) move.add(right);
     if (keys["KeyD"] ?? false) move.sub(right);
+
+    // Mobile joystick input
+    const [moveX, moveY] = mobileMoveRef.current;
+    if (Math.abs(moveX) > 0.05 || Math.abs(moveY) > 0.05) {
+      const mobileForward = forward.clone().multiplyScalar(-moveY);
+      const mobileRight = right.clone().multiplyScalar(moveX);
+      move.add(mobileForward).add(mobileRight);
+    }
+
+    // Mobile look input
+    if (Math.abs(mobileLookRef.current) > 0.0001) {
+      player.rotation += mobileLookRef.current;
+      mobileLookRef.current = 0;
+    }
 
     if (move.length() > 0) {
       move.normalize().multiplyScalar(speed * dt);

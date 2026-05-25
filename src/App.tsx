@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
+import MobileControls from "./MobileControls";
 import type { PlayerState } from "./types";
 
 export default function App(): React.JSX.Element {
@@ -12,11 +13,29 @@ export default function App(): React.JSX.Element {
     kills: 0,
   });
   const [gameOver, setGameOver] = useState(false);
+  const mobileMoveRef = useRef<[number, number]>([0, 0]);
+  const mobileLookRef = useRef(0);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
     setGameOver(false);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
+  }, []);
+
+  const handleMobileMove = useCallback((dx: number, dy: number): void => {
+    mobileMoveRef.current = [dx, dy];
+  }, []);
+
+  const handleMobileLook = useCallback((dx: number): void => {
+    mobileLookRef.current += dx;
+  }, []);
+
+  const handleShootStart = useCallback((): void => {
+    window.dispatchEvent(new CustomEvent("game-shoot", { detail: { shooting: true } }));
+  }, []);
+
+  const handleShootEnd = useCallback((): void => {
+    window.dispatchEvent(new CustomEvent("game-shoot", { detail: { shooting: false } }));
   }, []);
 
   if (!started) {
@@ -56,10 +75,10 @@ export default function App(): React.JSX.Element {
             animation: "blink 1s infinite",
           }}
         >
-          Click to start
+          Tap to start
         </p>
         <p style={{ fontSize: "12px", color: "#444", marginTop: "10px" }}>
-          WASD to move · Mouse to look · Click to shoot
+          WASD / Joystick · Mouse / Touch · Click to shoot
         </p>
       </div>
     );
@@ -71,12 +90,20 @@ export default function App(): React.JSX.Element {
         <Game
           onPlayerState={setPlayerState}
           onGameOver={(): void => { setGameOver(true); }}
+          mobileMoveRef={mobileMoveRef}
+          mobileLookRef={mobileLookRef}
         />
       </Canvas>
       <HUD
         health={playerState.health}
         ammo={playerState.ammo}
         kills={playerState.kills}
+      />
+      <MobileControls
+        onMove={handleMobileMove}
+        onLook={handleMobileLook}
+        onShootStart={handleShootStart}
+        onShootEnd={handleShootEnd}
       />
       {gameOver && (
         <div
@@ -111,7 +138,7 @@ export default function App(): React.JSX.Element {
             }}
             onClick={(): void => { window.location.reload(); }}
           >
-            Click to restart
+            Tap to restart
           </p>
         </div>
       )}
