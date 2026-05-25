@@ -65,7 +65,7 @@ export default function MobileControls({
       if (!touch) return;
       if (lookLastRef.current !== null) {
         const dx = touch.clientX - lookLastRef.current;
-        onLook(dx * 0.003);
+        onLook(-dx * 0.003);
       }
       lookLastRef.current = touch.clientX;
     },

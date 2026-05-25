@@ -32,6 +32,7 @@ interface PlayerData {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
+  { id: 0, position: [4, 0, 2], type: "imp", health: 30, maxHealth: 30, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 1, position: [8, 0, 8], type: "imp", health: 30, maxHealth: 30, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 2, position: [20, 0, 6], type: "imp", health: 30, maxHealth: 30, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 3, position: [14, 0, 18], type: "imp", health: 30, maxHealth: 30, alive: true, lastAttack: 0, hitFlash: 0 },
@@ -75,7 +76,7 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
 export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
-    rotation: 0,
+    rotation: Math.PI / 2, // Face east toward the door opening
     health: 100,
     ammo: 50,
     kills: 0,

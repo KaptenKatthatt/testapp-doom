@@ -10,17 +10,17 @@ const ENEMY_CONFIG: Record<EnemyType, {
 }> = {
   imp: {
     bodyW: 0.8, bodyH: 1.6, bodyD: 0.6,
-    headSize: 0.5, color: 0x886622, speed: 1.5,
+    headSize: 0.5, color: 0xaa7733, speed: 1.5,
     attackRange: 8, attackCooldown: 2, attackDamage: 8,
   },
   demon: {
     bodyW: 1.2, bodyH: 1.2, bodyD: 0.8,
-    headSize: 0.7, color: 0x882244, speed: 3,
+    headSize: 0.7, color: 0xaa3366, speed: 3,
     attackRange: 2.5, attackCooldown: 1.2, attackDamage: 15,
   },
   zombieman: {
     bodyW: 0.7, bodyH: 1.7, bodyD: 0.5,
-    headSize: 0.45, color: 0x556655, speed: 1.0,
+    headSize: 0.45, color: 0x778877, speed: 1.0,
     attackRange: 12, attackCooldown: 2.5, attackDamage: 6,
   },
 };
@@ -69,14 +69,14 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
           <meshLambertMaterial
             color={config.color}
             emissive={flashColor}
-            emissiveIntensity={flashIntensity}
+            emissiveIntensity={flashIntensity + 0.15}
           />
         </mesh>
 
         {/* Head */}
         <mesh position={[0, config.bodyH / 2 + config.headSize / 2, 0]}>
           <boxGeometry args={[config.headSize, config.headSize, config.headSize]} />
-          <meshLambertMaterial color={config.color} />
+          <meshLambertMaterial color={config.color} emissive={0x221100} emissiveIntensity={0.3} />
         </mesh>
 
         {/* Eyes - glowing */}
@@ -88,7 +88,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
             isDemon ? -0.3 : -0.25,
           ]}
         >
-          <sphereGeometry args={[0.06, 8, 8]} />
+          <sphereGeometry args={[0.08, 8, 8]} />
           <meshBasicMaterial color={eyeColor} />
         </mesh>
         <mesh
@@ -98,7 +98,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
             isDemon ? -0.3 : -0.25,
           ]}
         >
-          <sphereGeometry args={[0.06, 8, 8]} />
+          <sphereGeometry args={[0.08, 8, 8]} />
           <meshBasicMaterial color={eyeColor} />
         </mesh>
 
@@ -119,11 +119,11 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         {/* Arms */}
         <mesh position={[-(config.bodyW / 2 + 0.2), config.bodyH * 0.1, 0]}>
           <boxGeometry args={[0.25, config.bodyH * 0.4, 0.25]} />
-          <meshLambertMaterial color={config.color} />
+          <meshLambertMaterial color={config.color} emissive={0x110800} emissiveIntensity={0.2} />
         </mesh>
         <mesh position={[config.bodyW / 2 + 0.2, config.bodyH * 0.1, 0]}>
           <boxGeometry args={[0.25, config.bodyH * 0.4, 0.25]} />
-          <meshLambertMaterial color={config.color} />
+          <meshLambertMaterial color={config.color} emissive={0x110800} emissiveIntensity={0.2} />
         </mesh>
       </group>
 
