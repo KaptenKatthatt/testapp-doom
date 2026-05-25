@@ -85,8 +85,10 @@ export default function App(): React.JSX.Element {
   }
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#000" }}>
-      <Canvas shadows camera={{ fov: 75, near: 0.1, far: 100 }}>
+    <div style={{ width: "100vw", height: "100vh", background: "#000", position: "relative" }}>
+      <Canvas camera={{ fov: 75, near: 0.1, far: 100 }} gl={{ alpha: false, antialias: true }}>
+        <color attach="background" args={["#2a1f10"]} />
+        <fog attach="fog" args={["#2a1f10", 5, 80]} />
         <Game
           onPlayerState={setPlayerState}
           onGameOver={(): void => { setGameOver(true); }}

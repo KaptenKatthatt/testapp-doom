@@ -92,9 +92,9 @@ export default function MobileControls({
         style={{
           position: "absolute",
           left: 0,
-          bottom: 80,
+          bottom: "12vh",
           width: "50%",
-          height: "calc(100% - 80px)",
+          height: "calc(100% - 12vh)",
           zIndex: 15,
           touchAction: "none",
         }}
@@ -148,9 +148,9 @@ export default function MobileControls({
         style={{
           position: "absolute",
           right: 0,
-          bottom: 80,
+          bottom: "12vh",
           width: "50%",
-          height: "calc(100% - 80px)",
+          height: "calc(100% - 12vh)",
           zIndex: 15,
           touchAction: "none",
         }}
@@ -170,7 +170,7 @@ export default function MobileControls({
         </div>
       </div>
 
-      {/* Shoot button */}
+      {/* Shoot button with pistol SVG icon */}
       <button
         onTouchStart={(e: React.TouchEvent<HTMLButtonElement>): void => {
           e.preventDefault();
@@ -183,15 +183,13 @@ export default function MobileControls({
         style={{
           position: "absolute",
           right: 20,
-          bottom: 100,
-          width: 70,
-          height: 70,
+          bottom: "calc(12vh + 20px)",
+          width: 80,
+          height: 80,
           borderRadius: "50%",
-          background: "rgba(255, 60, 60, 0.6)",
+          background: "rgba(255, 60, 60, 0.5)",
           border: "3px solid rgba(255, 100, 100, 0.8)",
           color: "#fff",
-          fontSize: 24,
-          fontWeight: "bold",
           cursor: "pointer",
           zIndex: 20,
           touchAction: "none",
@@ -200,9 +198,22 @@ export default function MobileControls({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          padding: 0,
         }}
       >
-        🔫
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Pistol icon - pointed right */}
+          {/* Barrel */}
+          <rect x="18" y="8" width="20" height="6" rx="2" fill="#fff" />
+          {/* Body */}
+          <rect x="8" y="8" width="12" height="14" rx="2" fill="#fff" />
+          {/* Trigger guard */}
+          <rect x="10" y="22" width="6" height="8" rx="1" fill="#fff" />
+          {/* Grip */}
+          <rect x="6" y="18" width="8" height="16" rx="2" fill="#ddd" />
+          {/* Muzzle flash hint */}
+          <circle cx="40" cy="11" r="3" fill="#ff0" opacity="0.8" />
+        </svg>
       </button>
     </>
   );

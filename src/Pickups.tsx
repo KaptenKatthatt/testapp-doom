@@ -42,38 +42,22 @@ function Pickup({ pickup }: { readonly pickup: PickupData }): React.JSX.Element 
           <>
             <mesh>
               <boxGeometry args={[0.4, 0.12, 0.12]} />
-              <meshStandardMaterial
-                color={color}
-                emissive={emissiveColor}
-                emissiveIntensity={0.5}
-              />
+              <meshLambertMaterial color={color} emissive={emissiveColor} emissiveIntensity={0.8} />
             </mesh>
             <mesh>
               <boxGeometry args={[0.12, 0.4, 0.12]} />
-              <meshStandardMaterial
-                color={color}
-                emissive={emissiveColor}
-                emissiveIntensity={0.5}
-              />
+              <meshLambertMaterial color={color} emissive={emissiveColor} emissiveIntensity={0.8} />
             </mesh>
           </>
         ) : pickup.type === "ammo" ? (
           <mesh>
             <boxGeometry args={[0.3, 0.2, 0.2]} />
-            <meshStandardMaterial
-              color={color}
-              emissive={emissiveColor}
-              emissiveIntensity={0.5}
-            />
+            <meshLambertMaterial color={color} emissive={emissiveColor} emissiveIntensity={0.8} />
           </mesh>
         ) : (
           <mesh>
             <boxGeometry args={[0.25, 0.15, 0.5]} />
-            <meshStandardMaterial
-              color={color}
-              emissive={emissiveColor}
-              emissiveIntensity={0.5}
-            />
+            <meshLambertMaterial color={color} emissive={emissiveColor} emissiveIntensity={0.8} />
           </mesh>
         )}
       </group>
@@ -81,8 +65,8 @@ function Pickup({ pickup }: { readonly pickup: PickupData }): React.JSX.Element 
         ref={lightRef}
         position={[0, 0.5, 0]}
         color={lightColor}
-        intensity={0.5}
-        distance={4}
+        intensity={1.0}
+        distance={6}
       />
     </group>
   );

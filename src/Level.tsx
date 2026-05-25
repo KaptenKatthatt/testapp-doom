@@ -3,12 +3,12 @@ import type { WallBox } from "./types";
 // E1M1-inspired level geometry
 // Format: [x, y, z, width, height, depth, color, isDoor?]
 
-const WALL_COLOR = 0x665544;
-const WALL_COLOR2 = 0x554433;
-const DOOR_COLOR = 0x885522;
-const METAL_COLOR = 0x444455;
-const GREEN_ACCENT = 0x336633;
-const DARK_WALL = 0x443322;
+const WALL_COLOR = 0x887766;
+const WALL_COLOR2 = 0x776655;
+const DOOR_COLOR = 0xaa6633;
+const METAL_COLOR = 0x666677;
+const GREEN_ACCENT = 0x448844;
+const DARK_WALL = 0x554433;
 
 const WALL_DATA: Array<{
   x: number; y: number; z: number;
@@ -116,75 +116,41 @@ export function getWalls(): WallBox[] {
 export default function Level(): React.JSX.Element {
   return (
     <group>
-      {/* Lighting - Doom-style dim but visible */}
-      <ambientLight intensity={0.4} color="#665544" />
-      <pointLight
-        position={[3, 3.5, 4]}
-        intensity={2.0}
-        distance={25}
-        color="#ff8844"
-      />
-      <pointLight
-        position={[8, 3.5, 8]}
-        intensity={1.8}
-        distance={25}
-        color="#ff8844"
-      />
-      <pointLight
-        position={[20, 3.5, 14]}
-        intensity={1.5}
-        distance={22}
-        color="#ffaa44"
-      />
-      <pointLight
-        position={[36, 3.5, 8]}
-        intensity={1.2}
-        distance={18}
-        color="#ff6622"
-      />
-      <pointLight
-        position={[14, 3.5, 26]}
-        intensity={1.2}
-        distance={18}
-        color="#ff8844"
-      />
-      <pointLight
-        position={[38, 3.5, 28]}
-        intensity={1.0}
-        distance={16}
-        color="#44ff44"
-      />
-      <pointLight
-        position={[4, 3.5, 34]}
-        intensity={0.8}
-        distance={14}
-        color="#ff4444"
-      />
-
-      {/* Fog for atmosphere - wider range so more is visible */}
-      <fog attach="fog" args={["#1a0f00", 8, 50]} />
+      {/* Strong ambient so everything is visible */}
+      <ambientLight intensity={0.7} color="#bbaa99" />
+      
+      {/* Main overhead light (like ceiling lights) */}
+      <hemisphereLight args={["#ffeedd", "#332211", 0.4]} />
+      
+      {/* Key point lights for atmosphere */}
+      <pointLight position={[3, 3.5, 4]} intensity={3.0} color="#ffaa66" />
+      <pointLight position={[8, 3.5, 8]} intensity={2.5} color="#ff9944" />
+      <pointLight position={[20, 3.5, 14]} intensity={2.0} color="#ffcc88" />
+      <pointLight position={[36, 3.5, 8]} intensity={1.5} color="#ff8844" />
+      <pointLight position={[14, 3.5, 26]} intensity={1.5} color="#ffaa66" />
+      <pointLight position={[38, 3.5, 28]} intensity={1.5} color="#88ff88" />
+      <pointLight position={[4, 3.5, 34]} intensity={1.0} color="#ff6666" />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]} receiveShadow>
         <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={0x554433} roughness={0.85} />
+        <meshLambertMaterial color={0x665544} />
       </mesh>
 
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
         <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={0x333322} roughness={0.95} />
+        <meshLambertMaterial color={0x444433} />
       </mesh>
 
       {/* Walls */}
       {WALL_MESHES.map((w) => (
-        <mesh key={w.key} position={w.position} castShadow receiveShadow>
+        <mesh key={w.key} position={w.position}>
           <boxGeometry args={w.scale} />
-          <meshStandardMaterial
+          <meshLambertMaterial
             color={w.color}
-            roughness={w.isDoor ? 0.5 : 0.85}
-            emissive={w.isDoor ? 0x221100 : 0x000000}
-            emissiveIntensity={w.isDoor ? 0.3 : 0}
+            emissive={w.isDoor ? 0x442200 : 0x111111}
+            emissiveIntensity={w.isDoor ? 0.5 : 0.1}
           />
         </mesh>
       ))}
@@ -192,50 +158,40 @@ export default function Level(): React.JSX.Element {
       {/* Blood pool */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 18]}>
         <circleGeometry args={[1.5, 16]} />
-        <meshStandardMaterial
-          color={0x880000}
-          roughness={1}
-          transparent
-          opacity={0.7}
-        />
+        <meshLambertMaterial color={0xaa2222} transparent opacity={0.8} />
       </mesh>
 
       {/* Slime pool */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[38, 0.01, 38]}>
         <circleGeometry args={[2, 16]} />
-        <meshStandardMaterial
-          color={0x225522}
-          roughness={1}
-          transparent
-          opacity={0.7}
-        />
+        <meshLambertMaterial color={0x33aa33} transparent opacity={0.8} />
       </mesh>
 
       {/* Cross in starting room */}
       <mesh position={[3, 2.5, 4]}>
         <boxGeometry args={[0.2, 1.2, 0.05]} />
-        <meshStandardMaterial color={0xaa3333} emissive={0x331111} />
+        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.3} />
       </mesh>
       <mesh position={[3, 3, 4]}>
         <boxGeometry args={[0.6, 0.2, 0.05]} />
-        <meshStandardMaterial color={0xaa3333} emissive={0x331111} />
+        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.3} />
       </mesh>
 
       {/* Barrels/crates */}
       <mesh position={[22, 0.5, 10]}>
         <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshStandardMaterial color={0x556644} roughness={0.9} />
+        <meshLambertMaterial color={0x667755} />
       </mesh>
       <mesh position={[22, 0.5, 12]}>
         <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshStandardMaterial color={0x556644} roughness={0.9} />
+        <meshLambertMaterial color={0x667755} />
       </mesh>
 
       {/* Torch lights on walls */}
-      <pointLight position={[6, 3, 4]} intensity={0.6} distance={8} color="#ff6600" />
-      <pointLight position={[16, 3, 18]} intensity={0.6} distance={8} color="#ff6600" />
-      <pointLight position={[30, 3, 12]} intensity={0.5} distance={8} color="#ff6600" />
-      <pointLight position={[40, 3, 20]} intensity={0.5} distance={8} color="#448844" />
+      <pointLight position={[6, 3, 4]} intensity={1.0} color="#ff8833" />
+      <pointLight position={[16, 3, 18]} intensity={1.0} color="#ff8833" />
+      <pointLight position={[30, 3, 12]} intensity={0.8} color="#ff8833" />
+      <pointLight position={[40, 3, 20]} intensity={0.8} color="#88cc88" />
     </group>
   );
 }

@@ -54,19 +54,19 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
         {/* Gun body */}
         <mesh position={[0, 0, 0]}>
           <boxGeometry args={[0.08, 0.12, 0.25]} />
-          <meshStandardMaterial color={0x333333} metalness={0.8} roughness={0.2} />
+          <meshLambertMaterial color={0x333333} />
         </mesh>
 
         {/* Barrel */}
         <mesh position={[0, 0.03, -0.18]}>
           <boxGeometry args={[0.04, 0.04, 0.15]} />
-          <meshStandardMaterial color={0x222222} metalness={0.9} roughness={0.1} />
+          <meshLambertMaterial color={0x222222} />
         </mesh>
 
         {/* Grip */}
         <mesh position={[0, -0.08, 0.05]} rotation={[0.2, 0, 0]}>
           <boxGeometry args={[0.06, 0.15, 0.06]} />
-          <meshStandardMaterial color={0x554433} roughness={0.9} />
+          <meshLambertMaterial color={0x554433} />
         </mesh>
 
         {/* Muzzle flash */}
