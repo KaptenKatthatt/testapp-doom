@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import type { Mesh, Group } from "three";
 import type { EnemyData, EnemyType } from "./types";
 
@@ -46,6 +47,32 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const flashColor = hitFlash > 0 ? 0xffffff : 0x000000;
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
 
+  // Create procedural texture for this enemy type
+  const bodyTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return new THREE.CanvasTexture(canvas);
+    }
+    const baseColor = type === "imp" ? [170, 119, 51] : type === "demon" ? [170, 51, 102] : [119, 136, 119];
+    ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
+    ctx.fillRect(0, 0, 32, 32);
+    // Scale/skin detail
+    for (let i = 0; i < 60; i++) {
+      const x = Math.random() * 32;
+      const y = Math.random() * 32;
+      const a = Math.random() * 0.2;
+      ctx.fillStyle = `rgba(0,0,0,${a})`;
+      ctx.fillRect(x, y, 2, 1);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }, [type]);
+
   useFrame((state) => {
     if (meshRef.current) {
       meshRef.current.position.y =
@@ -67,6 +94,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         <mesh>
           <boxGeometry args={[config.bodyW, config.bodyH, config.bodyD]} />
           <meshLambertMaterial
+            map={bodyTexture}
             color={config.color}
             emissive={flashColor}
             emissiveIntensity={flashIntensity + 0.15}

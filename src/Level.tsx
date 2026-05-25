@@ -1,8 +1,17 @@
+import { useMemo } from "react";
 import type { WallBox } from "./types";
+import {
+  createWallTexture,
+  createFloorTexture,
+  createCeilingTexture,
+  createDoorTexture,
+  createMetalTexture,
+  createSlimeTexture,
+  createBarrelTexture,
+  createBloodTexture,
+} from "./Textures";
 
 // E1M1-inspired level geometry
-// Format: [x, y, z, width, height, depth, color, isDoor?]
-
 const WALL_COLOR = 0x887766;
 const WALL_COLOR2 = 0x776655;
 const DOOR_COLOR = 0xaa6633;
@@ -114,14 +123,23 @@ export function getWalls(): WallBox[] {
 }
 
 export default function Level(): React.JSX.Element {
+  const textures = useMemo(() => ({
+    wall: createWallTexture(),
+    floor: createFloorTexture(),
+    ceiling: createCeilingTexture(),
+    door: createDoorTexture(),
+    metal: createMetalTexture(),
+    slime: createSlimeTexture(),
+    barrel: createBarrelTexture(),
+    blood: createBloodTexture(),
+  }), []);
+
   return (
     <group>
       {/* Strong ambient so everything is visible */}
       <ambientLight intensity={0.7} color="#bbaa99" />
-      
-      {/* Main overhead light (like ceiling lights) */}
       <hemisphereLight args={["#ffeedd", "#332211", 0.4]} />
-      
+
       {/* Key point lights for atmosphere */}
       <pointLight position={[3, 3.5, 4]} intensity={3.0} color="#ffaa66" />
       <pointLight position={[8, 3.5, 8]} intensity={2.5} color="#ff9944" />
@@ -131,67 +149,95 @@ export default function Level(): React.JSX.Element {
       <pointLight position={[38, 3.5, 28]} intensity={1.5} color="#88ff88" />
       <pointLight position={[4, 3.5, 34]} intensity={1.0} color="#ff6666" />
 
-      {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]} receiveShadow>
-        <planeGeometry args={[50, 50]} />
-        <meshLambertMaterial color={0x665544} />
-      </mesh>
-
-      {/* Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
-        <planeGeometry args={[50, 50]} />
-        <meshLambertMaterial color={0x444433} />
-      </mesh>
-
-      {/* Walls */}
-      {WALL_MESHES.map((w) => (
-        <mesh key={w.key} position={w.position}>
-          <boxGeometry args={w.scale} />
-          <meshLambertMaterial
-            color={w.color}
-            emissive={w.isDoor ? 0x442200 : 0x111111}
-            emissiveIntensity={w.isDoor ? 0.5 : 0.1}
-          />
-        </mesh>
-      ))}
-
-      {/* Blood pool */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 18]}>
-        <circleGeometry args={[1.5, 16]} />
-        <meshLambertMaterial color={0xaa2222} transparent opacity={0.8} />
-      </mesh>
-
-      {/* Slime pool */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[38, 0.01, 38]}>
-        <circleGeometry args={[2, 16]} />
-        <meshLambertMaterial color={0x33aa33} transparent opacity={0.8} />
-      </mesh>
-
-      {/* Cross in starting room */}
-      <mesh position={[3, 2.5, 4]}>
-        <boxGeometry args={[0.2, 1.2, 0.05]} />
-        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[3, 3, 4]}>
-        <boxGeometry args={[0.6, 0.2, 0.05]} />
-        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.3} />
-      </mesh>
-
-      {/* Barrels/crates */}
-      <mesh position={[22, 0.5, 10]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial color={0x667755} />
-      </mesh>
-      <mesh position={[22, 0.5, 12]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial color={0x667755} />
-      </mesh>
-
       {/* Torch lights on walls */}
       <pointLight position={[6, 3, 4]} intensity={1.0} color="#ff8833" />
       <pointLight position={[16, 3, 18]} intensity={1.0} color="#ff8833" />
       <pointLight position={[30, 3, 12]} intensity={0.8} color="#ff8833" />
       <pointLight position={[40, 3, 20]} intensity={0.8} color="#88cc88" />
+
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]}>
+        <planeGeometry args={[50, 50]} />
+        <meshLambertMaterial map={textures.floor} />
+      </mesh>
+
+      {/* Ceiling */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
+        <planeGeometry args={[50, 50]} />
+        <meshLambertMaterial map={textures.ceiling} />
+      </mesh>
+
+      {/* Walls */}
+      {WALL_MESHES.map((w) => {
+        // Choose texture based on wall type
+        const isGreenSlime = w.color === GREEN_ACCENT;
+        const isMetal = w.color === METAL_COLOR;
+        const isDark = w.color === DARK_WALL;
+
+        let wallTexture = textures.wall;
+        if (w.isDoor) wallTexture = textures.door;
+        else if (isGreenSlime) wallTexture = textures.slime;
+        else if (isMetal) wallTexture = textures.metal;
+        else if (isDark) wallTexture = textures.wall;
+
+        // Adjust repeat based on wall size
+        const materialProps: Record<string, unknown> = {
+          map: wallTexture,
+          color: w.color,
+          emissive: w.isDoor ? 0x442200 : isGreenSlime ? 0x112211 : isMetal ? 0x111122 : isDark ? 0x221100 : 0x111111,
+          emissiveIntensity: w.isDoor ? 0.4 : isGreenSlime ? 0.2 : 0.1,
+        };
+
+        return (
+          <mesh key={w.key} position={w.position}>
+            <boxGeometry args={w.scale} />
+            <meshLambertMaterial {...materialProps} />
+          </mesh>
+        );
+      })}
+
+      {/* Blood pool */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 18]}>
+        <circleGeometry args={[1.5, 16]} />
+        <meshLambertMaterial map={textures.blood} transparent opacity={0.8} />
+      </mesh>
+
+      {/* Slime pool */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[38, 0.01, 38]}>
+        <circleGeometry args={[2, 16]} />
+        <meshLambertMaterial map={textures.slime} transparent opacity={0.8} />
+      </mesh>
+
+      {/* Cross in starting room */}
+      <mesh position={[3, 2.5, 4]}>
+        <boxGeometry args={[0.2, 1.2, 0.05]} />
+        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[3, 3, 4]}>
+        <boxGeometry args={[0.6, 0.2, 0.05]} />
+        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
+      </mesh>
+
+      {/* Barrels/crates */}
+      <mesh position={[22, 0.5, 10]}>
+        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+        <meshLambertMaterial map={textures.barrel} />
+      </mesh>
+      <mesh position={[22, 0.5, 12]}>
+        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+        <meshLambertMaterial map={textures.barrel} />
+      </mesh>
+
+      {/* Torch flames - small emissive cubes on walls */}
+      {[
+        [6, 3, 4], [16, 3, 18], [30, 3, 12], [40, 3, 20],
+        [3, 3.5, 4], [8, 3.5, 8],
+      ].map((pos, i) => (
+        <mesh key={`torch-${i}`} position={pos as [number, number, number]}>
+          <boxGeometry args={[0.15, 0.15, 0.15]} />
+          <meshBasicMaterial color="#ff6600" />
+        </mesh>
+      ))}
     </group>
   );
 }
