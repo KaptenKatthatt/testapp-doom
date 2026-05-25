@@ -116,18 +116,24 @@ export function getWalls(): WallBox[] {
 export default function Level(): React.JSX.Element {
   return (
     <group>
-      {/* Lighting - Doom-style dim with red/orange accents */}
-      <ambientLight intensity={0.15} color="#443322" />
+      {/* Lighting - Doom-style dim but visible */}
+      <ambientLight intensity={0.4} color="#665544" />
+      <pointLight
+        position={[3, 3.5, 4]}
+        intensity={2.0}
+        distance={25}
+        color="#ff8844"
+      />
       <pointLight
         position={[8, 3.5, 8]}
-        intensity={1.5}
-        distance={20}
+        intensity={1.8}
+        distance={25}
         color="#ff8844"
       />
       <pointLight
         position={[20, 3.5, 14]}
-        intensity={1.2}
-        distance={18}
+        intensity={1.5}
+        distance={22}
         color="#ffaa44"
       />
       <pointLight
@@ -138,40 +144,36 @@ export default function Level(): React.JSX.Element {
       />
       <pointLight
         position={[14, 3.5, 26]}
-        intensity={1.0}
-        distance={16}
+        intensity={1.2}
+        distance={18}
         color="#ff8844"
       />
       <pointLight
         position={[38, 3.5, 28]}
-        intensity={0.8}
-        distance={14}
+        intensity={1.0}
+        distance={16}
         color="#44ff44"
       />
       <pointLight
         position={[4, 3.5, 34]}
-        intensity={0.6}
-        distance={12}
+        intensity={0.8}
+        distance={14}
         color="#ff4444"
       />
 
-      {/* Fog for atmosphere */}
-      <fog attach="fog" args={["#110800", 5, 40]} />
+      {/* Fog for atmosphere - wider range so more is visible */}
+      <fog attach="fog" args={["#1a0f00", 8, 50]} />
 
       {/* Floor */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[22, 0, 22]}
-        receiveShadow
-      >
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]} receiveShadow>
         <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={0x333322} roughness={0.9} />
+        <meshStandardMaterial color={0x554433} roughness={0.85} />
       </mesh>
 
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
         <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={0x222211} roughness={0.95} />
+        <meshStandardMaterial color={0x333322} roughness={0.95} />
       </mesh>
 
       {/* Walls */}

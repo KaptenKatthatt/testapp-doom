@@ -93,6 +93,7 @@ export default function App(): React.JSX.Element {
             justifyContent: "center",
             fontFamily: "monospace",
             color: "#fff",
+            zIndex: 20,
           }}
         >
           <h1

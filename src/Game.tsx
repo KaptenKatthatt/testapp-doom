@@ -72,7 +72,7 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
 
 export default function Game({ onPlayerState, onGameOver }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
-    position: new THREE.Vector3(2, 1.7, 2),
+    position: new THREE.Vector3(3, 1.7, 4),
     rotation: 0,
     health: 100,
     ammo: 50,
@@ -155,13 +155,14 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
   }, [walls]);
 
   // Main game loop
-  useFrame((state) => {
+  useFrame((_state, delta) => {
     const player = playerRef.current;
     if (player.health <= 0) return;
 
-    const delta = Math.min(state.clock.getDelta(), 0.05);
+    const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
     const speed = 8;
+    const now = performance.now() / 1000;
 
     // Movement
     const forward = new THREE.Vector3(
@@ -182,7 +183,7 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
     if (keys["KeyD"] ?? false) move.sub(right);
 
     if (move.length() > 0) {
-      move.normalize().multiplyScalar(speed * delta);
+      move.normalize().multiplyScalar(speed * dt);
     }
 
     // Collision resolution with wall sliding
@@ -204,12 +205,17 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
       }
     }
 
-    // Camera follow
-    camera.position.copy(player.position);
-    camera.rotation.set(0, player.rotation, 0);
+    // Camera follow - use lookAt approach for correct rotation
+    camera.position.set(player.position.x, player.position.y, player.position.z);
+    const lookTarget = new THREE.Vector3(
+      player.position.x - Math.sin(player.rotation) * 10,
+      player.position.y,
+      player.position.z - Math.cos(player.rotation) * 10,
+    );
+    camera.lookAt(lookTarget);
+    camera.updateMatrixWorld(true);
 
     // Shooting
-    const now = state.clock.getElapsedTime();
     if (player.shooting && now - player.lastShot > 0.25 && player.ammo > 0) {
       player.ammo--;
       player.lastShot = now;
@@ -254,7 +260,7 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
       const updated = prev.map((e: EnemyData): EnemyData => {
         if (!e.alive) {
           if (e.hitFlash > 0) {
-            return { ...e, hitFlash: Math.max(0, e.hitFlash - delta * 4) };
+            return { ...e, hitFlash: Math.max(0, e.hitFlash - dt * 4) };
           }
           return e;
         }
@@ -271,7 +277,7 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
         let newX = e.position[0];
         let newZ = e.position[2];
         let newAttack = e.lastAttack;
-        const newHitFlash = Math.max(0, e.hitFlash - delta * 4);
+        const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
 
         if (dist < 20) {
           const dx = player.position.x - e.position[0];
@@ -281,8 +287,8 @@ export default function Game({ onPlayerState, onGameOver }: GameProps): React.JS
           const ndz = len > 0.01 ? dz / len : 0;
 
           if (dist > 2) {
-            newX += ndx * eSpeed * delta;
-            newZ += ndz * eSpeed * delta;
+            newX += ndx * eSpeed * dt;
+            newZ += ndz * eSpeed * dt;
           }
 
           if (dist < attackRange && now - e.lastAttack > attackCooldown) {

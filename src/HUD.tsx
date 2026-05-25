@@ -90,72 +90,70 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
 
     ctx.clearRect(0, 0, w, h);
 
-    // Bottom HUD bar
-    ctx.fillStyle = "#444444";
-    ctx.fillRect(0, h - 60, w, 60);
+    // Bottom HUD bar (Doom style) - full width
+    ctx.fillStyle = "#555555";
+    ctx.fillRect(0, 0, w, h);
 
-    // Border
-    ctx.strokeStyle = "#666666";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, h - 60, w, 60);
+    // Border lines
+    ctx.fillStyle = "#888888";
+    ctx.fillRect(0, 0, w, 2);
+    ctx.fillStyle = "#222222";
+    ctx.fillRect(0, h - 2, w, 2);
 
     // AMMO section
-    ctx.fillStyle = "#888888";
-    ctx.font = "12px monospace";
-    ctx.fillText("AMMO", 30, h - 40);
-    ctx.fillStyle = ammo > 20 ? "#ffaa00" : "#ff3300";
-    ctx.font = "bold 28px monospace";
-    ctx.fillText(String(ammo).padStart(3, "0"), 20, h - 10);
+    ctx.fillStyle = "#aaaaaa";
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("AMMO", 20, 22);
+    ctx.fillStyle = ammo > 20 ? "#ffcc00" : "#ff3300";
+    ctx.font = "bold 36px monospace";
+    ctx.fillText(String(ammo).padStart(3, "0"), 20, 58);
 
     // HEALTH section
-    ctx.fillStyle = "#888888";
-    ctx.font = "12px monospace";
-    ctx.fillText("HEALTH", 150, h - 40);
+    ctx.fillStyle = "#aaaaaa";
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("HEALTH", 140, 22);
     const healthColor = health > 50 ? "#00cc00" : health > 25 ? "#ccaa00" : "#cc0000";
     ctx.fillStyle = healthColor;
-    ctx.font = "bold 28px monospace";
-    ctx.fillText(String(health).padStart(3, "0"), 140, h - 10);
+    ctx.font = "bold 36px monospace";
+    ctx.fillText(String(health).padStart(3, "0"), 140, 58);
+
+    // Health bar
+    ctx.fillStyle = "#333333";
+    ctx.fillRect(140, 66, 100, 6);
+    ctx.fillStyle = healthColor;
+    ctx.fillRect(140, 66, 100 * (health / 100), 6);
 
     // Doom face
-    drawDoomFace(ctx, 220, h - 45, face);
+    drawDoomFace(ctx, 290, 16, face);
 
     // KILLS section
-    ctx.fillStyle = "#888888";
-    ctx.font = "12px monospace";
-    ctx.fillText("KILLS", 290, h - 40);
-    ctx.fillStyle = "#cccccc";
-    ctx.font = "bold 28px monospace";
-    ctx.fillText(String(kills), 290, h - 10);
+    ctx.fillStyle = "#aaaaaa";
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("KILLS", 340, 22);
+    ctx.fillStyle = "#dddddd";
+    ctx.font = "bold 36px monospace";
+    ctx.fillText(String(kills), 340, 58);
 
     // Weapon name
-    ctx.fillStyle = "#666666";
-    ctx.font = "10px monospace";
-    ctx.fillText("PISTOL", 30, h - 60 + 10);
-
-    // Health bar visual
-    const barWidth = 100;
-    const barX = 140;
-    const barY = h - 8;
-    ctx.fillStyle = "#333333";
-    ctx.fillRect(barX, barY, barWidth, 4);
-    ctx.fillStyle = healthColor;
-    ctx.fillRect(barX, barY, barWidth * (health / 100), 4);
+    ctx.fillStyle = "#888888";
+    ctx.font = "11px monospace";
+    ctx.fillText("PISTOL", 20, 76);
   }, [health, ammo, kills, face]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={400}
-      height={300}
+      width={480}
+      height={80}
       style={{
         position: "absolute",
         bottom: 0,
         left: 0,
         width: "100%",
-        height: "auto",
-        maxHeight: "120px",
+        height: "80px",
         imageRendering: "pixelated" as const,
         pointerEvents: "none",
+        zIndex: 10,
       }}
     />
   );
