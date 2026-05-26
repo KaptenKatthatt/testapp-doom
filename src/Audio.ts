@@ -8,8 +8,8 @@ class AudioManager {
   private musicSource: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
-  private musicVolume = 0.5;
-  private sfxVolume = 0.7;
+  private musicVolume = 1.0;
+  private sfxVolume = 0.5;
   private musicPlaying = false;
   private loaded = false;
 
