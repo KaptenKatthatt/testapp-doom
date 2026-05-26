@@ -219,6 +219,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return false;
   }, [walls]);
 
+  // Check if a point hits a door (only when closed)
+  const checkDoorHit = useCallback((x: number, z: number): boolean => {
+    for (const door of doorsRef.current) {
+      const doorBox = getDoorCollisionBox(door);
+      if (!doorBox) continue;
+      if (x >= doorBox.min[0] && x <= doorBox.max[0] && z >= doorBox.min[2] && z <= doorBox.max[2]) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
   // Check if a point hits a wall (for projectiles)
   const checkWallHit = useCallback((x: number, z: number): boolean => {
     for (const wall of walls) {
@@ -226,8 +238,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         return true;
       }
     }
+    if (checkDoorHit(x, z)) return true;
     return false;
-  }, [walls]);
+  }, [walls, checkDoorHit]);
 
   // Check if position collides with any alive enemy
   const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {
@@ -242,7 +255,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return false;
   }, []);
 
-  // Check line of sight between two points (no wall in between)
+  // Check line of sight between two points (no wall or door in between)
   const hasLineOfSight = useCallback((x1: number, z1: number, x2: number, z2: number): boolean => {
     const steps = Math.ceil(Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2) * 2);
     for (let i = 0; i <= steps; i++) {
@@ -254,9 +267,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           return false;
         }
       }
+      if (checkDoorHit(cx, cz)) {
+        return false;
+      }
     }
     return true;
-  }, [walls]);
+  }, [walls, checkDoorHit]);
 
   // Main game loop
   useFrame((_state, delta) => {
