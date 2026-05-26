@@ -11,6 +11,7 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
   const gunGroupRef = useRef<Group>(null);
   const muzzleRef = useRef<Mesh>(null);
   const recoilRef = useRef(0);
+  const prevShootingRef = useRef(false);
 
   useFrame((state) => {
     if (!gunGroupRef.current) return;
@@ -22,57 +23,96 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
 
     const recoil = recoilRef.current;
 
-    // Gun sway
-    const sway = Math.sin(state.clock.getElapsedTime() * 8) * 0.003;
-    const bob = Math.sin(state.clock.getElapsedTime() * 4) * 0.005;
+    // Walking bob - sinusoidal movement like real Doom
+    const time = state.clock.getElapsedTime();
 
+    // Horizontal sway (left-right)
+    const sway = Math.sin(time * 10) * 0.012;
+    // Vertical bob (up-down) - two cycles per step
+    const bob = Math.abs(Math.sin(time * 10)) * 0.02;
+
+    // Trigger recoil
+    if (shooting && !prevShootingRef.current) {
+      recoilRef.current = 0.6;
+    }
+    prevShootingRef.current = shooting;
+
+    // Shotgun position: right side, held lower
     gunGroupRef.current.position.set(
-      0.3 + sway + recoil * 0.05,
-      -0.3 + bob - recoil * 0.08,
-      -0.5 + recoil * 0.15,
+      0.35 + sway + recoil * 0.04,
+      -0.35 + bob - recoil * 0.1,
+      -0.55 + recoil * 0.18,
+    );
+
+    // Slight rotation during walk
+    gunGroupRef.current.rotation.set(
+      -0.05 + recoil * 0.15,
+      0.02 + sway * 0.5,
+      -0.1 + recoil * -0.1,
     );
 
     // Muzzle flash visibility
     if (muzzleRef.current) {
       const timeSinceShot = state.clock.getElapsedTime() - lastShot;
-      muzzleRef.current.visible = timeSinceShot < 0.05;
-    }
-
-    // Trigger recoil
-    if (shooting) {
-      const timeSinceShot = state.clock.getElapsedTime() - lastShot;
-      if (timeSinceShot < 0.05) {
-        recoilRef.current = 0.5;
-      }
+      muzzleRef.current.visible = timeSinceShot < 0.08;
     }
   });
 
   return (
     <>
-      {/* FPS Gun - Pistol */}
+      {/* FPS Shotgun */}
       <group ref={gunGroupRef}>
-        {/* Gun body */}
+        {/* Main receiver/body */}
         <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[0.08, 0.12, 0.25]} />
-          <meshLambertMaterial color={0x333333} />
+          <boxGeometry args={[0.1, 0.1, 0.45]} />
+          <meshLambertMaterial color={0x444444} />
         </mesh>
 
-        {/* Barrel */}
-        <mesh position={[0, 0.03, -0.18]}>
-          <boxGeometry args={[0.04, 0.04, 0.15]} />
+        {/* Barrel - long and thick */}
+        <mesh position={[0, 0.02, -0.35]}>
+          <cylinderGeometry args={[0.025, 0.03, 0.35, 8]} />
           <meshLambertMaterial color={0x222222} />
         </mesh>
 
-        {/* Grip */}
-        <mesh position={[0, -0.08, 0.05]} rotation={[0.2, 0, 0]}>
-          <boxGeometry args={[0.06, 0.15, 0.06]} />
-          <meshLambertMaterial color={0x554433} />
+        {/* Second barrel (over-under style) */}
+        <mesh position={[0, 0.06, -0.35]}>
+          <cylinderGeometry args={[0.02, 0.025, 0.3, 8]} />
+          <meshLambertMaterial color={0x1a1a1a} />
+        </mesh>
+
+        {/* Pump/forend */}
+        <mesh position={[0, -0.02, -0.15]}>
+          <boxGeometry args={[0.07, 0.07, 0.15]} />
+          <meshLambertMaterial color={0x664422} />
+        </mesh>
+
+        {/* Stock/grip */}
+        <mesh position={[0.02, -0.06, 0.2]} rotation={[0.15, 0, 0]}>
+          <boxGeometry args={[0.06, 0.08, 0.25]} />
+          <meshLambertMaterial color={0x553311} />
+        </mesh>
+
+        {/* Trigger guard */}
+        <mesh position={[0, -0.06, 0.02]}>
+          <boxGeometry args={[0.03, 0.04, 0.05]} />
+          <meshLambertMaterial color={0x333333} />
+        </mesh>
+
+        {/* Ejection port */}
+        <mesh position={[0.04, 0.03, 0.05]}>
+          <boxGeometry args={[0.02, 0.03, 0.08]} />
+          <meshLambertMaterial color={0x555555} />
         </mesh>
 
         {/* Muzzle flash */}
-        <mesh ref={muzzleRef} position={[0, 0.03, -0.28]} visible={false}>
-          <sphereGeometry args={[0.04, 8, 8]} />
+        <mesh ref={muzzleRef} position={[0, 0.02, -0.55]} visible={false}>
+          <sphereGeometry args={[0.08, 8, 8]} />
           <meshBasicMaterial color={0xffaa00} transparent opacity={0.9} />
+        </mesh>
+        {/* Flash glow */}
+        <mesh position={[0, 0.02, -0.55]} visible={false}>
+          <sphereGeometry args={[0.15, 8, 8]} />
+          <meshBasicMaterial color={0xff6600} transparent opacity={0.4} />
         </mesh>
       </group>
 
