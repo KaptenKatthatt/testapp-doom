@@ -37,8 +37,8 @@ interface PlayerData {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
-  { id: 0, position: [4, 0, 2], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 1, position: [8, 0, 8], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
+  { id: 0, position: [20, 0, 14], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
+  { id: 1, position: [36, 0, 28], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 2, position: [20, 0, 6], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 3, position: [14, 0, 18], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
   { id: 4, position: [30, 0, 12], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0 },
@@ -310,7 +310,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           const toEnemy = ePos.clone().sub(camera.position).normalize();
           const angle = dir.angleTo(toEnemy);
 
-          const hitRange = Math.max(0.08, 0.3 / (dist / 5));
+          // Shotgun spread: wider at close range, tight at long range
+          // At dist 5: ~25° cone, at dist 30: ~8° cone
+          const hitRange = Math.max(0.12, 0.45 / (dist / 5));
           if (angle < hitRange) {
             const damage = 15 + Math.random() * 10;
             const newHealth = e.health - damage;
