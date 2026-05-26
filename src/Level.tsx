@@ -144,7 +144,7 @@ interface WallMeshData {
 }
 
 function buildWallMeshes(): WallMeshData[] {
-  return WALL_DATA.map((w, i) => ({
+  return WALL_DATA.filter((w) => !w.isDoor).map((w, i) => ({
     key: i,
     position: [w.x + w.w / 2, w.y, w.z + w.d / 2] as [number, number, number],
     scale: [w.w, w.h, w.d] as [number, number, number],
@@ -156,7 +156,7 @@ function buildWallMeshes(): WallMeshData[] {
 const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
 export function getWalls(): WallBox[] {
-  return WALL_DATA.map((w) => ({
+  return WALL_DATA.filter((w) => !w.isDoor).map((w) => ({
     min: [w.x, 0, w.z] as [number, number, number],
     max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
   }));
