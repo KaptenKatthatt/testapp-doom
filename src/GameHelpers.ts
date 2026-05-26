@@ -174,12 +174,12 @@ export function updateEnemyAIHelper(
           const dzLast = e.position[2] - e.lastPosition[2];
           const moved = dxLast * dxLast + dzLast * dzLast;
 
-          if (moved < 0.01) {
-            // Truly stuck — try 8 directions
+          if (moved < 0.05) {
+            // Truly stuck — try 8 directions with smaller steps
             for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as Array<[number, number]>) {
-              const tryX = e.position[0] + mx * eSpeed * dt * 2;
-              const tryZ = e.position[2] + mz * eSpeed * dt * 2;
-              if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.6)) {
+              const tryX = e.position[0] + mx * eSpeed * dt;
+              const tryZ = e.position[2] + mz * eSpeed * dt;
+              if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.5)) {
                 newX = tryX;
                 newZ = tryZ;
                 break;
