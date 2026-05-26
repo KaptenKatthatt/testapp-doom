@@ -10,25 +10,12 @@ interface WeaponsProps {
 
 export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX.Element {
   const gunGroupRef = useRef<Group>(null);
-  const crosshairRef = useRef<Group>(null);
   const muzzleRef = useRef<Mesh>(null);
   const recoilRef = useRef(0);
   const prevShootingRef = useRef(false);
   const { camera } = useThree();
 
   useFrame((state) => {
-    // Attach weapon group to camera so it moves with the player
-    if (gunGroupRef.current) {
-      gunGroupRef.current.position.copy(camera.position);
-      gunGroupRef.current.quaternion.copy(camera.quaternion);
-    }
-
-    // Crosshair also follows camera
-    if (crosshairRef.current) {
-      crosshairRef.current.position.copy(camera.position);
-      crosshairRef.current.quaternion.copy(camera.quaternion);
-    }
-
     // Recoil animation
     if (recoilRef.current > 0) {
       recoilRef.current = Math.max(0, recoilRef.current - 0.15);
@@ -36,39 +23,38 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
 
     const recoil = recoilRef.current;
 
-    // Walking bob - sinusoidal movement like real Doom
+    // Walking bob - sinusoidal like real Doom
     const time = state.clock.getElapsedTime();
-    const sway = Math.sin(time * 10) * 0.008;
-    const bob = Math.abs(Math.sin(time * 10)) * 0.015;
+    const bobFreq = 10;
+    const sway = Math.sin(time * bobFreq) * 0.006;
+    const bob = Math.abs(Math.sin(time * bobFreq)) * 0.01;
 
-    // Trigger recoil on first frame of shooting
+    // Trigger recoil
     if (shooting && !prevShootingRef.current) {
-      recoilRef.current = 0.6;
+      recoilRef.current = 0.5;
     }
     prevShootingRef.current = shooting;
 
-    // Local position offsets (relative to camera)
     const gunGroup = gunGroupRef.current;
     if (gunGroup) {
-      // Apply local offset in camera space
+      // Local offset in camera space
       const offset = new THREE.Vector3(
-        0.25 + sway + recoil * 0.04,
-        -0.25 + bob - recoil * 0.1,
-        -0.5 + recoil * 0.15
+        0.22 + sway,
+        -0.22 + bob - recoil * 0.08,
+        -0.45 + recoil * 0.12,
       );
-      // Rotate offset by camera quaternion to get world-space offset
       offset.applyQuaternion(camera.quaternion);
       gunGroup.position.copy(camera.position).add(offset);
       gunGroup.quaternion.copy(camera.quaternion);
-      gunGroup.rotateX(-0.05 + recoil * 0.15);
-      gunGroup.rotateY(0.02 + sway * 0.5);
-      gunGroup.rotateZ(-0.1 + recoil * -0.1);
+      gunGroup.rotateX(-0.04 + recoil * 0.12);
+      gunGroup.rotateY(0.015 + sway * 0.3);
+      gunGroup.rotateZ(-0.06 + recoil * -0.08);
     }
 
     // Muzzle flash visibility
     if (muzzleRef.current) {
       const timeSinceShot = state.clock.getElapsedTime() - lastShot;
-      muzzleRef.current.visible = timeSinceShot < 0.08;
+      muzzleRef.current.visible = timeSinceShot < 0.07;
     }
   });
 
@@ -76,64 +62,84 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
     <>
       {/* FPS Shotgun - follows camera */}
       <group ref={gunGroupRef}>
-        {/* Main receiver/body */}
+        {/* Main receiver/body - wider box */}
         <mesh>
-          <boxGeometry args={[0.08, 0.08, 0.4]} />
+          <boxGeometry args={[0.07, 0.06, 0.35]} />
           <meshBasicMaterial color={0x555555} />
         </mesh>
 
-        {/* Barrel */}
-        <mesh position={[0, 0.02, -0.3]}>
-          <cylinderGeometry args={[0.02, 0.025, 0.35, 8]} />
+        {/* Barrel - long cylinder pointing forward */}
+        <mesh position={[0, 0.01, -0.28]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.018, 0.022, 0.28, 8]} />
           <meshBasicMaterial color={0x333333} />
         </mesh>
 
-        {/* Second barrel (over-under) */}
-        <mesh position={[0, 0.055, -0.3]}>
-          <cylinderGeometry args={[0.015, 0.02, 0.3, 8]} />
-          <meshBasicMaterial color={0x222222} />
+        {/* Second barrel (over-under style) */}
+        <mesh position={[0, 0.04, -0.25]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.015, 0.018, 0.24, 8]} />
+          <meshBasicMaterial color={0x2a2a2a} />
         </mesh>
 
-        {/* Pump/forend */}
-        <mesh position={[0, -0.02, -0.12]}>
-          <boxGeometry args={[0.06, 0.06, 0.12]} />
-          <meshBasicMaterial color={0x774422} />
-        </mesh>
-
-        {/* Stock/grip */}
-        <mesh position={[0.02, -0.05, 0.18]} rotation={[0.15, 0, 0]}>
-          <boxGeometry args={[0.05, 0.07, 0.22]} />
-          <meshBasicMaterial color={0x663311} />
-        </mesh>
-
-        {/* Trigger guard */}
-        <mesh position={[0, -0.05, 0.02]}>
-          <boxGeometry args={[0.025, 0.03, 0.04]} />
+        {/* Barrel shroud / magazine tube below barrel */}
+        <mesh position={[0, -0.025, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.016, 0.016, 0.2, 8]} />
           <meshBasicMaterial color={0x444444} />
         </mesh>
 
-        {/* Muzzle flash */}
-        <mesh ref={muzzleRef} position={[0, 0.02, -0.5]} visible={false}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshBasicMaterial color={0xffaa00} transparent opacity={0.9} />
+        {/* Pump/forend - wooden grip sliding on barrel */}
+        <mesh position={[0, -0.01, -0.12]}>
+          <boxGeometry args={[0.045, 0.045, 0.1]} />
+          <meshBasicMaterial color={0x8B5A2B} />
         </mesh>
-      </group>
 
-      {/* Crosshair - follows camera, always on top */}
-      <group ref={crosshairRef} renderOrder={999}>
-        <mesh renderOrder={999} position={[0, 0, -2]}>
-          <planeGeometry args={[0.03, 0.12]} />
-          <meshBasicMaterial color={0x00ff00} transparent opacity={0.9} depthTest={false} depthWrite={false} />
+        {/* Stock - wooden stock extending back */}
+        <mesh position={[0, -0.01, 0.15]}>
+          <boxGeometry args={[0.05, 0.055, 0.18]} />
+          <meshBasicMaterial color={0x7A4B2A} />
         </mesh>
-        <mesh renderOrder={999} position={[0, 0, -2]}>
-          <planeGeometry args={[0.12, 0.03]} />
-          <meshBasicMaterial color={0x00ff00} transparent opacity={0.9} depthTest={false} depthWrite={false} />
+
+        {/* Stock butt - wider at end */}
+        <mesh position={[0, -0.01, 0.27]}>
+          <boxGeometry args={[0.05, 0.07, 0.04]} />
+          <meshBasicMaterial color={0x6B3E20} />
         </mesh>
-        {/* Center dot */}
-        <mesh renderOrder={999} position={[0, 0, -2]}>
-          <circleGeometry args={[0.015, 16]} />
-          <meshBasicMaterial color={0xffffff} transparent opacity={0.8} depthTest={false} depthWrite={false} />
+
+        {/* Grip/pistol grip */}
+        <mesh position={[0, -0.05, 0.06]} rotation={[0.2, 0, 0]}>
+          <boxGeometry args={[0.035, 0.06, 0.03]} />
+          <meshBasicMaterial color={0x7A4B2A} />
         </mesh>
+
+        {/* Trigger guard */}
+        <mesh position={[0, -0.04, 0.02]}>
+          <boxGeometry args={[0.02, 0.025, 0.04]} />
+          <meshBasicMaterial color={0x444444} />
+        </mesh>
+
+        {/* Ejection port on top */}
+        <mesh position={[0.02, 0.035, 0.05]}>
+          <boxGeometry args={[0.015, 0.01, 0.05]} />
+          <meshBasicMaterial color={0x666666} />
+        </mesh>
+
+        {/* Barrel end cap / muzzle brake */}
+        <mesh position={[0, 0.025, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.024, 0.024, 0.02, 8]} />
+          <meshBasicMaterial color={0x222222} />
+        </mesh>
+
+        {/* Muzzle flash - bigger and more dramatic */}
+        <group position={[0, 0.025, -0.45]}>
+          <mesh ref={muzzleRef} visible={false}>
+            <sphereGeometry args={[0.06, 8, 8]} />
+            <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
+          </mesh>
+          {/* Flash glow ring */}
+          <mesh visible={false}>
+            <ringGeometry args={[0.03, 0.08, 8]} />
+            <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={2} />
+          </mesh>
+        </group>
       </group>
     </>
   );

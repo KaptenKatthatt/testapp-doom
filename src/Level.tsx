@@ -24,11 +24,15 @@ const WALL_DATA: Array<{
   w: number; h: number; d: number;
   color: number; isDoor?: boolean;
 }> = [
-  // === OUTER WALLS (fully sealed) ===
-  { x: -2, y: 2, z: 0, w: 1, h: 4, d: 48, color: WALL_COLOR },
-  { x: 46, y: 2, z: 0, w: 1, h: 4, d: 48, color: WALL_COLOR },
-  { x: 0, y: 2, z: -2, w: 48, h: 4, d: 1, color: WALL_COLOR },
-  { x: 0, y: 2, z: 46, w: 48, h: 4, d: 1, color: WALL_COLOR },
+  // === OUTER WALLS (fully sealed - overlapping at corners) ===
+  // West wall
+  { x: -2, y: 2, z: -2, w: 1, h: 4, d: 50, color: WALL_COLOR },
+  // East wall
+  { x: 47, y: 2, z: -2, w: 1, h: 4, d: 50, color: WALL_COLOR },
+  // South wall
+  { x: -2, y: 2, z: -2, w: 50, h: 4, d: 1, color: WALL_COLOR },
+  // North wall
+  { x: -2, y: 2, z: 47, w: 50, h: 4, d: 1, color: WALL_COLOR },
 
   // === STARTING ROOM (southwest) ===
   { x: 6, y: 2, z: 0, w: 1, h: 4, d: 16, color: WALL_COLOR2 },
