@@ -183,10 +183,7 @@ test.describe("DOOM - Integration", () => {
 test.describe("DOOM - Mobile Controls", () => {
   test("move and look zones exist after game start", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(BASE_URL);
-    await page.waitForTimeout(300);
-    await page.click("body");
-    await page.waitForTimeout(2000);
+    await startGame(page);
 
     const moveZone = page.locator('[data-testid="move-zone"]');
     const lookZone = page.locator('[data-testid="look-zone"]');
@@ -196,10 +193,7 @@ test.describe("DOOM - Mobile Controls", () => {
 
   test("touch zones have touchAction none", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(BASE_URL);
-    await page.waitForTimeout(300);
-    await page.click("body");
-    await page.waitForTimeout(2000);
+    await startGame(page);
 
     const touchAction = await page.evaluate(() => {
       const moveZone = document.querySelector('[data-testid="move-zone"]') as HTMLElement | null;
@@ -210,17 +204,12 @@ test.describe("DOOM - Mobile Controls", () => {
         look: window.getComputedStyle(lookZone).touchAction,
       };
     });
-    expect(touchAction).not.toBeNull();
-    expect(touchAction!.move).toBe("none");
-    expect(touchAction!.look).toBe("none");
+    expect(touchAction).toEqual({ move: "none", look: "none" });
   });
 
   test("shoot button exists and is accessible", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(BASE_URL);
-    await page.waitForTimeout(300);
-    await page.click("body");
-    await page.waitForTimeout(2000);
+    await startGame(page);
 
     const shootBtn = page.locator('[data-testid="shoot-button"]');
     await expect(shootBtn).toBeAttached();
