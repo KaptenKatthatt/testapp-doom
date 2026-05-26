@@ -23,6 +23,7 @@ interface GameProps {
   readonly onMissionComplete: () => void;
   readonly mobileMoveRef: React.MutableRefObject<[number, number]>;
   readonly mobileLookRef: React.MutableRefObject<number>;
+  readonly mobilePitchRef: React.MutableRefObject<number>;
 }
 
 interface PlayerData {
@@ -90,7 +91,7 @@ const PROJECTILE_COLORS: Record<string, string> = {
   zombieman: "#88ff44",
 };
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
     rotation: Math.PI / 2,
@@ -265,10 +266,17 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       move.add(mobileForward).add(mobileRight);
     }
 
-    // Mobile look input
-    if (Math.abs(mobileLookRef.current) > 0.0001) {
-      player.rotation += mobileLookRef.current;
-      mobileLookRef.current = 0;
+    // Mobile look input (joystick position × speed × dt)
+    const MOBILE_TURN_SPEED = 2.5;
+    const MOBILE_PITCH_SPEED = 1.5;
+    const lookX = mobileLookRef.current;
+    const lookY = mobilePitchRef.current;
+    if (Math.abs(lookX) > 0.05) {
+      player.rotation += lookX * MOBILE_TURN_SPEED * dt;
+    }
+    if (Math.abs(lookY) > 0.05) {
+      player.pitch -= lookY * MOBILE_PITCH_SPEED * dt;
+      player.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, player.pitch));
     }
 
     if (move.length() > 0) {
