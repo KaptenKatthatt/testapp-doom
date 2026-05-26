@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface HUDProps {
   readonly health: number;
@@ -8,15 +8,20 @@ interface HUDProps {
 
 export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const faceImgRef = useRef<HTMLImageElement | null>(null);
+  const [faceImg, setFaceImg] = useState<HTMLImageElement | null>(null);
+  const [fontLoaded, setFontLoaded] = useState(false);
 
-  // Load Doom face image once
+  // Load Doom face image once and listen to font loading
   useEffect(() => {
     const img = new Image();
     img.src = "/doom-face.jpg";
     img.onload = () => {
-      faceImgRef.current = img;
+      setFaceImg(img);
     };
+
+    document.fonts.ready.then(() => {
+      setFontLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -102,7 +107,6 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     ctx.fillRect(faceX - 4 * s, faceY - 4 * s, faceSize + 8 * s, faceSize + 8 * s);
 
     // Draw the actual Doom face image
-    const faceImg = faceImgRef.current;
     if (faceImg) {
       ctx.drawImage(faceImg, faceX, faceY, faceSize, faceSize);
     } else {
@@ -131,7 +135,7 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     ctx.font = doomFont(Math.round(9 * s));
     ctx.fillText("ARMS", killsX, 80 * s);
 
-  }, [health, ammo, kills]);
+  }, [health, ammo, kills, faceImg, fontLoaded]);
 
   return (
     <canvas
