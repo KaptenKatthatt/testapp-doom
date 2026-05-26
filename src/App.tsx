@@ -5,17 +5,19 @@ import HUD from "./HUD";
 import MobileControls from "./MobileControls";
 import type { PlayerState } from "./types";
 
-function formatTime(startTime: number): string {
+function formatTime(startTime: number, endTime: number): string {
   if (!startTime) return "0:00";
-  const elapsed = Math.round(performance.now() / 1000 - startTime);
+  const end = endTime || performance.now() / 1000;
+  const elapsed = Math.round(end - startTime);
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 function calcScore(state: PlayerState): number {
+  const end = state.endTime || performance.now() / 1000;
   const killPoints = state.kills * 100;
-  const timeBonus = Math.max(0, 3000 - Math.round((performance.now() / 1000 - state.startTime) * 10));
+  const timeBonus = Math.max(0, 3000 - Math.round((end - state.startTime) * 10));
   const accuracyBonus = state.shotsFired > 0 ? Math.round((state.kills / state.shotsFired) * 500) : 0;
   const healthBonus = state.health * 5;
   const hitPenalty = state.timesHit * 50;
@@ -31,6 +33,8 @@ export default function App(): React.JSX.Element {
     shotsFired: 0,
     timesHit: 0,
     startTime: 0,
+    endTime: 0,
+    damageFlash: 0,
   });
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
@@ -43,7 +47,7 @@ export default function App(): React.JSX.Element {
     setGameOver(false);
     setMissionComplete(false);
     setGameKey((k) => k + 1);
-    setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000 });
+    setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000, endTime: 0, damageFlash: 0 });
     // Request pointer lock synchronously while still in user gesture context
     document.body.requestPointerLock();
   }, []);
@@ -186,6 +190,20 @@ export default function App(): React.JSX.Element {
         zIndex: 15,
       }} />
 
+      {/* Damage flash - subtle red overlay */}
+      <div style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: "radial-gradient(ellipse at center, transparent 30%, rgba(200,0,0,0.35) 100%)",
+        opacity: playerState.damageFlash,
+        pointerEvents: "none",
+        zIndex: 14,
+        transition: "opacity 0.1s ease-out",
+      }} />
+
       <MobileControls
         onMove={handleMobileMove}
         onLook={handleMobileLook}
@@ -284,7 +302,7 @@ export default function App(): React.JSX.Element {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
               <span style={{ color: "#aa7744" }}>TIME</span>
-              <span style={{ color: "#ffcc00" }}>{formatTime(playerState.startTime)}</span>
+              <span style={{ color: "#ffcc00" }}>{formatTime(playerState.startTime, playerState.endTime)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
               <span style={{ color: "#aa7744" }}>SHOTS FIRED</span>

@@ -37,6 +37,8 @@ interface PlayerData {
   startTime: number;
   shooting: boolean;
   lastShot: number;
+  lastContactDmg: number;
+  damageFlash: number;
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
@@ -100,6 +102,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     startTime: performance.now() / 1000,
     shooting: false,
     lastShot: 0,
+    lastContactDmg: 0,
+    damageFlash: 0,
   });
   const keysRef = useRef<Record<string, boolean>>({});
   const projectilesRef = useRef<ProjectileData[]>([]);
@@ -127,6 +131,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       shotsFired: p.shotsFired,
       timesHit: p.timesHit,
       startTime: p.startTime,
+      endTime: 0,
+      damageFlash: p.damageFlash,
     });
   }, [onPlayerState]);
 
@@ -288,6 +294,33 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     }
     // If hitEnemy, don't move at all (can't walk through monsters)
 
+    // Contact damage: if player is very close to any alive enemy, take damage
+    const contactRadius = 1.0;
+    for (const e of enemiesRef.current) {
+      if (!e.alive) continue;
+      const cdx = player.position.x - e.position[0];
+      const cdz = player.position.z - e.position[2];
+      if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
+        if (now - player.lastContactDmg > 0.5) {
+          player.lastContactDmg = now;
+          player.health = Math.max(0, player.health - 2);
+          player.timesHit++;
+          player.damageFlash = 1;
+          if (player.health <= 0) {
+            gameActiveRef.current = false;
+            onGameOver();
+          }
+        }
+        break;
+      }
+    }
+
+    // Also trigger flash on ranged damage (already applied in setEnemies callback)
+    // Fade damage flash
+    if (player.damageFlash > 0) {
+      player.damageFlash = Math.max(0, player.damageFlash - dt * 3);
+    }
+
     // Camera follow with pitch
     camera.position.set(player.position.x, player.position.y, player.position.z);
     const lookDir = new THREE.Vector3(
@@ -355,6 +388,17 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               if (player.kills >= totalEnemies && !missionCompleteRef.current) {
                 missionCompleteRef.current = true;
                 gameActiveRef.current = false;
+                // Send final state with endTime frozen
+                onPlayerState({
+                  health: Math.round(player.health),
+                  ammo: player.ammo,
+                  kills: player.kills,
+                  shotsFired: player.shotsFired,
+                  timesHit: player.timesHit,
+                  startTime: player.startTime,
+                  endTime: now,
+                  damageFlash: 0,
+                });
                 onMissionComplete();
               }
               return { ...e, health: 0, alive: false, hitFlash: 0 };
@@ -438,6 +482,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       if (tookDamage) {
         player.health = Math.max(0, player.health - damageAmount);
         player.timesHit++;
+        player.damageFlash = 1;
         if (player.health <= 0) {
           gameActiveRef.current = false;
           onGameOver();

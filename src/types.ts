@@ -5,6 +5,8 @@ export interface PlayerState {
   shotsFired: number;
   timesHit: number;
   startTime: number;
+  endTime: number;
+  damageFlash: number;
 }
 
 export interface EnemyData {
