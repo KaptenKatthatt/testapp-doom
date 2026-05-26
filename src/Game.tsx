@@ -509,76 +509,74 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
 
         // Always chase the player - no distance limit
-        {
-          const dx = player.position.x - e.position[0];
-          const dz = player.position.z - e.position[2];
-          const len = Math.sqrt(dx * dx + dz * dz);
-          const ndx = len > 0.01 ? dx / len : 0;
-          const ndz = len > 0.01 ? dz / len : 0;
+        const dx = player.position.x - e.position[0];
+        const dz = player.position.z - e.position[2];
+        const len = Math.sqrt(dx * dx + dz * dz);
+        const ndx = len > 0.01 ? dx / len : 0;
+        const ndz = len > 0.01 ? dz / len : 0;
 
-          // Check line of sight before moving or attacking
-          const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
+        // Check line of sight before moving or attacking
+        const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
 
-          // Alert sound when enemy first sees the player
-          if (canSeePlayer && !e.hasAlerted) {
-            const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
-            audioManager.play(alertSounds[e.type] || 'zombie_alert');
-          }
+        // Alert sound when enemy first sees the player
+        if (canSeePlayer && !e.hasAlerted) {
+          const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
+          audioManager.play(alertSounds[e.type] || 'zombie_alert');
+        }
 
-          if (dist > 1.2) {
-            // Direct movement toward player
-            const proposedX = e.position[0] + ndx * eSpeed * dt;
-            const proposedZ = e.position[2] + ndz * eSpeed * dt;
+        if (dist > 1.2) {
+          // Direct movement toward player
+          const proposedX = e.position[0] + ndx * eSpeed * dt;
+          const proposedZ = e.position[2] + ndz * eSpeed * dt;
 
-            if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
-              // Can move directly toward player
-              newX = proposedX;
-              newZ = proposedZ;
-            } else {
-              // Blocked — try wall sliding (X or Z independently)
-              let movedX = false;
-              let movedZ = false;
-              const slideXPos = e.position[0] + ndx * eSpeed * dt;
-              const slideZPos = e.position[2] + ndz * eSpeed * dt;
+          if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
+            // Can move directly toward player
+            newX = proposedX;
+            newZ = proposedZ;
+          } else {
+            // Blocked — try wall sliding (X or Z independently)
+            let movedX = false;
+            let movedZ = false;
+            const slideXPos = e.position[0] + ndx * eSpeed * dt;
+            const slideZPos = e.position[2] + ndz * eSpeed * dt;
 
-              if (!checkCollision(new THREE.Vector3(slideXPos, 0, e.position[2]), 0.6)) {
-                newX = slideXPos;
-                movedX = true;
-              }
-              if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZPos), 0.6)) {
-                newZ = slideZPos;
-                movedZ = true;
-              }
+            if (!checkCollision(new THREE.Vector3(slideXPos, 0, e.position[2]), 0.6)) {
+              newX = slideXPos;
+              movedX = true;
+            }
+            if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZPos), 0.6)) {
+              newZ = slideZPos;
+              movedZ = true;
+            }
 
-              // If stuck (not moving), try perpendicular or random direction
-              if (!movedX && !movedZ) {
-                // Check if we're truly stuck (not moving)
-                const dx = e.position[0] - e.lastPosition[0];
-                const dz = e.position[2] - e.lastPosition[2];
-                const moved = dx * dx + dz * dz;
+            // If stuck (not moving), try perpendicular or random direction
+            if (!movedX && !movedZ) {
+              // Check if we're truly stuck (not moving)
+              const dx = e.position[0] - e.lastPosition[0];
+              const dz = e.position[2] - e.lastPosition[2];
+              const moved = dx * dx + dz * dz;
 
-                if (moved < 0.01) {
-                  // Truly stuck — try all 8 directions to find any open path
-                  for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as [number,number][]) {
-                    const tryX = e.position[0] + mx * eSpeed * dt * 2;
-                    const tryZ = e.position[2] + mz * eSpeed * dt * 2;
-                    if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.6)) {
-                      newX = tryX;
-                      newZ = tryZ;
-                      break;
-                    }
+              if (moved < 0.01) {
+                // Truly stuck — try all 8 directions to find any open path
+                for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as [number,number][]) {
+                  const tryX = e.position[0] + mx * eSpeed * dt * 2;
+                  const tryZ = e.position[2] + mz * eSpeed * dt * 2;
+                  if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.6)) {
+                    newX = tryX;
+                    newZ = tryZ;
+                    break;
                   }
-                } else {
-                  // Sliding — try perpendicular
-                  const perpX = -ndz * eSpeed * dt;
-                  const perpZ = ndx * eSpeed * dt;
-                  if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
-                    newX = e.position[0] + perpX;
-                    newZ = e.position[2] + perpZ;
-                  } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
-                    newX = e.position[0] - perpX;
-                    newZ = e.position[2] - perpZ;
-                  }
+                }
+              } else {
+                // Sliding — try perpendicular
+                const perpX = -ndz * eSpeed * dt;
+                const perpZ = ndx * eSpeed * dt;
+                if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
+                  newX = e.position[0] + perpX;
+                  newZ = e.position[2] + perpZ;
+                } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
+                  newX = e.position[0] - perpX;
+                  newZ = e.position[2] - perpZ;
                 }
               }
             }
