@@ -14,6 +14,7 @@ export default function App(): React.JSX.Element {
   });
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
+  const [gameKey, setGameKey] = useState(0);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
 
@@ -21,6 +22,7 @@ export default function App(): React.JSX.Element {
     setStarted(true);
     setGameOver(false);
     setMissionComplete(false);
+    setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
   }, []);
 
@@ -29,12 +31,12 @@ export default function App(): React.JSX.Element {
     if (!gameOver && !missionComplete) return;
     const handleRestartKey = (e: KeyboardEvent): void => {
       if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
-        window.location.reload();
+        handleStart();
       }
     };
     window.addEventListener("keydown", handleRestartKey);
     return () => window.removeEventListener("keydown", handleRestartKey);
-  }, [gameOver, missionComplete]);
+  }, [gameOver, missionComplete, handleStart]);
 
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];
@@ -105,6 +107,7 @@ export default function App(): React.JSX.Element {
         <color attach="background" args={["#3d2e1e"]} />
         <fog attach="fog" args={["#3d2e1e", 20, 120]} />
         <Game
+          key={gameKey}
           onPlayerState={setPlayerState}
           onGameOver={(): void => {
             setGameOver(true);
@@ -162,7 +165,7 @@ export default function App(): React.JSX.Element {
             zIndex: 20,
             cursor: "pointer",
           }}
-          onClick={(): void => { window.location.reload(); }}
+          onClick={(): void => { handleStart(); }}
         >
           <h1
             style={{
@@ -199,7 +202,7 @@ export default function App(): React.JSX.Element {
             zIndex: 20,
             cursor: "pointer",
           }}
-          onClick={(): void => { window.location.reload(); }}
+          onClick={(): void => { handleStart(); }}
         >
           <h1
             style={{
