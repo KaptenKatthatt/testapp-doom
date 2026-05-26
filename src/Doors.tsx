@@ -112,7 +112,7 @@ export function getDoorVisual(door: DoorData): {
 }
 
 // Check if a door is open enough to walk through
-export function isDoorPassable(door: DoorData): boolean {
+function isDoorPassable(door: DoorData): boolean {
   return door.state === 'open' || (door.state === 'opening' && door.timer > 0.5);
 }
 

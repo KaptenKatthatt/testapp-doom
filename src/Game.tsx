@@ -9,6 +9,7 @@ import Projectiles from "./Projectiles";
 import { audioManager } from "./Audio";
 import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
 import type { DoorData } from "./Doors";
+import { createDoorTexture } from "./Textures";
 import type {
   PlayerState,
   EnemyData,
@@ -16,9 +17,14 @@ import type {
   WallBox,
   ProjectileData,
 } from "./types";
+import {
+  updateProjectilesHelper,
+  updateEnemyAIHelper,
+  checkSlimeDamageHelper,
+  updatePickupCollectionHelper,
+} from "./GameHelpers";
 
 const COLLISION_MARGIN = 0.4;
-const PROJECTILE_SPEED = 12;
 
 interface GameProps {
   readonly onPlayerState: (state: PlayerState) => void;
@@ -76,29 +82,6 @@ const INITIAL_PICKUPS: PickupData[] = [
   { id: 7, position: [13, 0.3, 33], type: "ammo", active: true },
 ];
 
-const ENEMY_SPEEDS: Record<string, number> = {
-  imp: 3.0,
-  demon: 5.0,
-  zombieman: 2.5,
-};
-
-const ENEMY_ATTACK_RANGES: Record<string, number> = {
-  imp: 8,
-  demon: 2.5,
-  zombieman: 12,
-};
-
-const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
-  imp: 1.5,
-  demon: 0.8,
-  zombieman: 2.5,
-};
-
-const PROJECTILE_COLORS: Record<string, string> = {
-  imp: "#ff6600",
-  demon: "#ff0044",
-  zombieman: "#88ff44",
-};
 
 export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
@@ -124,6 +107,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const missionCompleteRef = useRef(false);
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
+  const pullbackRef = useRef(0);
+  const doorTexture = useMemo(() => createDoorTexture(), []);
   const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
   const enemiesRef = useRef<EnemyData[]>(INITIAL_ENEMIES);
   const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
@@ -475,229 +460,48 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               onMissionComplete();
             }
             const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
-            audioManager.play(deathSounds[e.type] || 'imp_death');
+            audioManager.play(deathSounds[e.type] ?? 'imp_death');
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
           return { ...e, health: newHealth, hitFlash: 1 };
         });
         return updated;
       });
-    }
-
-    // Enemy AI + projectile spawning
-    setEnemies((prev: EnemyData[]): EnemyData[] => {
-      const updated = prev.map((e: EnemyData): EnemyData => {
-        if (!e.alive) {
-          if (e.hitFlash > 0) {
-            return { ...e, hitFlash: Math.max(0, e.hitFlash - dt * 4) };
-          }
-          return e;
-        }
-
-        const eSpeed = ENEMY_SPEEDS[e.type] ?? 1.5;
-        const attackRange = ENEMY_ATTACK_RANGES[e.type] ?? 8;
-        const attackCooldown = ENEMY_ATTACK_COOLDOWNS[e.type] ?? 2;
-
-        const dist = Math.sqrt(
-          (player.position.x - e.position[0]) ** 2 +
-          (player.position.z - e.position[2]) ** 2,
-        );
-
-        let newX = e.position[0];
-        let newZ = e.position[2];
-        let newAttack = e.lastAttack;
-        const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
-
-        // Always chase the player - no distance limit
-        const dx = player.position.x - e.position[0];
-        const dz = player.position.z - e.position[2];
-        const len = Math.sqrt(dx * dx + dz * dz);
-        const ndx = len > 0.01 ? dx / len : 0;
-        const ndz = len > 0.01 ? dz / len : 0;
-
-        // Check line of sight before moving or attacking
-        const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
-
-        // Alert sound when enemy first sees the player
-        if (canSeePlayer && !e.hasAlerted) {
-          const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
-          audioManager.play(alertSounds[e.type] || 'zombie_alert');
-        }
-
-        if (dist > 1.2) {
-          // Direct movement toward player
-          const proposedX = e.position[0] + ndx * eSpeed * dt;
-          const proposedZ = e.position[2] + ndz * eSpeed * dt;
-
-          if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
-            // Can move directly toward player
-            newX = proposedX;
-            newZ = proposedZ;
-          } else {
-            // Blocked — try wall sliding (X or Z independently)
-            let movedX = false;
-            let movedZ = false;
-            const slideXPos = e.position[0] + ndx * eSpeed * dt;
-            const slideZPos = e.position[2] + ndz * eSpeed * dt;
-
-            if (!checkCollision(new THREE.Vector3(slideXPos, 0, e.position[2]), 0.6)) {
-              newX = slideXPos;
-              movedX = true;
-            }
-            if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZPos), 0.6)) {
-              newZ = slideZPos;
-              movedZ = true;
-            }
-
-            // If stuck (not moving), try perpendicular or random direction
-            if (!movedX && !movedZ) {
-              // Check if we're truly stuck (not moving)
-              const dx = e.position[0] - e.lastPosition[0];
-              const dz = e.position[2] - e.lastPosition[2];
-              const moved = dx * dx + dz * dz;
-
-              if (moved < 0.01) {
-                // Truly stuck — try all 8 directions to find any open path
-                for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as [number,number][]) {
-                  const tryX = e.position[0] + mx * eSpeed * dt * 2;
-                  const tryZ = e.position[2] + mz * eSpeed * dt * 2;
-                  if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.6)) {
-                    newX = tryX;
-                    newZ = tryZ;
-                    break;
-                  }
-                }
-              } else {
-                // Sliding — try perpendicular
-                const perpX = -ndz * eSpeed * dt;
-                const perpZ = ndx * eSpeed * dt;
-                if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
-                  newX = e.position[0] + perpX;
-                  newZ = e.position[2] + perpZ;
-                } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
-                  newX = e.position[0] - perpX;
-                  newZ = e.position[2] - perpZ;
-                }
-              }
-            }
-          }
-
-          // Only attack if enemy can see the player
-          if (canSeePlayer && dist < attackRange && now - e.lastAttack > attackCooldown) {
-            newAttack = now;
-
-            // Spawn projectile from enemy toward player (damage applied on hit)
-            const projDir: [number, number, number] = [ndx, 0, ndz];
-            const projPos: [number, number, number] = [e.position[0], 1, e.position[2]];
-            const projColor = PROJECTILE_COLORS[e.type] ?? "#ff6600";
-            const proj: ProjectileData = {
-              id: projectileIdRef.current++,
-              position: projPos,
-              direction: projDir,
-              speed: PROJECTILE_SPEED,
-              fromEnemy: true,
-              color: projColor,
-              life: 2,
-            };
-            projectilesRef.current = [...projectilesRef.current, proj];
-          }
-        }
-
-        return {
-          ...e,
-          position: [newX, 0, newZ] as [number, number, number],
-          lastAttack: newAttack,
-          hitFlash: newHitFlash,
-          rotation: Math.atan2(player.position.x - newX, player.position.z - newZ) + Math.PI,
-          lastPosition: [e.position[0], 0, e.position[2]] as [number, number, number],
-          hasAlerted: e.hasAlerted || canSeePlayer,
-        };
-      });
-
-      return updated;
-    });
+    }    // Enemy AI + projectile spawning
+    const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
+      dt,
+      now,
+      player,
+      enemiesRef.current,
+      checkCollision,
+      hasLineOfSight,
+      projectileIdRef.current
+    );
+    projectileIdRef.current += spawnedProjectiles.length;
+    projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
+    setEnemies(updatedEnemies);
 
     // Update projectiles
-    projectilesRef.current = projectilesRef.current
-      .map((p: ProjectileData): ProjectileData => ({
-        ...p,
-        position: [
-          p.position[0] + p.direction[0] * p.speed * dt,
-          p.position[1] + p.direction[1] * p.speed * dt,
-          p.position[2] + p.direction[2] * p.speed * dt,
-        ] as [number, number, number],
-        life: p.life - dt,
-      }))
-      .filter((p: ProjectileData): boolean => {
-        // Remove if expired
-        if (p.life <= 0) return false;
-        // Remove if hit wall
-        if (checkWallHit(p.position[0], p.position[2])) return false;
-        // Remove if out of bounds
-        if (Math.abs(p.position[0]) > 60 || Math.abs(p.position[2]) > 60) return false;
-
-        // Player projectiles hit first enemy they touch
-        if (!p.fromEnemy) {
-          for (const e of enemiesRef.current) {
-            if (!e.alive) continue;
-            const dx = p.position[0] - e.position[0];
-            const dz = p.position[2] - e.position[2];
-            if (dx * dx + dz * dz < 0.8) {
-              // Bullet hit enemy — remove projectile, damage already applied by raycast
-              return false;
-            }
-          }
-        }
-
-        // Enemy projectiles hit player
-        if (p.fromEnemy) {
-          const dx = p.position[0] - player.position.x;
-          const dz = p.position[2] - player.position.z;
-          if (dx * dx + dz * dz < 0.8) {
-            // Enemy projectile hit player — apply damage
-            player.health = Math.max(0, player.health - 2);
-            player.timesHit++;
-            player.damageFlash = 1;
-            audioManager.play('player_hurt');
-            if (player.health <= 0) {
-              gameActiveRef.current = false;
-              onGameOver();
-              audioManager.play('player_death');
-            }
-            return false; // Remove projectile on player hit
-          }
-        }
-
-        return true;
-      });
-
+    projectilesRef.current = updateProjectilesHelper(
+      dt,
+      projectilesRef.current,
+      player,
+      enemiesRef.current,
+      checkWallHit,
+      onGameOver,
+      (active) => { gameActiveRef.current = active; }
+    );
     setProjectiles([...projectilesRef.current]);
 
     // Pickup collection
-    setPickups((prev: PickupData[]): PickupData[] => {
-      let healthBonus = 0;
-      let ammoBonus = 0;
-      let shotgunPickup = false;
-      const updated = prev.map((p: PickupData): PickupData => {
-        if (!p.active) return p;
-        const dx = player.position.x - p.position[0];
-        const dz = player.position.z - p.position[2];
-        if (dx * dx + dz * dz < 1.5) {
-          if (p.type === "health") healthBonus = 25;
-          else if (p.type === "ammo") ammoBonus = 20;
-          else if (p.type === "shotgun") { ammoBonus = 8; shotgunPickup = true; }
-          return { ...p, active: false };
-        }
-        return p;
-      });
-      if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }
-      if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('shotgun' in audioManager ? 'weapon_pickup' : 'item_pickup'); }
-      if (shotgunPickup) { audioManager.play('weapon_pickup'); }
-      return updated;
-    });
-
-    // Reset use action after processing
-    if (useActionRef) useActionRef.current = false;
+    const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
+      player.position,
+      pickups
+    );
+    setPickups(updatedPickups);
+    if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }
+    if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('shotgun' in audioManager ? 'weapon_pickup' : 'item_pickup'); }
+    if (shotgunPickup) { audioManager.play('weapon_pickup'); }
 
     // Update doors
     const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
@@ -706,24 +510,56 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
     );
 
-    // Nukage/slime damage — 1 damage per second when standing in slime zones
-    const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
-      { x: 12, z: 22, radius: 4 }, // Slime room center
-      { x: 8, z: 18, radius: 3 },  // Slime room west
-      { x: 18, z: 28, radius: 3 },  // Slime room east
-    ];
-    for (const zone of SLIME_ZONES) {
-      const sdx = player.position.x - zone.x;
-      const sdz = player.position.z - zone.z;
-      if (sdx * sdx + sdz * sdz < zone.radius * zone.radius) {
-        player.health = Math.max(0, player.health - dt * 1); // 1 damage per second
-        if (player.health <= 0) {
-          gameActiveRef.current = false;
-          onGameOver();
-          audioManager.play('player_death');
+    // Reset use action after processing
+    if (useActionRef) useActionRef.current = false;
+
+    // Calculate tactical weapon pullback when close to walls/doors
+    const pullbackLookDir = new THREE.Vector3();
+    camera.getWorldDirection(pullbackLookDir);
+    const ray = new THREE.Ray(camera.position, pullbackLookDir);
+    let minDistance = 1.2; // Max distance we care about for pullback
+
+    const boxes: THREE.Box3[] = [];
+    for (const wall of walls) {
+      boxes.push(new THREE.Box3(
+        new THREE.Vector3(wall.min[0], 0, wall.min[2]),
+        new THREE.Vector3(wall.max[0], wall.max[1], wall.max[2])
+      ));
+    }
+    for (const door of doorsRef.current) {
+      const doorBox = getDoorCollisionBox(door);
+      if (doorBox) {
+        boxes.push(new THREE.Box3(
+          new THREE.Vector3(doorBox.min[0], 0, doorBox.min[2]),
+          new THREE.Vector3(doorBox.max[0], doorBox.max[1], doorBox.max[2])
+        ));
+      }
+    }
+
+    for (const box of boxes) {
+      const target = new THREE.Vector3();
+      if (ray.intersectBox(box, target)) {
+        const dist = camera.position.distanceTo(target);
+        if (dist < minDistance) {
+          minDistance = dist;
         }
       }
     }
+
+    const pullbackThreshold = 0.95; // Weapon extends ~0.9 units
+    const pullbackVal = minDistance < pullbackThreshold
+      ? (pullbackThreshold - minDistance) / (pullbackThreshold - 0.4)
+      : 0;
+    pullbackRef.current = Math.max(0, Math.min(1, pullbackVal));
+
+    // Nukage/slime damage — 1 damage per second when standing in slime zones
+    player.health = checkSlimeDamageHelper(
+      dt,
+      player.position,
+      player.health,
+      onGameOver,
+      (active) => { gameActiveRef.current = active; }
+    );
 
     handlePlayerState();
   });
@@ -738,6 +574,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           <mesh key={`door-${door.id}`} position={visual.position}>
             <boxGeometry args={visual.size} />
             <meshLambertMaterial
+              map={doorTexture}
               color={door.isSecret ? 0x553322 : 0xcc7744}
               emissive={door.isSecret ? 0x221100 : 0x664400}
               emissiveIntensity={door.isSecret ? 0.3 : 0.6}
@@ -752,6 +589,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         shooting={playerRef.current.shooting}
         lastShot={playerRef.current.lastShot}
         isMoving={playerRef.current.isMoving}
+        pullbackRef={pullbackRef}
       />
     </>
   );
