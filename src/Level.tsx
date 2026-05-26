@@ -158,6 +158,23 @@ export function getWalls(): WallBox[] {
   }));
 }
 
+export interface BarrelData {
+  position: [number, number, number];
+  radius: number;
+}
+
+export const BARREL_DATA: BarrelData[] = [
+  { position: [1.5, 0.5, 7], radius: 0.4 },
+  { position: [8.5, 0.5, 2], radius: 0.4 },
+  { position: [21, 0.5, 28], radius: 0.4 },
+  { position: [5, 0.5, 30], radius: 0.4 },
+  { position: [14.5, 0.5, 33], radius: 0.35 },
+];
+
+export function getBarrels(): BarrelData[] {
+  return BARREL_DATA;
+}
+
 export default function Level(): React.JSX.Element {
   const textures = useMemo(() => ({
     wall: createWallTexture(),
@@ -293,6 +310,18 @@ export default function Level(): React.JSX.Element {
       </mesh>
       <pointLight position={[16, 3.5, 36]} intensity={3.0} color="#ff0000" distance={8} />
 
+      {/* ═══ EXIT SWITCH ═══ */}
+      {/* Switch Plate */}
+      <mesh position={[16, 1.5, 36.35]}>
+        <boxGeometry args={[0.5, 0.7, 0.1]} />
+        <meshLambertMaterial color={0x555555} />
+      </mesh>
+      {/* Switch Button (Glowing Green) */}
+      <mesh position={[16, 1.5, 36.41]}>
+        <boxGeometry args={[0.2, 0.2, 0.08]} />
+        <meshBasicMaterial color={0x00ff00} />
+      </mesh>
+
       {/* ═══ CROSS in start room ═══ */}
       <mesh position={[1.5, 2.5, 3]}>
         <boxGeometry args={[0.15, 1.0, 0.05]} />
@@ -304,29 +333,12 @@ export default function Level(): React.JSX.Element {
       </mesh>
 
       {/* ═══ BARRELS ═══ */}
-      {/* Start room */}
-      <mesh position={[1.5, 0.5, 7]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      <mesh position={[8.5, 0.5, 2]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      {/* Slime room */}
-      <mesh position={[21, 0.5, 28]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      <mesh position={[5, 0.5, 30]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      {/* North corridor */}
-      <mesh position={[14.5, 0.5, 33]}>
-        <cylinderGeometry args={[0.35, 0.35, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
+      {BARREL_DATA.map((b, i) => (
+        <mesh key={`barrel-${i}`} position={b.position}>
+          <cylinderGeometry args={[b.radius, b.radius, 1, 8]} />
+          <meshLambertMaterial map={textures.barrel} />
+        </mesh>
+      ))}
 
       {/* ═══ BLOOD POOL ═══ */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[20, 0.01, 29]}>

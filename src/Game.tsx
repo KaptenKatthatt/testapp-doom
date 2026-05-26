@@ -1,7 +1,8 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import Level, { getWalls } from "./Level";
+import Level, { getWalls, getBarrels } from "./Level";
+import type { BarrelData } from "./Level";
 import Enemies from "./Enemies";
 import Weapons from "./Weapons";
 import Pickups from "./Pickups";
@@ -57,7 +58,7 @@ interface PlayerData {
 const INITIAL_ENEMIES: EnemyData[] = [
   // L-Corridor zombiemen
   { id: 1, position: [2, 0, 12], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [2, 0, 12] as [number, number, number], hasAlerted: false },
-  { id: 2, position: [10, 0, 16], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 16] as [number, number, number], hasAlerted: false },
+  { id: 2, position: [10.5, 0, 16], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10.5, 0, 16] as [number, number, number], hasAlerted: false },
   // Slime Room imps
   { id: 3, position: [6, 0, 22], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 22] as [number, number, number], hasAlerted: false },
   { id: 4, position: [20, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 26] as [number, number, number], hasAlerted: false },
@@ -121,6 +122,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
   const walls: WallBox[] = useMemo(() => getWalls(), []);
+  const barrels: BarrelData[] = useMemo(() => getBarrels(), []);
 
   const handlePlayerState = useCallback((): void => {
     const p = playerRef.current;
@@ -216,18 +218,49 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         return true;
       }
     }
+    // Also check barrels
+    for (const barrel of barrels) {
+      const dx = pos.x - barrel.position[0];
+      const dz = pos.z - barrel.position[2];
+      const distSq = dx * dx + dz * dz;
+      const minDist = radius + barrel.radius;
+      if (distSq < minDist * minDist) {
+        return true;
+      }
+    }
     return false;
-  }, [walls]);
+  }, [walls, barrels]);
 
-  // Check if a point hits a wall (for projectiles)
+  // Check if a point hits a door (only when closed)
+  const checkDoorHit = useCallback((x: number, z: number): boolean => {
+    for (const door of doorsRef.current) {
+      const doorBox = getDoorCollisionBox(door);
+      if (!doorBox) continue;
+      if (x >= doorBox.min[0] && x <= doorBox.max[0] && z >= doorBox.min[2] && z <= doorBox.max[2]) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  // Check if a point hits a wall or barrel (for projectiles)
   const checkWallHit = useCallback((x: number, z: number): boolean => {
     for (const wall of walls) {
       if (x >= wall.min[0] && x <= wall.max[0] && z >= wall.min[2] && z <= wall.max[2]) {
         return true;
       }
     }
+    if (checkDoorHit(x, z)) return true;
+    // Check barrels
+    for (const barrel of barrels) {
+      const dx = x - barrel.position[0];
+      const dz = z - barrel.position[2];
+      if (dx * dx + dz * dz < barrel.radius * barrel.radius) {
+        return true;
+      }
+    }
     return false;
-  }, [walls]);
+  }, [walls, checkDoorHit, barrels]);
 
   // Check if position collides with any alive enemy
   const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {
@@ -242,7 +275,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return false;
   }, []);
 
-  // Check line of sight between two points (no wall in between)
+  // Check line of sight between two points (no wall or door in between)
   const hasLineOfSight = useCallback((x1: number, z1: number, x2: number, z2: number): boolean => {
     const steps = Math.ceil(Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2) * 2);
     for (let i = 0; i <= steps; i++) {
@@ -254,9 +287,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           return false;
         }
       }
+      if (checkDoorHit(cx, cz)) {
+        return false;
+      }
     }
     return true;
-  }, [walls]);
+  }, [walls, checkDoorHit]);
 
   // Main game loop
   useFrame((_state, delta) => {
@@ -512,6 +548,32 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     setDoors((prev: DoorData[]): DoorData[] =>
       prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
     );
+
+    // Exit Switch interaction
+    const switchX = 16;
+    const switchZ = 36.35;
+    const sdx = player.position.x - switchX;
+    const sdz = player.position.z - switchZ;
+    const distToSwitch = Math.sqrt(sdx * sdx + sdz * sdz);
+    if (useAct && distToSwitch < 2.2) {
+      if (!missionCompleteRef.current) {
+        missionCompleteRef.current = true;
+        gameActiveRef.current = false;
+        player.endTime = now;
+        audioManager.play('switch');
+        onPlayerState({
+          health: Math.round(player.health),
+          ammo: player.ammo,
+          kills: player.kills,
+          shotsFired: player.shotsFired,
+          timesHit: player.timesHit,
+          startTime: player.startTime,
+          endTime: now,
+          damageFlash: 0,
+        });
+        onMissionComplete();
+      }
+    }
 
     // Reset use action after processing
     if (useActionRef) useActionRef.current = false;
