@@ -35,6 +35,7 @@ interface PlayerData {
   shotsFired: number;
   timesHit: number;
   startTime: number;
+  endTime: number;
   shooting: boolean;
   lastShot: number;
   lastContactDmg: number;
@@ -100,6 +101,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     shotsFired: 0,
     timesHit: 0,
     startTime: performance.now() / 1000,
+    endTime: 0,
     shooting: false,
     lastShot: 0,
     lastContactDmg: 0,
@@ -131,7 +133,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       shotsFired: p.shotsFired,
       timesHit: p.timesHit,
       startTime: p.startTime,
-      endTime: 0,
+      endTime: p.endTime,
       damageFlash: p.damageFlash,
     });
   }, [onPlayerState]);
@@ -388,6 +390,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               if (player.kills >= totalEnemies && !missionCompleteRef.current) {
                 missionCompleteRef.current = true;
                 gameActiveRef.current = false;
+                player.endTime = now; // Freeze time
                 // Send final state with endTime frozen
                 onPlayerState({
                   health: Math.round(player.health),

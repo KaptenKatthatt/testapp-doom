@@ -324,7 +324,7 @@ export default function App(): React.JSX.Element {
               handleStart();
             }}
             style={{
-              fontFamily: "monospace",
+              fontFamily: '"DooM", monospace',
               fontSize: "clamp(14px, 2.5vw, 18px)",
               padding: "12px 32px",
               background: "#663300",
@@ -333,6 +333,17 @@ export default function App(): React.JSX.Element {
               cursor: "url(/doom-cursor.png) 16 16, crosshair",
               letterSpacing: "2px",
               marginTop: "8px",
+              transition: "background 0.15s, color 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={(e): void => {
+              e.currentTarget.style.background = "#aa5500";
+              e.currentTarget.style.color = "#ffffff";
+              e.currentTarget.style.borderColor = "#ff8800";
+            }}
+            onMouseLeave={(e): void => {
+              e.currentTarget.style.background = "#663300";
+              e.currentTarget.style.color = "#ffcc00";
+              e.currentTarget.style.borderColor = "#aa5500";
             }}
           >
             RESTART GAME
