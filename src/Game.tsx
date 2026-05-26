@@ -99,6 +99,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const projectilesRef = useRef<ProjectileData[]>([]);
   const projectileIdRef = useRef(0);
   const missionCompleteRef = useRef(false);
+  const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
   const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
@@ -128,6 +129,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     };
     const handleMouseDown = (e: MouseEvent): void => {
       if (e.button === 0) {
+        if (!gameActiveRef.current) return;
         if (!document.pointerLockElement) {
           document.body.requestPointerLock?.();
         }
@@ -317,6 +319,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               const totalEnemies = INITIAL_ENEMIES.length;
               if (player.kills >= totalEnemies && !missionCompleteRef.current) {
                 missionCompleteRef.current = true;
+                gameActiveRef.current = false;
                 onMissionComplete();
               }
               return { ...e, health: 0, alive: false, hitFlash: 0 };
@@ -400,6 +403,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       if (tookDamage) {
         player.health = Math.max(0, player.health - damageAmount);
         if (player.health <= 0) {
+          gameActiveRef.current = false;
           onGameOver();
         }
       }

@@ -162,10 +162,16 @@ export default function App(): React.JSX.Element {
             justifyContent: "center",
             fontFamily: "monospace",
             color: "#fff",
-            zIndex: 20,
+            zIndex: 100,
             cursor: "pointer",
           }}
-          onClick={(): void => { handleStart(); }}
+          onClick={(): void => {
+            document.exitPointerLock();
+            handleStart();
+          }}
+          onMouseDown={(): void => {
+            document.exitPointerLock();
+          }}
         >
           <h1
             style={{
@@ -199,10 +205,16 @@ export default function App(): React.JSX.Element {
             justifyContent: "center",
             fontFamily: "monospace",
             color: "#00ff00",
-            zIndex: 20,
+            zIndex: 100,
             cursor: "pointer",
           }}
-          onClick={(): void => { handleStart(); }}
+          onClick={(): void => {
+            document.exitPointerLock();
+            handleStart();
+          }}
+          onMouseDown={(): void => {
+            document.exitPointerLock();
+          }}
         >
           <h1
             style={{
