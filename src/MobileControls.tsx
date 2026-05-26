@@ -155,6 +155,7 @@ export default function MobileControls({
     background: "rgba(255, 255, 255, 0.08)",
     border: "2px solid rgba(255, 255, 255, 0.35)",
     pointerEvents: "none",
+    overflow: "visible",
   });
 
   const knobStyle = (j: JoystickVisual): React.CSSProperties => ({
@@ -183,7 +184,7 @@ export default function MobileControls({
           left: 0,
           bottom: 0,
           width: "50%",
-          height: "50%",
+          height: "70%",
           zIndex: 15,
           touchAction: "none",
         }}
@@ -208,7 +209,7 @@ export default function MobileControls({
           right: 0,
           bottom: 0,
           width: "50%",
-          height: "50%",
+          height: "70%",
           zIndex: 15,
           touchAction: "none",
         }}
