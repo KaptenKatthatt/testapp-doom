@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { audioManager } from './Audio';
 
 interface AudioMenuProps {
@@ -12,22 +12,6 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
   const [sfxVol, setSfxVol] = useState(audioManager.getSfxVolume());
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close when clicking outside — also notify parent to re-enable shooting
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        onMenuClose?.();
-      }
-    };
-    // Use pointerdown to catch events before the game's mousedown handler
-    document.addEventListener('pointerdown', handler, true);
-    return () => {
-      document.removeEventListener('pointerdown', handler, true);
-    };
-  }, [open, onMenuClose]);
-
   const toggleMenu = () => {
     const next = !open;
     setOpen(next);
@@ -36,6 +20,11 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
     } else {
       onMenuClose?.();
     }
+  };
+
+  const closeMenu = () => {
+    setOpen(false);
+    onMenuClose?.();
   };
 
   const handleMusicChange = (v: number) => {
@@ -53,7 +42,8 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
       {/* Sound button — bottom right corner, above HUD */}
       <button
         onClick={(e) => { e.stopPropagation(); toggleMenu(); }}
-        onTouchStart={(e) => { e.stopPropagation(); }}
+        onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onMouseDown={(e) => { e.stopPropagation(); }}
         style={{
           position: 'fixed',
           bottom: open ? 150 : 60,
@@ -66,7 +56,7 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
           color: '#ccc',
           fontSize: 20,
           cursor: 'pointer',
-          zIndex: 1000,
+          zIndex: 1002,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -79,12 +69,33 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
         🔊
       </button>
 
+      {/* Invisible overlay — catches ALL events when menu is open, prevents shooting */}
+      {open && (
+        <div
+          onClick={(e) => { e.stopPropagation(); closeMenu(); }}
+          onMouseDown={(e) => { e.stopPropagation(); }}
+          onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onPointerDown={(e) => { e.stopPropagation(); }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.1)',
+          }}
+        />
+      )}
+
       {/* Dropdown menu */}
       {open && (
         <div
           ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
           style={{
             position: 'fixed',
             bottom: 60,
@@ -116,6 +127,8 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
               step={0.05}
               value={musicVol}
               onChange={(e) => handleMusicChange(parseFloat(e.target.value))}
+              onTouchStart={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               style={{ width: '100%', accentColor: '#c00' }}
             />
           </div>
@@ -133,6 +146,8 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
               step={0.05}
               value={sfxVol}
               onChange={(e) => handleSfxChange(parseFloat(e.target.value))}
+              onTouchStart={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               style={{ width: '100%', accentColor: '#c00' }}
             />
           </div>
