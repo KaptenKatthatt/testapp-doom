@@ -232,6 +232,10 @@ export default function MobileControls({
           e.preventDefault();
           onShootEnd();
         }}
+        onTouchCancel={(e: React.TouchEvent<HTMLButtonElement>): void => {
+          e.preventDefault();
+          onShootEnd();
+        }}
         style={{
           position: "absolute",
           right: 20,

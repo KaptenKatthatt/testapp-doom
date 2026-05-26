@@ -272,7 +272,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     const lookX = mobileLookRef.current;
     const lookY = mobilePitchRef.current;
     if (Math.abs(lookX) > 0.05) {
-      player.rotation += lookX * MOBILE_TURN_SPEED * dt;
+      player.rotation -= lookX * MOBILE_TURN_SPEED * dt;
     }
     if (Math.abs(lookY) > 0.05) {
       player.pitch -= lookY * MOBILE_PITCH_SPEED * dt;
