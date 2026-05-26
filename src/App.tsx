@@ -155,6 +155,19 @@ export default function App(): React.JSX.Element {
         >
           Tap to start
         </p>
+        <a
+          href="#editor"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            fontSize: "12px",
+            color: "#c00",
+            marginTop: "16px",
+            textDecoration: "none",
+            opacity: 0.7,
+          }}
+        >
+          📐 Level Editor
+        </a>
         <p style={{ fontSize: "12px", color: "#444", marginTop: "10px" }}>
           WASD / Joystick · Mouse / Touch · Click to shoot
         </p>
@@ -164,6 +177,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <div style={{ width: "100vw", height: "100dvh", background: "#000", position: "relative", overflow: "hidden" }}>
+      <a href="#editor" style={{ position: 'fixed', top: 4, left: 4, color: '#666', fontSize: 10, fontFamily: 'monospace', textDecoration: 'none', zIndex: 999, opacity: 0.5 }}>📐 Editor</a>
       <Canvas camera={{ fov: 75, near: 0.1, far: 200 }} gl={{ alpha: false, antialias: true }}>
         <color attach="background" args={["#3d2e1e"]} />
         <fog attach="fog" args={["#3d2e1e", 20, 120]} />
