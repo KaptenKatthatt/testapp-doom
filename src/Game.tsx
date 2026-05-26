@@ -332,10 +332,8 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
       });
 
       if (tookDamage) {
-        player.health = Math.max(0, player.health - damageAmount);
-        if (player.health <= 0) {
-          onGameOver();
-        }
+        // God mode: health never goes below 1, player can't die
+        player.health = Math.max(1, player.health - damageAmount);
       }
 
       return updated;
