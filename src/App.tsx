@@ -155,6 +155,19 @@ export default function App(): React.JSX.Element {
         >
           Tap to start
         </p>
+        <a
+          href="#editor"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            fontSize: "12px",
+            color: "#c00",
+            marginTop: "16px",
+            textDecoration: "none",
+            opacity: 0.7,
+          }}
+        >
+          📐 Level Editor
+        </a>
         <p style={{ fontSize: "12px", color: "#444", marginTop: "10px" }}>
           WASD / Joystick · Mouse / Touch · Click to shoot
         </p>
