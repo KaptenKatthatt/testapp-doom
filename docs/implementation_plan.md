@@ -31,7 +31,20 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Apply the `doorTexture` as a `map` prop to the door `meshLambertMaterial`.
     *   Keep the distinct color tinting (`color={door.isSecret ? 0x553322 : 0xcc7744}`) to maintain standard vs. secret door differentiation while overlaying the high-quality Doom door texture.
 
-### 4. Code Duplication & Export Cleanups (Fallow Errors)
+### 4. HUD starting face & Kills font visibility
+
+*   **Problem**: The character's face in the lower status bar and the custom Doom font for values (like Kills, Health, Ammo) only render after the first action (like shooting), because setting `faceImgRef.current` does not trigger re-render on load, and custom fonts are not ready on initial mount.
+*   **Solution**:
+    *   Change `faceImgRef` to a React state `faceImg`.
+    *   Add a listener for `document.fonts.ready` to trigger a state update when the font loads.
+    *   Include both `faceImg` and `fontLoaded` in the canvas drawing `useEffect` dependency array, so the HUD renders correctly from the start.
+
+### 5. Starting Player Rotation
+
+*   **Problem**: The player starts the game looking directly into a wall instead of facing the room's main door.
+*   **Solution**: Rotate the starting player rotation in `Game.tsx` by 180 degrees (setting `rotation: -Math.PI / 2` instead of `Math.PI / 2`), so they face the door immediately upon start.
+
+### 6. Code Duplication & Export Cleanups (Fallow Errors)
 
 *   **Problem**: `npx fallow` reports errors for:
     1.  Unused files in `e2e/` (cjs files) and `generate-midi.cjs`.
@@ -42,7 +55,7 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Remove the `export` keyword from `isDoorPassable` in `src/Doors.tsx` since it is only used internally in that file.
     *   Extract the duplicate canvas noise generation loops in `src/Textures.tsx` into a reusable `addNoise(ctx, count, maxOpacity)` helper function.
 
-### 5. Code Refactoring (Reducing Large Files & Complexity)
+### 7. Code Refactoring (Reducing Large Files & Complexity)
 
 *   **Problem**: `src/Game.tsx` is very large (758 lines) and contains high cognitive complexity, especially in the `useFrame` main loop.
 *   **Solution**:
