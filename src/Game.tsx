@@ -230,6 +230,22 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return false;
   }, []);
 
+  // Check line of sight between two points (no wall in between)
+  const hasLineOfSight = useCallback((x1: number, z1: number, x2: number, z2: number): boolean => {
+    const steps = Math.ceil(Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2) * 2);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const cx = x1 + (x2 - x1) * t;
+      const cz = z1 + (z2 - z1) * t;
+      for (const wall of walls) {
+        if (cx >= wall.min[0] && cx <= wall.max[0] && cz >= wall.min[2] && cz <= wall.max[2]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [walls]);
+
   // Main game loop
   useFrame((_state, delta) => {
     const player = playerRef.current;
@@ -311,6 +327,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       const cdx = player.position.x - e.position[0];
       const cdz = player.position.z - e.position[2];
       if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
+        // Only damage if no wall between player and enemy
+        if (!hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z)) continue;
         if (now - player.lastContactDmg > 0.5) {
           player.lastContactDmg = now;
           player.health = Math.max(0, player.health - 2);
@@ -455,12 +473,32 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           const ndx = len > 0.01 ? dx / len : 0;
           const ndz = len > 0.01 ? dz / len : 0;
 
-          if (dist > 1.2) {
-            newX += ndx * eSpeed * dt;
-            newZ += ndz * eSpeed * dt;
+          // Check line of sight before moving or attacking
+          const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
+
+          if (dist > 1.2 && canSeePlayer) {
+            const proposedX = e.position[0] + ndx * eSpeed * dt;
+            const proposedZ = e.position[2] + ndz * eSpeed * dt;
+            // Wall collision for enemies
+            if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
+              newX = proposedX;
+              newZ = proposedZ;
+            } else {
+              // Try sliding along X only
+              const slideX = e.position[0] + ndx * eSpeed * dt;
+              if (!checkCollision(new THREE.Vector3(slideX, 0, e.position[2]), 0.6)) {
+                newX = slideX;
+              }
+              // Try sliding along Z only
+              const slideZ = e.position[2] + ndz * eSpeed * dt;
+              if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZ), 0.6)) {
+                newZ = slideZ;
+              }
+            }
           }
 
-          if (dist < attackRange && now - e.lastAttack > attackCooldown) {
+          // Only attack if enemy can see the player
+          if (canSeePlayer && dist < attackRange && now - e.lastAttack > attackCooldown) {
             tookDamage = true;
             damageAmount += 2; // All enemies deal 2 damage per hit
             newAttack = now;
