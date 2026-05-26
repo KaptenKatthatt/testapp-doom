@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
 import MobileControls from "./MobileControls";
+import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
 
 function formatTime(startTime: number, endTime: number): string {
@@ -42,6 +43,7 @@ export default function App(): React.JSX.Element {
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
   const mobilePitchRef = useRef(0);
+  const useActionRef = useRef(false);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -49,6 +51,11 @@ export default function App(): React.JSX.Element {
     setMissionComplete(false);
     setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000, endTime: 0, damageFlash: 0 });
+    // Initialize audio and start music on first user gesture
+    audioManager.init().then(() => {
+      audioManager.resume();
+      audioManager.playMusic();
+    });
     // Request pointer lock synchronously while still in user gesture context
     document.body.requestPointerLock();
   }, []);
@@ -162,6 +169,7 @@ export default function App(): React.JSX.Element {
           onPlayerState={setPlayerState}
           onGameOver={(): void => {
             setGameOver(true);
+            audioManager.stopMusic();
             document.exitPointerLock();
           }}
           onMissionComplete={(): void => {
@@ -171,6 +179,7 @@ export default function App(): React.JSX.Element {
           mobileMoveRef={mobileMoveRef}
           mobileLookRef={mobileLookRef}
           mobilePitchRef={mobilePitchRef}
+          useActionRef={useActionRef}
         />
       </Canvas>
       <HUD
@@ -212,6 +221,7 @@ export default function App(): React.JSX.Element {
         onLook={handleMobileLook}
         onShootStart={handleShootStart}
         onShootEnd={handleShootEnd}
+        onUse={(): void => { useActionRef.current = true; }}
       />
       {gameOver && (
         <div

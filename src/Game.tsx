@@ -6,6 +6,7 @@ import Enemies from "./Enemies";
 import Weapons from "./Weapons";
 import Pickups from "./Pickups";
 import Projectiles from "./Projectiles";
+import { audioManager } from "./Audio";
 import type {
   PlayerState,
   EnemyData,
@@ -24,6 +25,7 @@ interface GameProps {
   readonly mobileMoveRef: React.MutableRefObject<[number, number]>;
   readonly mobileLookRef: React.MutableRefObject<number>;
   readonly mobilePitchRef: React.MutableRefObject<number>;
+  readonly useActionRef: React.MutableRefObject<boolean>;
 }
 
 interface PlayerData {
@@ -92,7 +94,7 @@ const PROJECTILE_COLORS: Record<string, string> = {
   zombieman: "#88ff44",
 };
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
     rotation: Math.PI / 2,
@@ -147,6 +149,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       keysRef.current[e.code] = true;
       if (e.code === "Escape") {
         document.exitPointerLock?.();
+      }
+      if (e.code === "KeyE" && useActionRef) {
+        useActionRef.current = true;
       }
     };
     const handleKeyUp = (e: KeyboardEvent): void => {
@@ -337,9 +342,11 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           player.health = Math.max(0, player.health - 2);
           player.timesHit++;
           player.damageFlash = 1;
+          audioManager.play('player_pain');
           if (player.health <= 0) {
             gameActiveRef.current = false;
             onGameOver();
+            audioManager.play('player_death');
           }
         }
         break;
@@ -368,6 +375,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       player.ammo--;
       player.lastShot = now;
       player.shotsFired++;
+      audioManager.play('shotgun');
       player.shooting = false; // Reset: must click again for next shot
 
       // Spawn player bullet projectile
@@ -446,6 +454,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
             }
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+          audioManager.play(deathSounds[e.type] || 'imp_death');
           return { ...e, health: newHealth, hitFlash: 1 };
         });
         return updated;
@@ -604,9 +614,11 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
             player.health = Math.max(0, player.health - 2);
             player.timesHit++;
             player.damageFlash = 1;
+            audioManager.play('player_hurt');
             if (player.health <= 0) {
               gameActiveRef.current = false;
               onGameOver();
+              audioManager.play('player_death');
             }
             return false; // Remove projectile on player hit
           }
@@ -632,8 +644,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         }
         return p;
       });
-      if (healthBonus > 0) player.health = Math.min(100, player.health + healthBonus);
-      if (ammoBonus > 0) player.ammo += ammoBonus;
+      if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }
+      if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('item_pickup'); }
       return updated;
     });
 

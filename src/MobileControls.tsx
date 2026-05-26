@@ -5,6 +5,7 @@ interface MobileControlsProps {
   readonly onLook: (dx: number, dy: number) => void;
   readonly onShootStart: () => void;
   readonly onShootEnd: () => void;
+  readonly onUse: () => void;
 }
 
 interface JoystickVisual {
@@ -53,6 +54,7 @@ export default function MobileControls({
   onLook,
   onShootStart,
   onShootEnd,
+  onUse,
 }: MobileControlsProps): React.JSX.Element {
   const [isMobile, setIsMobile] = useState(false);
   const [moveJoystick, setMoveJoystick] = useState<JoystickVisual>({
@@ -220,6 +222,47 @@ export default function MobileControls({
           </div>
         )}
       </div>
+
+      {/* Use button (E key) */}
+      <button
+        data-testid="use-button"
+        onTouchStart={(e: React.TouchEvent<HTMLButtonElement>): void => {
+          e.preventDefault();
+          onUse();
+        }}
+        onTouchEnd={(e: React.TouchEvent<HTMLButtonElement>): void => {
+          e.preventDefault();
+        }}
+        onTouchCancel={(e: React.TouchEvent<HTMLButtonElement>): void => {
+          e.preventDefault();
+        }}
+        onClick={(): void => onUse()}
+        style={{
+          position: "absolute",
+          right: 110,
+          bottom: 25,
+          width: 70,
+          height: 70,
+          borderRadius: "50%",
+          background: "rgba(60, 180, 255, 0.5)",
+          border: "3px solid rgba(100, 200, 255, 0.8)",
+          color: "#fff",
+          cursor: "pointer",
+          zIndex: 20,
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          fontSize: 18,
+          fontWeight: "bold",
+          fontFamily: "monospace",
+        }}
+      >
+        USE
+      </button>
 
       {/* Shoot button */}
       <button
