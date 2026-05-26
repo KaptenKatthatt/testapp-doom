@@ -32,6 +32,9 @@ interface PlayerData {
   health: number;
   ammo: number;
   kills: number;
+  shotsFired: number;
+  timesHit: number;
+  startTime: number;
   shooting: boolean;
   lastShot: number;
 }
@@ -92,6 +95,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     health: 100,
     ammo: 50,
     kills: 0,
+    shotsFired: 0,
+    timesHit: 0,
+    startTime: performance.now() / 1000,
     shooting: false,
     lastShot: 0,
   });
@@ -118,6 +124,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       health: Math.round(p.health),
       ammo: p.ammo,
       kills: p.kills,
+      shotsFired: p.shotsFired,
+      timesHit: p.timesHit,
+      startTime: p.startTime,
     });
   }, [onPlayerState]);
 
@@ -294,6 +303,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (player.shooting && now - player.lastShot > 0.25 && player.ammo > 0) {
       player.ammo--;
       player.lastShot = now;
+      player.shotsFired++;
       player.shooting = false; // Reset: must click again for next shot
 
       // Spawn player bullet projectile
@@ -427,6 +437,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
       if (tookDamage) {
         player.health = Math.max(0, player.health - damageAmount);
+        player.timesHit++;
         if (player.health <= 0) {
           gameActiveRef.current = false;
           onGameOver();

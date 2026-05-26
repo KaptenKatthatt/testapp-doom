@@ -5,12 +5,32 @@ import HUD from "./HUD";
 import MobileControls from "./MobileControls";
 import type { PlayerState } from "./types";
 
+function formatTime(startTime: number): string {
+  if (!startTime) return "0:00";
+  const elapsed = Math.round(performance.now() / 1000 - startTime);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function calcScore(state: PlayerState): number {
+  const killPoints = state.kills * 100;
+  const timeBonus = Math.max(0, 3000 - Math.round((performance.now() / 1000 - state.startTime) * 10));
+  const accuracyBonus = state.shotsFired > 0 ? Math.round((state.kills / state.shotsFired) * 500) : 0;
+  const healthBonus = state.health * 5;
+  const hitPenalty = state.timesHit * 50;
+  return Math.max(0, killPoints + timeBonus + accuracyBonus + healthBonus - hitPenalty);
+}
+
 export default function App(): React.JSX.Element {
   const [started, setStarted] = useState(false);
   const [playerState, setPlayerState] = useState<PlayerState>({
     health: 100,
     ammo: 50,
     kills: 0,
+    shotsFired: 0,
+    timesHit: 0,
+    startTime: 0,
   });
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
@@ -23,12 +43,12 @@ export default function App(): React.JSX.Element {
     setGameOver(false);
     setMissionComplete(false);
     setGameKey((k) => k + 1);
-    setPlayerState({ health: 100, ammo: 50, kills: 0 });
+    setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000 });
     // Request pointer lock synchronously while still in user gesture context
     document.body.requestPointerLock();
   }, []);
 
-  // Restart on click/Enter/Space when game over or mission complete
+  // Restart on keyboard/mouse when game over or mission complete
   useEffect(() => {
     const handleRestartKey = (e: KeyboardEvent): void => {
       if (!gameOver && !missionComplete) return;
@@ -38,14 +58,15 @@ export default function App(): React.JSX.Element {
       }
     };
 
-    // Global mousedown: restart game from overlay click
+    // Global mousedown for death screen only (click anywhere to restart)
+    // Mission complete has a dedicated button
     const handleMouseDown = (): void => {
-      if (!gameOver && !missionComplete) return; // Skip if game is running
+      if (!gameOver) return;
       document.exitPointerLock();
-      handleStart(); // This requests pointer lock synchronously
+      handleStart();
     };
 
-    // Also listen for pointerlockchange to force exit
+    // Force exit pointer lock if game is over
     const handlePointerLockChange = (): void => {
       if ((gameOver || missionComplete) && document.pointerLockElement) {
         document.exitPointerLock();
@@ -222,41 +243,82 @@ export default function App(): React.JSX.Element {
             left: 0,
             width: "100%",
             height: "100%",
-            background: "rgba(0,40,0,0.8)",
+            background: "#1a0a00",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             fontFamily: "monospace",
-            color: "#00ff00",
+            color: "#cc8800",
             zIndex: 100,
-            cursor: "pointer",
-          }}
-          onClick={(): void => {
-            document.exitPointerLock();
-            handleStart();
-          }}
-          onMouseDown={(): void => {
-            document.exitPointerLock();
+            cursor: "crosshair",
+            overflow: "hidden",
+            padding: "20px",
+            boxSizing: "border-box",
           }}
         >
-          <h1
-            style={{
-              fontSize: "56px",
-              textShadow: "0 0 30px #0f0",
-            }}
-          >
-            MISSION ACCOMPLISHED
+          <h1 style={{
+            fontSize: "clamp(28px, 5vw, 48px)",
+            color: "#ff6600",
+            textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200",
+            margin: "0 0 20px 0",
+            letterSpacing: "4px",
+          }}>
+            LEVEL COMPLETE
           </h1>
-          <p
+
+          <div style={{
+            border: "2px solid #663300",
+            padding: "20px 40px",
+            background: "rgba(40,20,0,0.9)",
+            margin: "0 0 20px 0",
+            minWidth: "280px",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+              <span style={{ color: "#aa7744" }}>KILLS</span>
+              <span style={{ color: "#ffcc00" }}>{playerState.kills}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+              <span style={{ color: "#aa7744" }}>ITEMS</span>
+              <span style={{ color: "#ffcc00" }}>{playerState.kills * 100}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+              <span style={{ color: "#aa7744" }}>TIME</span>
+              <span style={{ color: "#ffcc00" }}>{formatTime(playerState.startTime)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+              <span style={{ color: "#aa7744" }}>SHOTS FIRED</span>
+              <span style={{ color: "#ffcc00" }}>{playerState.shotsFired}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+              <span style={{ color: "#aa7744" }}>TIMES HIT</span>
+              <span style={{ color: "#ff4400" }}>{playerState.timesHit}</span>
+            </div>
+            <div style={{ borderTop: "1px solid #663300", marginTop: "12px", paddingTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "clamp(16px, 3vw, 22px)" }}>
+              <span style={{ color: "#ff6600" }}>TOTAL SCORE</span>
+              <span style={{ color: "#ffee00", fontWeight: "bold" }}>{calcScore(playerState)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={(): void => {
+              document.exitPointerLock();
+              handleStart();
+            }}
             style={{
-              fontSize: "20px",
-              marginTop: "20px",
-              color: "#88ff88",
+              fontFamily: "monospace",
+              fontSize: "clamp(14px, 2.5vw, 18px)",
+              padding: "12px 32px",
+              background: "#663300",
+              color: "#ffcc00",
+              border: "2px solid #aa5500",
+              cursor: "crosshair",
+              letterSpacing: "2px",
+              marginTop: "8px",
             }}
           >
-            Play again?
-          </p>
+            RESTART GAME
+          </button>
         </div>
       )}
     </div>

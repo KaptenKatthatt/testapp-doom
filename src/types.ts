@@ -2,6 +2,9 @@ export interface PlayerState {
   health: number;
   ammo: number;
   kills: number;
+  shotsFired: number;
+  timesHit: number;
+  startTime: number;
 }
 
 export interface EnemyData {
