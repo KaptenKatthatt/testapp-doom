@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import type { Mesh } from "three";
 import type { ProjectileData } from "./types";
 
 export default function Projectiles({ projectiles }: { readonly projectiles: ProjectileData[] }): React.JSX.Element {
@@ -13,7 +14,7 @@ export default function Projectiles({ projectiles }: { readonly projectiles: Pro
 }
 
 function Projectile({ projectile }: { readonly projectile: ProjectileData }): React.JSX.Element {
-  const meshRef = useRef<import("three").Mesh>(null);
+  const meshRef = useRef<Mesh>(null);
 
   useFrame((_state, delta) => {
     if (!meshRef.current) return;

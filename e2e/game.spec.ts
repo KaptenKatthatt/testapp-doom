@@ -181,6 +181,8 @@ test.describe("DOOM - Integration", () => {
 });
 
 test.describe("DOOM - Mobile Controls", () => {
+  test.use({ hasTouch: true });
+
   test("move and look zones exist after game start", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await startGame(page);

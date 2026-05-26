@@ -218,7 +218,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   }, [walls]);
 
   // Check if position collides with any alive enemy
-  const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius: number = 0.8): boolean => {
+  const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {
     for (const e of currentEnemies) {
       if (!e.alive) continue;
       const dx = pos.x - e.position[0];
