@@ -24,6 +24,8 @@ export default function App(): React.JSX.Element {
     setMissionComplete(false);
     setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
+    // Request pointer lock synchronously while still in user gesture context
+    document.body.requestPointerLock();
   }, []);
 
   // Restart on click/Enter/Space when game over or mission complete
@@ -36,14 +38,11 @@ export default function App(): React.JSX.Element {
       }
     };
 
-    // Global mousedown: exit pointer lock first, then restart on next click
+    // Global mousedown: restart game from overlay click
     const handleMouseDown = (): void => {
       if (!gameOver && !missionComplete) return; // Skip if game is running
-      if (document.pointerLockElement) {
-        document.exitPointerLock();
-      } else {
-        handleStart();
-      }
+      document.exitPointerLock();
+      handleStart(); // This requests pointer lock synchronously
     };
 
     // Also listen for pointerlockchange to force exit
