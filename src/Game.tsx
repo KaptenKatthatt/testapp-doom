@@ -45,17 +45,17 @@ interface PlayerData {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
-  { id: 0, position: [20, 0, 14], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 1, position: [36, 0, 28], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 2, position: [20, 0, 6], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 3, position: [14, 0, 18], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 4, position: [30, 0, 12], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 5, position: [36, 0, 8], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 6, position: [24, 0, 24], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 7, position: [40, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 8, position: [10, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 9, position: [34, 0, 14], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0 },
-  { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0 },
+  { id: 0, position: [20, 0, 14], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 1, position: [36, 0, 28], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 2, position: [20, 0, 6], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 3, position: [14, 0, 18], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 4, position: [30, 0, 12], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 5, position: [36, 0, 8], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 6, position: [24, 0, 24], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 7, position: [40, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 8, position: [10, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 9, position: [34, 0, 14], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
 ];
 
 const INITIAL_PICKUPS: PickupData[] = [
@@ -555,6 +555,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           position: [newX, 0, newZ] as [number, number, number],
           lastAttack: newAttack,
           hitFlash: newHitFlash,
+          rotation: Math.atan2(player.position.x - newX, player.position.z - newZ),
         };
       });
 

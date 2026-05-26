@@ -18,6 +18,7 @@ export interface EnemyData {
   alive: boolean;
   lastAttack: number;
   hitFlash: number;
+  rotation: number;
 }
 
 export type EnemyType = "imp" | "demon" | "zombieman";

@@ -39,7 +39,7 @@ export default function Enemies({ enemies }: { readonly enemies: EnemyData[] }):
 function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const meshRef = useRef<Group>(null);
   const glowRef = useRef<Mesh>(null);
-  const { position, type, hitFlash } = enemy;
+  const { position, type, hitFlash, rotation } = enemy;
   const config = ENEMY_CONFIG[type];
   const isDemon = type === "demon";
   const eyeColor = isDemon ? "#ff0044" : "#ff4400";
@@ -91,7 +91,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   });
 
   return (
-    <group position={[position[0], 0, position[2]]}>
+    <group position={[position[0], 0, position[2]]} rotation={[0, rotation, 0]}>
       <group ref={meshRef} position={[0, config.bodyH / 2, 0]}>
         {/* Body */}
         <mesh>
