@@ -264,25 +264,25 @@ export default function Level(): React.JSX.Element {
         />
       </mesh>
 
-      {/* ═══ ZIGZAG WALKWAY (raised metal platforms over nukage) ═══ */}
+      {/* ═══ ZIGZAG WALKWAY (flat metal paths over nukage) ═══ */}
       {/* Segment 1: entrance from south, heading north */}
-      <mesh position={[10, 0.25, 19]}>
-        <boxGeometry args={[3, 0.5, 3]} />
+      <mesh position={[10, 0.01, 19]}>
+        <boxGeometry args={[3, 0.02, 3]} />
         <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
       </mesh>
       {/* Segment 2: turns east */}
-      <mesh position={[13, 0.25, 20]}>
-        <boxGeometry args={[4, 0.5, 3]} />
+      <mesh position={[13, 0.01, 20]}>
+        <boxGeometry args={[4, 0.02, 3]} />
         <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
       </mesh>
       {/* Segment 3: turns north */}
-      <mesh position={[16, 0.25, 24]}>
-        <boxGeometry args={[3, 0.5, 5]} />
+      <mesh position={[16, 0.01, 24]}>
+        <boxGeometry args={[3, 0.02, 5]} />
         <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
       </mesh>
       {/* Segment 4: approaches north corridor door */}
-      <mesh position={[14, 0.25, 28]}>
-        <boxGeometry args={[5, 0.5, 3]} />
+      <mesh position={[14, 0.01, 28]}>
+        <boxGeometry args={[5, 0.02, 3]} />
         <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
       </mesh>
 
