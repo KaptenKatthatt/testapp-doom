@@ -45,6 +45,7 @@ export default function App(): React.JSX.Element {
   const mobileLookRef = useRef(0);
   const mobilePitchRef = useRef(0);
   const useActionRef = useRef(false);
+  const audioMenuOpenRef = useRef(false);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -106,6 +107,7 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const handleShootStart = useCallback((): void => {
+    if (audioMenuOpenRef.current) return; // Don't shoot while audio menu is open
     window.dispatchEvent(new CustomEvent("game-shoot", { detail: { shooting: true } }));
   }, []);
 
@@ -364,7 +366,10 @@ export default function App(): React.JSX.Element {
           </button>
         </div>
       )}
-      <AudioMenu />
+      <AudioMenu 
+        onMenuOpen={() => { audioMenuOpenRef.current = true; handleShootEnd(); }}
+        onMenuClose={() => { audioMenuOpenRef.current = false; }}
+      />
     </div>
   );
 }
