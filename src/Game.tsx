@@ -513,6 +513,32 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
     );
 
+    // Exit Switch interaction
+    const switchX = 16;
+    const switchZ = 36.35;
+    const sdx = player.position.x - switchX;
+    const sdz = player.position.z - switchZ;
+    const distToSwitch = Math.sqrt(sdx * sdx + sdz * sdz);
+    if (useAct && distToSwitch < 2.2) {
+      if (!missionCompleteRef.current) {
+        missionCompleteRef.current = true;
+        gameActiveRef.current = false;
+        player.endTime = now;
+        audioManager.play('switch');
+        onPlayerState({
+          health: Math.round(player.health),
+          ammo: player.ammo,
+          kills: player.kills,
+          shotsFired: player.shotsFired,
+          timesHit: player.timesHit,
+          startTime: player.startTime,
+          endTime: now,
+          damageFlash: 0,
+        });
+        onMissionComplete();
+      }
+    }
+
     // Reset use action after processing
     if (useActionRef) useActionRef.current = false;
 

@@ -293,6 +293,18 @@ export default function Level(): React.JSX.Element {
       </mesh>
       <pointLight position={[16, 3.5, 36]} intensity={3.0} color="#ff0000" distance={8} />
 
+      {/* ═══ EXIT SWITCH ═══ */}
+      {/* Switch Plate */}
+      <mesh position={[16, 1.5, 36.35]}>
+        <boxGeometry args={[0.5, 0.7, 0.1]} />
+        <meshLambertMaterial color={0x555555} />
+      </mesh>
+      {/* Switch Button (Glowing Green) */}
+      <mesh position={[16, 1.5, 36.41]}>
+        <boxGeometry args={[0.2, 0.2, 0.08]} />
+        <meshBasicMaterial color={0x00ff00} />
+      </mesh>
+
       {/* ═══ CROSS in start room ═══ */}
       <mesh position={[1.5, 2.5, 3]}>
         <boxGeometry args={[0.15, 1.0, 0.05]} />
