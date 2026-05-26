@@ -476,7 +476,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         let newAttack = e.lastAttack;
         const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
 
-        if (dist < 20) {
+        // Always chase the player - no distance limit
+        {
           const dx = player.position.x - e.position[0];
           const dz = player.position.z - e.position[2];
           const len = Math.sqrt(dx * dx + dz * dz);
