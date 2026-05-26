@@ -35,18 +35,18 @@ const WALL_DATA: Array<{
   { x: -2, y: 2, z: 47, w: 50, h: 4, d: 1, color: WALL_COLOR },
 
   // === STARTING ROOM (southwest) ===
-  { x: 6, y: 2, z: 0, w: 1, h: 4, d: 16, color: WALL_COLOR2 },
-  { x: 0, y: 2, z: 8, w: 14, h: 4, d: 1, color: WALL_COLOR2 },
+  { x: 6, y: 2, z: 0, w: 1, h: 4, d: 10, color: WALL_COLOR2 },
+  { x: 0, y: 2, z: 8, w: 10, h: 4, d: 1, color: WALL_COLOR2 },
 
   // Corridor east from start
-  { x: 6, y: 2, z: 16, w: 1, h: 4, d: 6, color: WALL_COLOR2 },
-  { x: 0, y: 2, z: 22, w: 8, h: 4, d: 1, color: WALL_COLOR2 },
+  { x: 6, y: 2, z: 14, w: 1, h: 4, d: 8, color: WALL_COLOR2 },
+  { x: 0, y: 2, z: 22, w: 10, h: 4, d: 1, color: WALL_COLOR2 },
 
   // === CENTRAL ROOM ===
-  { x: 16, y: 2, z: 8, w: 1, h: 4, d: 16, color: WALL_COLOR },
+  { x: 16, y: 2, z: 6, w: 1, h: 4, d: 12, color: WALL_COLOR },
   { x: 16, y: 2, z: 24, w: 12, h: 4, d: 1, color: WALL_COLOR },
   // Door opening
-  { x: 16, y: 2, z: 16, w: 1, h: 4, d: 2, color: DOOR_COLOR, isDoor: true },
+  { x: 16, y: 2, z: 16, w: 1, h: 4, d: 4, color: DOOR_COLOR, isDoor: true },
 
   // Pillars in central room
   { x: 10, y: 2, z: 14, w: 2, h: 4, d: 2, color: METAL_COLOR },
@@ -55,19 +55,19 @@ const WALL_DATA: Array<{
   { x: 14, y: 2, z: 20, w: 2, h: 4, d: 2, color: METAL_COLOR },
 
   // === EAST CORRIDOR ===
-  { x: 24, y: 2, z: 0, w: 1, h: 4, d: 20, color: WALL_COLOR },
+  { x: 24, y: 2, z: 0, w: 1, h: 4, d: 16, color: WALL_COLOR },
   { x: 24, y: 2, z: 24, w: 1, h: 4, d: 22, color: WALL_COLOR },
 
   // === NORTH ROOM ===
-  { x: 16, y: 2, z: 0, w: 1, h: 4, d: 12, color: WALL_COLOR },
-  { x: 16, y: 2, z: 16, w: 8, h: 4, d: 1, color: DOOR_COLOR, isDoor: true },
+  { x: 16, y: 2, z: 0, w: 1, h: 4, d: 10, color: WALL_COLOR },
+  { x: 16, y: 2, z: 16, w: 10, h: 4, d: 1, color: DOOR_COLOR, isDoor: true },
 
   // === SOUTH ROOM ===
   { x: 8, y: 2, z: 32, w: 16, h: 4, d: 1, color: WALL_COLOR },
-  { x: 24, y: 2, z: 28, w: 1, h: 4, d: 12, color: WALL_COLOR },
+  { x: 24, y: 2, z: 28, w: 1, h: 4, d: 10, color: WALL_COLOR },
 
   // === NORTHEAST ROOM ===
-  { x: 32, y: 2, z: 6, w: 1, h: 4, d: 16, color: WALL_COLOR },
+  { x: 32, y: 2, z: 6, w: 1, h: 4, d: 14, color: WALL_COLOR },
   { x: 32, y: 2, z: 24, w: 14, h: 4, d: 1, color: WALL_COLOR },
 
   // === SOUTHEAST ROOM ===
@@ -75,8 +75,8 @@ const WALL_DATA: Array<{
   { x: 38, y: 2, z: 24, w: 1, h: 4, d: 12, color: WALL_COLOR },
 
   // Interior walls for maze feel
-  { x: 36, y: 2, z: 16, w: 8, h: 4, d: 1, color: WALL_COLOR2 },
-  { x: 40, y: 2, z: 10, w: 1, h: 4, d: 14, color: WALL_COLOR2 },
+  { x: 36, y: 2, z: 16, w: 6, h: 4, d: 1, color: WALL_COLOR2 },
+  { x: 40, y: 2, z: 10, w: 1, h: 4, d: 10, color: WALL_COLOR2 },
 
   // Green slime walls
   { x: 28, y: 2, z: 36, w: 8, h: 4, d: 1, color: GREEN_ACCENT },
