@@ -259,10 +259,30 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
     camera.lookAt(lookTarget);
     camera.updateMatrixWorld(true);
 
-    // Shooting
+    // Shooting - player projectiles
     if (player.shooting && now - player.lastShot > 0.25 && player.ammo > 0) {
       player.ammo--;
       player.lastShot = now;
+
+      // Spawn player bullet projectile
+      const camDir = new THREE.Vector3();
+      camera.getWorldDirection(camDir);
+      const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
+      const bulletPos: [number, number, number] = [
+        camera.position.x + camDir.x * 1.5,
+        camera.position.y + camDir.y * 0.5 - 0.1,
+        camera.position.z + camDir.z * 1.5,
+      ];
+      const bullet: ProjectileData = {
+        id: projectileIdRef.current++,
+        position: bulletPos,
+        direction: bulletDir,
+        speed: 40,
+        fromEnemy: false,
+        color: "#ffff44",
+        life: 1.5,
+      };
+      projectilesRef.current = [...projectilesRef.current, bullet];
 
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);

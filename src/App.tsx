@@ -104,7 +104,10 @@ export default function App(): React.JSX.Element {
         <fog attach="fog" args={["#3d2e1e", 20, 120]} />
         <Game
           onPlayerState={setPlayerState}
-          onGameOver={(): void => { setGameOver(true); }}
+          onGameOver={(): void => {
+            setGameOver(true);
+            document.exitPointerLock();
+          }}
           mobileMoveRef={mobileMoveRef}
           mobileLookRef={mobileLookRef}
         />
