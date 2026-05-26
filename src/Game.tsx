@@ -7,6 +7,8 @@ import Weapons from "./Weapons";
 import Pickups from "./Pickups";
 import Projectiles from "./Projectiles";
 import { audioManager } from "./Audio";
+import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
+import type { DoorData } from "./Doors";
 import type {
   PlayerState,
   EnemyData,
@@ -120,11 +122,13 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const { camera } = useThree();
   const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
   const enemiesRef = useRef<EnemyData[]>(INITIAL_ENEMIES);
-  // Keep enemies ref in sync for collision checks in game loop
-  useEffect(() => {
-    enemiesRef.current = enemies;
-  }, [enemies]);
   const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
+  const [doors, setDoors] = useState<DoorData[]>(INITIAL_DOORS);
+  const doorsRef = useRef<DoorData[]>(INITIAL_DOORS);
+  // Keep doors ref in sync for collision checks
+  useEffect(() => {
+    doorsRef.current = doors;
+  }, [doors]);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
   const walls: WallBox[] = useMemo(() => getWalls(), []);
@@ -205,6 +209,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     for (const wall of walls) {
       const closestX = Math.max(wall.min[0], Math.min(pos.x, wall.max[0]));
       const closestZ = Math.max(wall.min[2], Math.min(pos.z, wall.max[2]));
+      const dx = pos.x - closestX;
+      const dz = pos.z - closestZ;
+      if (dx * dx + dz * dz < radius * radius) {
+        return true;
+      }
+    }
+    // Also check closed doors
+    for (const door of doorsRef.current) {
+      const doorBox = getDoorCollisionBox(door);
+      if (!doorBox) continue;
+      const closestX = Math.max(doorBox.min[0], Math.min(pos.x, doorBox.max[0]));
+      const closestZ = Math.max(doorBox.min[2], Math.min(pos.z, doorBox.max[2]));
       const dx = pos.x - closestX;
       const dz = pos.z - closestZ;
       if (dx * dx + dz * dz < radius * radius) {
@@ -652,12 +668,51 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Reset use action after processing
     if (useActionRef) useActionRef.current = false;
 
+    // Update doors
+    const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
+    const useAct = useActionRef ? useActionRef.current : false;
+    setDoors((prev: DoorData[]): DoorData[] =>
+      prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
+    );
+
+    // Nukage/slime damage — 1 damage per second when standing in slime zones
+    const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
+      // Slime zones will be defined in Level, for now placeholder
+      // { x: 20, z: 14, radius: 5 }, // Main slime room
+    ];
+    for (const zone of SLIME_ZONES) {
+      const sdx = player.position.x - zone.x;
+      const sdz = player.position.z - zone.z;
+      if (sdx * sdx + sdz * sdz < zone.radius * zone.radius) {
+        player.health = Math.max(0, player.health - dt * 1); // 1 damage per second
+        if (player.health <= 0) {
+          gameActiveRef.current = false;
+          onGameOver();
+          audioManager.play('player_death');
+        }
+      }
+    }
+
     handlePlayerState();
   });
 
   return (
     <>
       <Level />
+      {/* Doors */}
+      {doors.map((door: DoorData) => {
+        const visual = getDoorVisual(door);
+        return (
+          <mesh key={`door-${door.id}`} position={visual.position}>
+            <boxGeometry args={visual.size} />
+            <meshLambertMaterial
+              color={door.isSecret ? 0x553322 : 0xcc7744}
+              emissive={door.isSecret ? 0x221100 : 0x664400}
+              emissiveIntensity={door.isSecret ? 0.3 : 0.6}
+            />
+          </mesh>
+        );
+      })}
       <Enemies enemies={enemies} />
       <Pickups pickups={pickups} />
       <Projectiles projectiles={projectiles} />
