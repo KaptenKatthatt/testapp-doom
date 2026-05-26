@@ -11,124 +11,92 @@ import {
   createBloodTexture,
 } from "./Textures";
 
-// ============================================================
-// E1M1 "Hangar" — simplified layout for our raycasting engine
-// Coordinate system: X=east, Y=up, Z=north
-// Player starts at approximately (3, 1.7, 4) facing north
-// Map roughly 32 wide (X) × 38 deep (Z)
-// ============================================================
-
-const WH = 4; // Wall height
-const W  = 0xaa9988; // Standard concrete
-const W2 = 0x998877; // Secondary wall tone
-const D  = 0xcc7744; // Door color
-const M  = 0x888899; // Metal
-const G  = 0x55aa55; // Nukage/slime
-const RE = 0xcc2222; // Exit red
-
-// ============================================================
-// Layout (south to north, matching player start at z≈4):
-//
-// START ROOM:      x:0..10,  z:0..10   (player starts here, no enemies)
-// L-CORRIDOR:      x:0..3 z:10..14 north, then x:3..16 z:14..17 east
-// SLIME ROOM:      x:3..22,  z:14..31  (nukage + zigzag walkway)
-// NORTH CORRIDOR:  x:12..15, z:31..34   (short, with door)
-// EXIT ROOM:       x:12..20,  z:34..37  (exit switch)
-//
-// Doors (all require USE button):
-//   Door 1: x:4..7, z:10  (start room → L-corridor)
-//   Door 2: x:9..12, z:17 (L-corridor → slime room)
-//   Door 3: x:12..15, z:31 (slime room → north corridor)
-//   Door 4: x:13..15, z:34 (north corridor → exit room)
-// ============================================================
+// E1M1-inspired level geometry
+const WALL_COLOR = 0xaa9988;
+const WALL_COLOR2 = 0x998877;
+const DOOR_COLOR = 0xcc7744;
+const METAL_COLOR = 0x888899;
+const GREEN_ACCENT = 0x55aa55;
+const DARK_WALL = 0x776655;
 
 const WALL_DATA: Array<{
   x: number; y: number; z: number;
   w: number; h: number; d: number;
-  color: number; isDoor?: boolean; noCollision?: boolean;
+  color: number; isDoor?: boolean;
 }> = [
-  // ═══════════════════════════════════════════════════
-  // OUTER PERIMETER (fully sealed, corners overlap)
-  // ═══════════════════════════════════════════════════
-  { x: -1, y: 2, z: -1, w: 1, h: WH, d: 39, color: W },       // West wall
-  { x: 32, y: 2, z: -1, w: 1, h: WH, d: 39, color: W },       // East wall
-  { x: -1, y: 2, z: -1, w: 34, h: WH, d: 1, color: W },        // South wall
-  // North wall — split around exit room opening (x:12..20)
-  { x: -1, y: 2, z: 37, w: 13, h: WH, d: 1, color: W },       // NW (x:-1..12)
-  { x: 20, y: 2, z: 37, w: 13, h: WH, d: 1, color: W },       // NE (x:20..33)
+  // === OUTER WALLS (fully sealed - overlapping at corners) ===
+  // West wall
+  { x: -2, y: 2, z: -2, w: 1, h: 4, d: 50, color: WALL_COLOR },
+  // East wall
+  { x: 47, y: 2, z: -2, w: 1, h: 4, d: 50, color: WALL_COLOR },
+  // South wall
+  { x: -2, y: 2, z: -2, w: 50, h: 4, d: 1, color: WALL_COLOR },
+  // North wall
+  { x: -2, y: 2, z: 47, w: 50, h: 4, d: 1, color: WALL_COLOR },
 
-  // ═══════════════════════════════════════════════════
-  // START ROOM — x:0..10, z:0..10
-  // Player at ~(3, 1.7, 4), facing north
-  // ═══════════════════════════════════════════════════
-  // East wall (x=10, z:0..10)
-  { x: 10, y: 2, z: 0, w: 1, h: WH, d: 10, color: W2 },
-  // North wall (z=10) — split around Door 1
-  { x: 0, y: 2, z: 10, w: 4, h: WH, d: 1, color: W2 },               // left of door
-  { x: 4, y: 2, z: 10, w: 3, h: WH, d: 1, color: D, isDoor: true },  // DOOR 1
-  { x: 7, y: 2, z: 10, w: 3, h: WH, d: 1, color: W2 },               // right of door
+  // === STARTING ROOM (southwest) ===
+  { x: 6, y: 2, z: 0, w: 1, h: 4, d: 16, color: WALL_COLOR2 },
+  { x: 0, y: 2, z: 8, w: 14, h: 4, d: 1, color: WALL_COLOR2 },
 
-  // ═══════════════════════════════════════════════════
-  // L-CORRIDOR — north leg then east leg
-  // North leg: x:0..3, z:10..14 (3 wide, player walks north)
-  // East leg:  x:3..16, z:14..17 (3 deep, player walks east)
-  // ═══════════════════════════════════════════════════
-  // East wall of north leg (x=3, z:10..14)
-  { x: 3, y: 2, z: 10, w: 1, h: WH, d: 4, color: W2 },
-  // North wall of east leg / south wall of slime room (z=14, x:3..16)
-  // This wall separates the corridor (south) from the slime room (north)
-  { x: 3, y: 2, z: 14, w: 13, h: WH, d: 1, color: W2 },
-  // East wall of east leg (x=16, z:14..17)
-  { x: 16, y: 2, z: 14, w: 1, h: WH, d: 3, color: W2 },
-  // South wall of east leg (z=17) — split for Door 2
-  { x: 3, y: 2, z: 17, w: 6, h: WH, d: 1, color: W2 },               // x:3..9
-  { x: 9, y: 2, z: 17, w: 3, h: WH, d: 1, color: D, isDoor: true },  // DOOR 2
-  { x: 12, y: 2, z: 17, w: 4, h: WH, d: 1, color: W2 },              // x:12..16
+  // Corridor east from start
+  { x: 6, y: 2, z: 16, w: 1, h: 4, d: 6, color: WALL_COLOR2 },
+  { x: 0, y: 2, z: 22, w: 8, h: 4, d: 1, color: WALL_COLOR2 },
 
-  // ═══════════════════════════════════════════════════
-  // SLIME / NUKAGE ROOM — x:3..22, z:14..31 (19×17)
-  // Large room with nukage pool and zigzag walkway
-  // ═══════════════════════════════════════════════════
-  // West wall (x=3, z:17..31) — gap at z:14..17 for corridor
-  { x: 3, y: 2, z: 17, w: 1, h: WH, d: 14, color: W2 },
-  // South wall east extension (z=17, x:16..22) — past corridor east leg
-  { x: 16, y: 2, z: 17, w: 6, h: WH, d: 1, color: W2 },
-  // East wall (x=22, z:14..31)
-  { x: 22, y: 2, z: 14, w: 1, h: WH, d: 17, color: W },
-  // North wall (z=31) — split for Door 3
-  { x: 3, y: 2, z: 31, w: 9, h: WH, d: 1, color: W2 },               // x:3..12
-  { x: 12, y: 2, z: 31, w: 3, h: WH, d: 1, color: D, isDoor: true }, // DOOR 3
-  { x: 15, y: 2, z: 31, w: 7, h: WH, d: 1, color: W },               // x:15..22
-  // Internal partitions for zigzag walkway feel
-  { x: 8, y: 2, z: 20, w: 1, h: WH, d: 7, color: G },
-  { x: 18, y: 2, z: 22, w: 1, h: WH, d: 7, color: G },
+  // === CENTRAL ROOM ===
+  { x: 16, y: 2, z: 8, w: 1, h: 4, d: 16, color: WALL_COLOR },
+  { x: 16, y: 2, z: 24, w: 12, h: 4, d: 1, color: WALL_COLOR },
+  // Door opening
+  { x: 16, y: 2, z: 16, w: 1, h: 4, d: 2, color: DOOR_COLOR, isDoor: true },
 
-  // ═══════════════════════════════════════════════════
-  // NORTH CORRIDOR — x:12..15, z:31..34 (3 wide)
-  // ═══════════════════════════════════════════════════
-  // West wall (x=12, z:31..34)
-  { x: 12, y: 2, z: 31, w: 1, h: WH, d: 3, color: W2 },
-  // East wall (x=15, z:31..34)
-  { x: 15, y: 2, z: 31, w: 1, h: WH, d: 3, color: W2 },
-  // North wall (z=34) — split for Door 4
-  { x: 12, y: 2, z: 34, w: 1, h: WH, d: 1, color: W2 },
-  { x: 13, y: 2, z: 34, w: 2, h: WH, d: 1, color: D, isDoor: true }, // DOOR 4
+  // Pillars in central room
+  { x: 10, y: 2, z: 14, w: 2, h: 4, d: 2, color: METAL_COLOR },
+  { x: 14, y: 2, z: 14, w: 2, h: 4, d: 2, color: METAL_COLOR },
+  { x: 10, y: 2, z: 20, w: 2, h: 4, d: 2, color: METAL_COLOR },
+  { x: 14, y: 2, z: 20, w: 2, h: 4, d: 2, color: METAL_COLOR },
 
-  // ═══════════════════════════════════════════════════
-  // EXIT ROOM — x:12..20, z:34..37
-  // ═══════════════════════════════════════════════════
-  // West wall (x=12, z:34..37)
-  { x: 12, y: 2, z: 34, w: 1, h: WH, d: 3, color: RE },
-  // East wall (x=20, z:34..37)
-  { x: 20, y: 2, z: 34, w: 1, h: WH, d: 3, color: RE },
-  // Red accent wall (interior face of north outer wall)
-  { x: 13, y: 2, z: 36.5, w: 7, h: WH, d: 0.3, color: RE },
+  // === EAST CORRIDOR ===
+  { x: 24, y: 2, z: 0, w: 1, h: 4, d: 20, color: WALL_COLOR },
+  { x: 24, y: 2, z: 24, w: 1, h: 4, d: 22, color: WALL_COLOR },
 
-  // ═══════════════════════════════════════════════════
-  // DECORATIVE / DETAIL
-  // ═══════════════════════════════════════════════════
-  // Alcove in start room SW corner
-  { x: 0, y: 2, z: 8, w: 1.5, h: WH, d: 1, color: W2 },
+  // === NORTH ROOM ===
+  { x: 16, y: 2, z: 0, w: 1, h: 4, d: 12, color: WALL_COLOR },
+  { x: 16, y: 2, z: 16, w: 8, h: 4, d: 1, color: DOOR_COLOR, isDoor: true },
+
+  // === SOUTH ROOM ===
+  { x: 8, y: 2, z: 32, w: 16, h: 4, d: 1, color: WALL_COLOR },
+  { x: 24, y: 2, z: 28, w: 1, h: 4, d: 12, color: WALL_COLOR },
+
+  // === NORTHEAST ROOM ===
+  { x: 32, y: 2, z: 6, w: 1, h: 4, d: 16, color: WALL_COLOR },
+  { x: 32, y: 2, z: 24, w: 14, h: 4, d: 1, color: WALL_COLOR },
+
+  // === SOUTHEAST ROOM ===
+  { x: 32, y: 2, z: 32, w: 14, h: 4, d: 1, color: WALL_COLOR },
+  { x: 38, y: 2, z: 24, w: 1, h: 4, d: 12, color: WALL_COLOR },
+
+  // Interior walls for maze feel
+  { x: 36, y: 2, z: 16, w: 8, h: 4, d: 1, color: WALL_COLOR2 },
+  { x: 40, y: 2, z: 10, w: 1, h: 4, d: 14, color: WALL_COLOR2 },
+
+  // Green slime walls
+  { x: 28, y: 2, z: 36, w: 8, h: 4, d: 1, color: GREEN_ACCENT },
+  { x: 36, y: 2, z: 36, w: 1, h: 4, d: 6, color: GREEN_ACCENT },
+
+  // Steps/ramp
+  { x: 4, y: 1, z: 28, w: 4, h: 2, d: 2, color: METAL_COLOR },
+  { x: 4, y: 0.5, z: 30, w: 4, h: 1, d: 2, color: METAL_COLOR },
+
+  // Small alcove north
+  { x: 20, y: 2, z: 4, w: 1, h: 4, d: 4, color: WALL_COLOR2 },
+
+  // === SECRET ROOM (hidden behind wall) ===
+  { x: 42, y: 2, z: 38, w: 4, h: 4, d: 1, color: DARK_WALL },
+  { x: 42, y: 2, z: 42, w: 1, h: 4, d: 6, color: DARK_WALL },
+  { x: 44, y: 2, z: 42, w: 1, h: 4, d: 4, color: DARK_WALL },
+
+  // More corridors
+  { x: 30, y: 2, z: 28, w: 1, h: 4, d: 6, color: WALL_COLOR },
+  { x: 30, y: 2, z: 22, w: 6, h: 4, d: 1, color: WALL_COLOR },
 ];
 
 interface WallMeshData {
@@ -140,7 +108,7 @@ interface WallMeshData {
 }
 
 function buildWallMeshes(): WallMeshData[] {
-  return WALL_DATA.filter((w) => !w.isDoor).map((w, i) => ({
+  return WALL_DATA.map((w, i) => ({
     key: i,
     position: [w.x + w.w / 2, w.y, w.z + w.d / 2] as [number, number, number],
     scale: [w.w, w.h, w.d] as [number, number, number],
@@ -152,27 +120,10 @@ function buildWallMeshes(): WallMeshData[] {
 const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
 export function getWalls(): WallBox[] {
-  return WALL_DATA.filter((w) => !w.isDoor && !w.noCollision).map((w) => ({
+  return WALL_DATA.map((w) => ({
     min: [w.x, 0, w.z] as [number, number, number],
     max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
   }));
-}
-
-export interface BarrelData {
-  position: [number, number, number];
-  radius: number;
-}
-
-export const BARREL_DATA: BarrelData[] = [
-  { position: [1.5, 0.5, 7], radius: 0.4 },
-  { position: [8.5, 0.5, 2], radius: 0.4 },
-  { position: [21, 0.5, 28], radius: 0.4 },
-  { position: [5, 0.5, 30], radius: 0.4 },
-  { position: [14.5, 0.5, 33], radius: 0.35 },
-];
-
-export function getBarrels(): BarrelData[] {
-  return BARREL_DATA;
 }
 
 export default function Level(): React.JSX.Element {
@@ -189,62 +140,61 @@ export default function Level(): React.JSX.Element {
 
   return (
     <group>
-      {/* ═══ Ambient + hemisphere for base visibility ═══ */}
-      <ambientLight intensity={1.2} color="#ddccaa" />
-      <hemisphereLight args={["#ffeedd", "#443322", 0.6]} />
+      {/* Strong ambient so everything is visible */}
+      <ambientLight intensity={1.5} color="#eeccaa" />
+      <hemisphereLight args={["#ffeedd", "#665544", 0.8]} />
 
-      {/* ═══ Start Room lighting ═══ */}
-      <pointLight position={[5, 3.5, 5]} intensity={5.0} color="#ffaa66" distance={20} />
-      <pointLight position={[5, 3.5, 8]} intensity={3.0} color="#ffcc88" distance={15} />
+      {/* Key point lights for atmosphere - much stronger */}
+      <pointLight position={[3, 3.5, 4]} intensity={6.0} color="#ffaa66" distance={30} />
+      <pointLight position={[8, 3.5, 8]} intensity={5.0} color="#ff9944" distance={25} />
+      <pointLight position={[20, 3.5, 14]} intensity={4.0} color="#ffcc88" distance={30} />
+      <pointLight position={[36, 3.5, 8]} intensity={3.0} color="#ff8844" distance={25} />
+      <pointLight position={[14, 3.5, 26]} intensity={3.0} color="#ffaa66" distance={25} />
+      <pointLight position={[38, 3.5, 28]} intensity={3.0} color="#88ff88" distance={25} />
+      <pointLight position={[4, 3.5, 34]} intensity={2.0} color="#ff6666" distance={20} />
 
-      {/* ═══ L-Corridor lighting ═══ */}
-      <pointLight position={[2, 3.5, 12]} intensity={3.0} color="#ff9944" distance={12} />
-      <pointLight position={[8, 3.5, 15]} intensity={3.0} color="#ffaa55" distance={12} />
+      {/* Ceiling lights - uniform overhead lighting */}
+      <pointLight position={[10, 3.8, 16]} intensity={4.0} color="#ffffff" distance={20} />
+      <pointLight position={[28, 3.8, 16]} intensity={3.0} color="#ffffff" distance={20} />
+      <pointLight position={[40, 3.8, 30]} intensity={3.0} color="#ffffff" distance={20} />
 
-      {/* ═══ Slime Room lighting ═══ */}
-      <pointLight position={[12, 3.5, 24]} intensity={4.0} color="#88ff88" distance={25} />
-      <pointLight position={[18, 3.5, 22]} intensity={3.0} color="#66dd66" distance={20} />
-      <pointLight position={[6, 3.5, 26]} intensity={2.5} color="#ffaa44" distance={15} />
+      {/* Torch lights on walls - brighter */}
+      <pointLight position={[6, 3, 4]} intensity={3.0} color="#ff8833" distance={15} />
+      <pointLight position={[16, 3, 18]} intensity={3.0} color="#ff8833" distance={15} />
+      <pointLight position={[30, 3, 12]} intensity={2.5} color="#ff8833" distance={15} />
+      <pointLight position={[40, 3, 20]} intensity={2.5} color="#88cc88" distance={15} />
 
-      {/* ═══ North Corridor & Exit lighting ═══ */}
-      <pointLight position={[13.5, 3.5, 32.5]} intensity={3.0} color="#ff6666" distance={12} />
-      <pointLight position={[16, 3.5, 35.5]} intensity={4.0} color="#ff4444" distance={10} />
-
-      {/* ═══ Ceiling lights ═══ */}
-      <pointLight position={[5, 3.9, 5]} intensity={2.0} color="#ffffff" distance={12} />
-      <pointLight position={[13, 3.9, 24]} intensity={2.5} color="#ffffff" distance={18} />
-      <pointLight position={[16, 3.9, 35.5]} intensity={2.0} color="#ffffff" distance={8} />
-
-      {/* ═══ FLOOR ═══ */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[16, 0, 18]}>
-        <planeGeometry args={[34, 40]} />
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]}>
+        <planeGeometry args={[50, 50]} />
         <meshLambertMaterial map={textures.floor} color={0x776655} emissive={0x221100} emissiveIntensity={0.2} />
       </mesh>
 
-      {/* ═══ CEILING ═══ */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[16, 4, 18]}>
-        <planeGeometry args={[34, 40]} />
+      {/* Ceiling */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
+        <planeGeometry args={[50, 50]} />
         <meshLambertMaterial map={textures.ceiling} color={0x666655} emissive={0x222211} emissiveIntensity={0.15} />
       </mesh>
 
-      {/* ═══ WALLS ═══ */}
+      {/* Walls */}
       {WALL_MESHES.map((w) => {
-        const isDoor = w.isDoor;
-        const isGreen = w.color === G;
-        const isMetal = w.color === M;
-        const isRedExit = w.color === RE;
+        // Choose texture based on wall type
+        const isGreenSlime = w.color === GREEN_ACCENT;
+        const isMetal = w.color === METAL_COLOR;
+        const isDark = w.color === DARK_WALL;
 
         let wallTexture = textures.wall;
-        if (isDoor) wallTexture = textures.door;
-        else if (isGreen) wallTexture = textures.slime;
+        if (w.isDoor) wallTexture = textures.door;
+        else if (isGreenSlime) wallTexture = textures.slime;
         else if (isMetal) wallTexture = textures.metal;
-        else if (isRedExit) wallTexture = textures.blood;
+        else if (isDark) wallTexture = textures.wall;
 
+        // Adjust repeat based on wall size
         const materialProps: Record<string, unknown> = {
           map: wallTexture,
           color: w.color,
-          emissive: isDoor ? 0x664400 : isGreen ? 0x225522 : isMetal ? 0x222233 : isRedExit ? 0x661111 : 0x333322,
-          emissiveIntensity: isDoor ? 0.6 : isGreen ? 0.4 : isRedExit ? 0.8 : 0.35,
+          emissive: w.isDoor ? 0x664400 : isGreenSlime ? 0x225522 : isMetal ? 0x222233 : isDark ? 0x332211 : 0x333322,
+          emissiveIntensity: w.isDoor ? 0.6 : isGreenSlime ? 0.4 : 0.35,
         };
 
         return (
@@ -255,115 +205,56 @@ export default function Level(): React.JSX.Element {
         );
       })}
 
-      {/* ═══ NUKAGE POOLS ═══ */}
-      {/* Main nukage pool in slime room */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[13, 0.01, 24]}>
-        <planeGeometry args={[10, 7]} />
-        <meshLambertMaterial
-          map={textures.slime}
-          color={0x44aa44}
-          emissive={0x22ff22}
-          emissiveIntensity={0.6}
-          transparent
-          opacity={0.85}
-        />
-      </mesh>
-      {/* Secondary nukage pool */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 29]}>
-        <planeGeometry args={[8, 4]} />
-        <meshLambertMaterial
-          map={textures.slime}
-          color={0x44aa44}
-          emissive={0x22ff22}
-          emissiveIntensity={0.6}
-          transparent
-          opacity={0.85}
-        />
+      {/* Blood pool */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 18]}>
+        <circleGeometry args={[1.5, 16]} />
+        <meshLambertMaterial map={textures.blood} transparent opacity={0.8} />
       </mesh>
 
-      {/* ═══ ZIGZAG WALKWAY (flat metal paths over nukage) ═══ */}
-      {/* Segment 1: entrance from south, heading north */}
-      <mesh position={[10, 0.01, 19]}>
-        <boxGeometry args={[3, 0.02, 3]} />
-        <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
-      </mesh>
-      {/* Segment 2: turns east */}
-      <mesh position={[13, 0.01, 20]}>
-        <boxGeometry args={[4, 0.02, 3]} />
-        <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
-      </mesh>
-      {/* Segment 3: turns north */}
-      <mesh position={[16, 0.01, 24]}>
-        <boxGeometry args={[3, 0.02, 5]} />
-        <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
-      </mesh>
-      {/* Segment 4: approaches north corridor door */}
-      <mesh position={[14, 0.01, 28]}>
-        <boxGeometry args={[5, 0.02, 3]} />
-        <meshLambertMaterial map={textures.metal} color={0x888899} emissive={0x222233} emissiveIntensity={0.3} />
+      {/* Slime pool */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[38, 0.01, 38]}>
+        <circleGeometry args={[2, 16]} />
+        <meshLambertMaterial map={textures.slime} transparent opacity={0.8} />
       </mesh>
 
-      {/* ═══ EXIT SIGN ═══ */}
-      <mesh position={[16, 3.2, 36.5]}>
-        <boxGeometry args={[2, 0.6, 0.15]} />
-        <meshBasicMaterial color={0xff0000} />
-      </mesh>
-      <pointLight position={[16, 3.5, 36]} intensity={3.0} color="#ff0000" distance={8} />
-
-      {/* ═══ EXIT SWITCH ═══ */}
-      {/* Switch Plate */}
-      <mesh position={[16, 1.5, 36.35]}>
-        <boxGeometry args={[0.5, 0.7, 0.1]} />
-        <meshLambertMaterial color={0x555555} />
-      </mesh>
-      {/* Switch Button (Glowing Green) */}
-      <mesh position={[16, 1.5, 36.41]}>
-        <boxGeometry args={[0.2, 0.2, 0.08]} />
-        <meshBasicMaterial color={0x00ff00} />
-      </mesh>
-
-      {/* ═══ CROSS in start room ═══ */}
-      <mesh position={[1.5, 2.5, 3]}>
-        <boxGeometry args={[0.15, 1.0, 0.05]} />
+      {/* Cross in starting room */}
+      <mesh position={[3, 2.5, 4]}>
+        <boxGeometry args={[0.2, 1.2, 0.05]} />
         <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
       </mesh>
-      <mesh position={[1.5, 2.8, 3]}>
-        <boxGeometry args={[0.5, 0.15, 0.05]} />
+      <mesh position={[3, 3, 4]}>
+        <boxGeometry args={[0.6, 0.2, 0.05]} />
         <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
       </mesh>
 
-      {/* ═══ BARRELS ═══ */}
-      {BARREL_DATA.map((b, i) => (
-        <mesh key={`barrel-${i}`} position={b.position}>
-          <cylinderGeometry args={[b.radius, b.radius, 1, 8]} />
-          <meshLambertMaterial map={textures.barrel} />
-        </mesh>
-      ))}
-
-      {/* ═══ BLOOD POOL ═══ */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[20, 0.01, 29]}>
-        <circleGeometry args={[1.2, 16]} />
-        <meshLambertMaterial map={textures.blood} transparent opacity={0.7} />
+      {/* Barrels/crates */}
+      <mesh position={[22, 0.5, 10]}>
+        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+        <meshLambertMaterial map={textures.barrel} />
+      </mesh>
+      <mesh position={[22, 0.5, 12]}>
+        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+        <meshLambertMaterial map={textures.barrel} />
       </mesh>
 
-      {/* ═══ TORCH FLAMES ═══ */}
+      {/* Torch flames - small emissive cubes on walls */}
       {[
-        [1, 3.2, 6] as [number, number, number],
-        [9, 3.2, 3] as [number, number, number],
-        [1.5, 3.2, 12] as [number, number, number],
-        [10, 3.2, 16] as [number, number, number],
-        [4, 3.2, 19] as [number, number, number],
-        [7, 3.2, 26] as [number, number, number],
-        [20, 3.2, 20] as [number, number, number],
-        [20, 3.2, 28] as [number, number, number],
-        [13.5, 3.2, 32.5] as [number, number, number],
+        [6, 3, 4], [16, 3, 18], [30, 3, 12], [40, 3, 20],
+        [3, 3.5, 4], [8, 3.5, 8],
       ].map((pos, i) => (
-        <mesh key={`torch-${i}`} position={pos}>
+        <mesh key={`torch-${i}`} position={pos as [number, number, number]}>
           <boxGeometry args={[0.15, 0.15, 0.15]} />
           <meshBasicMaterial color="#ff6600" />
         </mesh>
       ))}
-
     </group>
   );
+}
+export interface BarrelData {
+  position: [number, number, number];
+  radius: number;
+}
+
+export function getBarrels(): BarrelData[] {
+  return [];
 }

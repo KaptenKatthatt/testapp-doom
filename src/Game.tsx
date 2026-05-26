@@ -56,37 +56,33 @@ interface PlayerData {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
-  // L-Corridor zombiemen
-  { id: 1, position: [2, 0, 12], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [2, 0, 12] as [number, number, number], hasAlerted: false },
-  { id: 2, position: [10.5, 0, 16], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10.5, 0, 16] as [number, number, number], hasAlerted: false },
-  // Slime Room imps
-  { id: 3, position: [6, 0, 22], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 22] as [number, number, number], hasAlerted: false },
-  { id: 4, position: [20, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 26] as [number, number, number], hasAlerted: false },
-  // Extra enemies
-  { id: 5, position: [15, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [15, 0, 20] as [number, number, number], hasAlerted: false },
-  { id: 6, position: [6, 0, 16], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 16] as [number, number, number], hasAlerted: false },
-  // North corridor
-  { id: 7, position: [13, 0, 32], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [13, 0, 32] as [number, number, number], hasAlerted: false },
+  { id: 0, position: [20, 0, 14], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 14] as [number, number, number], hasAlerted: false },
+  { id: 1, position: [36, 0, 28], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [36, 0, 28] as [number, number, number], hasAlerted: false },
+  { id: 2, position: [20, 0, 6], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 6] as [number, number, number], hasAlerted: false },
+  { id: 3, position: [14, 0, 18], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [14, 0, 18] as [number, number, number], hasAlerted: false },
+  { id: 4, position: [30, 0, 12], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [30, 0, 12] as [number, number, number], hasAlerted: false },
+  { id: 5, position: [36, 0, 8], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [36, 0, 8] as [number, number, number], hasAlerted: false },
+  { id: 6, position: [24, 0, 24], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [24, 0, 24] as [number, number, number], hasAlerted: false },
+  { id: 7, position: [40, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [40, 0, 20] as [number, number, number], hasAlerted: false },
+  { id: 8, position: [10, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 26] as [number, number, number], hasAlerted: false },
+  { id: 9, position: [34, 0, 14], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [34, 0, 14] as [number, number, number], hasAlerted: false },
+  { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [18, 0, 34] as [number, number, number], hasAlerted: false },
 ];
 
 const INITIAL_PICKUPS: PickupData[] = [
-  // Start room health pickups (corners)
-  { id: 1, position: [1, 0.3, 1], type: "health", active: true },
-  { id: 2, position: [9, 0.3, 1], type: "health", active: true },
-  // L-Corridor ammo
-  { id: 3, position: [1, 0.3, 12], type: "ammo", active: true },
-  { id: 4, position: [12, 0.3, 16], type: "ammo", active: true },
-  // Slime room pickups
-  { id: 5, position: [10, 0.3, 22], type: "health", active: true },
-  { id: 6, position: [18, 0.3, 28], type: "shotgun", active: true },
-  // North corridor ammo
-  { id: 7, position: [13, 0.3, 33], type: "ammo", active: true },
+  { id: 1, position: [16, 0.3, 10], type: "health", active: true },
+  { id: 2, position: [28, 0.3, 16], type: "ammo", active: true },
+  { id: 3, position: [38, 0.3, 14], type: "health", active: true },
+  { id: 4, position: [6, 0.3, 20], type: "ammo", active: true },
+  { id: 5, position: [32, 0.3, 26], type: "health", active: true },
+  { id: 6, position: [12, 0.3, 30], type: "shotgun", active: true },
+  { id: 7, position: [42, 0.3, 40], type: "ammo", active: true },
 ];
 
 
 export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
-    position: new THREE.Vector3(3, 1.7, 4),
+    position: new THREE.Vector3(2, 1.7, 3),
     rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,

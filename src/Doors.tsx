@@ -17,14 +17,7 @@ export interface DoorData {
 }
 
 export const INITIAL_DOORS: DoorData[] = [
-  // Door 1: Start Room north wall → L-Corridor
-  { id: 1, position: [5.5, 2, 10], size: [3, 4, 1], state: 'closed', timer: 0, autoClose: 4.0, isSecret: false, triggerDistance: 2.5 },
-  // Door 2: L-Corridor east → Slime Room
-  { id: 2, position: [10.5, 2, 17], size: [3, 4, 1], state: 'closed', timer: 0, autoClose: 4.0, isSecret: false, triggerDistance: 2.5 },
-  // Door 3: Slime Room → North Corridor
-  { id: 3, position: [13.5, 2, 31], size: [3, 4, 1], state: 'closed', timer: 0, autoClose: 4.0, isSecret: false, triggerDistance: 2.5 },
-  // Door 4: North Corridor → Exit Room
-  { id: 4, position: [14, 2, 34], size: [3, 4, 1], state: 'closed', timer: 0, autoClose: 4.0, isSecret: false, triggerDistance: 2.5 },
+  // E1M1 doors will be defined when rebuilding the level
 ];
 
 export function updateDoor(door: DoorData, dt: number, playerPos: [number, number, number], useAction: boolean): DoorData {
@@ -112,7 +105,7 @@ export function getDoorVisual(door: DoorData): {
 }
 
 // Check if a door is open enough to walk through
-function isDoorPassable(door: DoorData): boolean {
+export function isDoorPassable(door: DoorData): boolean {
   return door.state === 'open' || (door.state === 'opening' && door.timer > 0.5);
 }
 
