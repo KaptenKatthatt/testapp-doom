@@ -395,49 +395,58 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       raycaster.far = 50;
 
       setEnemies((prev: EnemyData[]): EnemyData[] => {
-        const updated = prev.map((e: EnemyData): EnemyData => {
-          if (!e.alive) return e;
+        // Find the closest enemy in the hit cone — only damage that one
+        let closestEnemy: EnemyData | null = null;
+        let closestDist = Infinity;
+        let closestDamage = 0;
+
+        for (const e of prev) {
+          if (!e.alive) continue;
           const ePos = new THREE.Vector3(e.position[0], 1, e.position[2]);
           const dist = ePos.distanceTo(camera.position);
-          if (dist > 50) return e;
+          if (dist > 50) continue;
 
           const dir = new THREE.Vector3();
           camera.getWorldDirection(dir);
           const toEnemy = ePos.clone().sub(camera.position).normalize();
           const angle = dir.angleTo(toEnemy);
 
-          // Shotgun spread: wider at close range, tight at long range
-          // At dist 5: ~25° cone, at dist 30: ~8° cone
           const hitRange = Math.max(0.12, 0.45 / (dist / 5));
-          if (angle < hitRange) {
-            const damage = 15 + Math.random() * 10;
-            const newHealth = e.health - damage;
-            if (newHealth <= 0) {
-              player.kills++;
-              // Check if all enemies dead
-              const totalEnemies = INITIAL_ENEMIES.length;
-              if (player.kills >= totalEnemies && !missionCompleteRef.current) {
-                missionCompleteRef.current = true;
-                gameActiveRef.current = false;
-                player.endTime = now; // Freeze time
-                // Send final state with endTime frozen
-                onPlayerState({
-                  health: Math.round(player.health),
-                  ammo: player.ammo,
-                  kills: player.kills,
-                  shotsFired: player.shotsFired,
-                  timesHit: player.timesHit,
-                  startTime: player.startTime,
-                  endTime: now,
-                  damageFlash: 0,
-                });
-                onMissionComplete();
-              }
-              return { ...e, health: 0, alive: false, hitFlash: 0 };
-            }
-            return { ...e, health: newHealth, hitFlash: 1 };
+          if (angle < hitRange && dist < closestDist) {
+            // Can't shoot through walls
+            if (!hasLineOfSight(camera.position.x, camera.position.z, e.position[0], e.position[2])) continue;
+            closestDist = dist;
+            closestEnemy = e;
+            closestDamage = 15 + Math.random() * 10;
           }
-          return e;
+        }
+
+        const updated = prev.map((e: EnemyData): EnemyData => {
+          if (!e.alive) return e;
+          if (e !== closestEnemy) return e;
+          const newHealth = e.health - closestDamage;
+          if (newHealth <= 0) {
+            player.kills++;
+            const totalEnemies = INITIAL_ENEMIES.length;
+            if (player.kills >= totalEnemies && !missionCompleteRef.current) {
+              missionCompleteRef.current = true;
+              gameActiveRef.current = false;
+              player.endTime = now;
+              onPlayerState({
+                health: Math.round(player.health),
+                ammo: player.ammo,
+                kills: player.kills,
+                shotsFired: player.shotsFired,
+                timesHit: player.timesHit,
+                startTime: player.startTime,
+                endTime: now,
+                damageFlash: 0,
+              });
+              onMissionComplete();
+            }
+            return { ...e, health: 0, alive: false, hitFlash: 0 };
+          }
+          return { ...e, health: newHealth, hitFlash: 1 };
         });
         return updated;
       });
@@ -562,6 +571,29 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         if (checkWallHit(p.position[0], p.position[2])) return false;
         // Remove if out of bounds
         if (Math.abs(p.position[0]) > 60 || Math.abs(p.position[2]) > 60) return false;
+
+        // Player projectiles hit first enemy they touch
+        if (!p.fromEnemy) {
+          for (const e of enemiesRef.current) {
+            if (!e.alive) continue;
+            const dx = p.position[0] - e.position[0];
+            const dz = p.position[2] - e.position[2];
+            if (dx * dx + dz * dz < 0.8) {
+              // Bullet hit enemy — remove projectile, damage already applied by raycast
+              return false;
+            }
+          }
+        }
+
+        // Enemy projectiles hit player
+        if (p.fromEnemy) {
+          const dx = p.position[0] - player.position.x;
+          const dz = p.position[2] - player.position.z;
+          if (dx * dx + dz * dz < 0.8) {
+            return false; // Remove projectile on player hit
+          }
+        }
+
         return true;
       });
 
