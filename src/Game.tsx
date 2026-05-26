@@ -49,27 +49,31 @@ interface PlayerData {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
-  { id: 0, position: [20, 0, 14], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 1, position: [36, 0, 28], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 2, position: [20, 0, 6], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 3, position: [14, 0, 18], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 4, position: [30, 0, 12], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 5, position: [36, 0, 8], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 6, position: [24, 0, 24], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 7, position: [40, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 8, position: [10, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 9, position: [34, 0, 14], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
-  { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: 0 },
+  // L-Corridor zombiemen
+  { id: 1, position: [2, 0, 12], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [2, 0, 12] as [number, number, number], hasAlerted: false },
+  { id: 2, position: [10, 0, 15], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 15] as [number, number, number], hasAlerted: false },
+  // Slime Room imps
+  { id: 3, position: [8, 0, 22], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [8, 0, 22] as [number, number, number], hasAlerted: false },
+  { id: 4, position: [18, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [18, 0, 26] as [number, number, number], hasAlerted: false },
+  // Extra enemies
+  { id: 5, position: [15, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [15, 0, 20] as [number, number, number], hasAlerted: false },
+  { id: 6, position: [6, 0, 16], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 16] as [number, number, number], hasAlerted: false },
+  // North corridor
+  { id: 7, position: [13, 0, 32], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [13, 0, 32] as [number, number, number], hasAlerted: false },
 ];
 
 const INITIAL_PICKUPS: PickupData[] = [
-  { id: 1, position: [16, 0.3, 10], type: "health", active: true },
-  { id: 2, position: [28, 0.3, 16], type: "ammo", active: true },
-  { id: 3, position: [38, 0.3, 14], type: "health", active: true },
-  { id: 4, position: [6, 0.3, 20], type: "ammo", active: true },
-  { id: 5, position: [32, 0.3, 26], type: "health", active: true },
-  { id: 6, position: [12, 0.3, 30], type: "shotgun", active: true },
-  { id: 7, position: [42, 0.3, 40], type: "ammo", active: true },
+  // Start room health pickups (corners)
+  { id: 1, position: [1, 0.3, 1], type: "health", active: true },
+  { id: 2, position: [9, 0.3, 1], type: "health", active: true },
+  // L-Corridor ammo
+  { id: 3, position: [1, 0.3, 12], type: "ammo", active: true },
+  { id: 4, position: [12, 0.3, 16], type: "ammo", active: true },
+  // Slime room pickups
+  { id: 5, position: [10, 0.3, 22], type: "health", active: true },
+  { id: 6, position: [18, 0.3, 28], type: "shotgun", active: true },
+  // North corridor ammo
+  { id: 7, position: [13, 0.3, 33], type: "ammo", active: true },
 ];
 
 const ENEMY_SPEEDS: Record<string, number> = {
@@ -387,11 +391,13 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     camera.updateMatrixWorld(true);
 
     // Shooting - pump action: one shot per click
-    if (player.shooting && now - player.lastShot > 0.25 && player.ammo > 0) {
+    if (player.shooting && now - player.lastShot > 0.6 && player.ammo > 0) {
       player.ammo--;
       player.lastShot = now;
       player.shotsFired++;
       audioManager.play('shotgun');
+      // Pump sound plays after a short delay (matches Doom pump timing)
+      setTimeout(() => audioManager.play('shotgun_cock'), 300);
       player.shooting = false; // Reset: must click again for next shot
 
       // Spawn player bullet projectile
@@ -513,6 +519,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           // Check line of sight before moving or attacking
           const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
 
+          // Alert sound when enemy first sees the player
+          if (canSeePlayer && !e.hasAlerted) {
+            const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
+            audioManager.play(alertSounds[e.type] || 'zombie_alert');
+          }
+
           if (dist > 1.2) {
             // Direct movement toward player
             const proposedX = e.position[0] + ndx * eSpeed * dt;
@@ -538,19 +550,35 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
                 movedZ = true;
               }
 
-              // If still stuck, try perpendicular directions to navigate around corners
+              // If stuck (not moving), try perpendicular or random direction
               if (!movedX && !movedZ) {
-                // Try sliding along walls perpendicular to desired direction
-                const perpX = -ndz * eSpeed * dt; // Perpendicular to desired direction
-                const perpZ = ndx * eSpeed * dt;
+                // Check if we're truly stuck (not moving)
+                const dx = e.position[0] - e.lastPosition[0];
+                const dz = e.position[2] - e.lastPosition[2];
+                const moved = dx * dx + dz * dz;
 
-                // Try both perpendicular directions
-                if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
-                  newX = e.position[0] + perpX;
-                  newZ = e.position[2] + perpZ;
-                } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
-                  newX = e.position[0] - perpX;
-                  newZ = e.position[2] - perpZ;
+                if (moved < 0.01) {
+                  // Truly stuck — try all 8 directions to find any open path
+                  for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as [number,number][]) {
+                    const tryX = e.position[0] + mx * eSpeed * dt * 2;
+                    const tryZ = e.position[2] + mz * eSpeed * dt * 2;
+                    if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.6)) {
+                      newX = tryX;
+                      newZ = tryZ;
+                      break;
+                    }
+                  }
+                } else {
+                  // Sliding — try perpendicular
+                  const perpX = -ndz * eSpeed * dt;
+                  const perpZ = ndx * eSpeed * dt;
+                  if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
+                    newX = e.position[0] + perpX;
+                    newZ = e.position[2] + perpZ;
+                  } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
+                    newX = e.position[0] - perpX;
+                    newZ = e.position[2] - perpZ;
+                  }
                 }
               }
             }
@@ -571,7 +599,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               speed: PROJECTILE_SPEED,
               fromEnemy: true,
               color: projColor,
-              life: 3,
+              life: 2,
             };
             projectilesRef.current = [...projectilesRef.current, proj];
           }
@@ -582,7 +610,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           position: [newX, 0, newZ] as [number, number, number],
           lastAttack: newAttack,
           hitFlash: newHitFlash,
-          rotation: Math.atan2(player.position.x - newX, player.position.z - newZ),
+          rotation: Math.atan2(player.position.x - newX, player.position.z - newZ) + Math.PI,
+          lastPosition: [e.position[0], 0, e.position[2]] as [number, number, number],
+          hasAlerted: e.hasAlerted || canSeePlayer,
         };
       });
 
@@ -649,6 +679,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     setPickups((prev: PickupData[]): PickupData[] => {
       let healthBonus = 0;
       let ammoBonus = 0;
+      let shotgunPickup = false;
       const updated = prev.map((p: PickupData): PickupData => {
         if (!p.active) return p;
         const dx = player.position.x - p.position[0];
@@ -656,12 +687,14 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         if (dx * dx + dz * dz < 1.5) {
           if (p.type === "health") healthBonus = 25;
           else if (p.type === "ammo") ammoBonus = 20;
+          else if (p.type === "shotgun") { ammoBonus = 8; shotgunPickup = true; }
           return { ...p, active: false };
         }
         return p;
       });
       if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }
-      if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('item_pickup'); }
+      if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('shotgun' in audioManager ? 'weapon_pickup' : 'item_pickup'); }
+      if (shotgunPickup) { audioManager.play('weapon_pickup'); }
       return updated;
     });
 
@@ -677,8 +710,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
     // Nukage/slime damage — 1 damage per second when standing in slime zones
     const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
-      // Slime zones will be defined in Level, for now placeholder
-      // { x: 20, z: 14, radius: 5 }, // Main slime room
+      { x: 12, z: 22, radius: 4 }, // Slime room center
+      { x: 8, z: 18, radius: 3 },  // Slime room west
+      { x: 18, z: 28, radius: 3 },  // Slime room east
     ];
     for (const zone of SLIME_ZONES) {
       const sdx = player.position.x - zone.x;

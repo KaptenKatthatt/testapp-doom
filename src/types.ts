@@ -19,6 +19,9 @@ export interface EnemyData {
   lastAttack: number;
   hitFlash: number;
   rotation: number;
+  stuckCounter: number;
+  lastPosition: [number, number, number];
+  hasAlerted: boolean;
 }
 
 export type EnemyType = "imp" | "demon" | "zombieman";
