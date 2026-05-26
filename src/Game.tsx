@@ -27,6 +27,7 @@ interface GameProps {
 interface PlayerData {
   position: THREE.Vector3;
   rotation: number;
+  pitch: number;
   health: number;
   ammo: number;
   kills: number;
@@ -86,6 +87,7 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
     rotation: Math.PI / 2,
+    pitch: 0,
     health: 100,
     ammo: 50,
     kills: 0,
@@ -138,6 +140,8 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
     const handleMouseMove = (e: MouseEvent): void => {
       if (document.pointerLockElement) {
         playerRef.current.rotation -= e.movementX * 0.002;
+        playerRef.current.pitch -= e.movementY * 0.002;
+        playerRef.current.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, playerRef.current.pitch));
       }
     };
 
@@ -249,13 +253,14 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
       }
     }
 
-    // Camera follow
+    // Camera follow with pitch
     camera.position.set(player.position.x, player.position.y, player.position.z);
-    const lookTarget = new THREE.Vector3(
-      player.position.x - Math.sin(player.rotation) * 10,
-      player.position.y,
-      player.position.z - Math.cos(player.rotation) * 10,
+    const lookDir = new THREE.Vector3(
+      -Math.sin(player.rotation) * Math.cos(player.pitch),
+      Math.sin(player.pitch),
+      -Math.cos(player.rotation) * Math.cos(player.pitch),
     );
+    const lookTarget = camera.position.clone().add(lookDir.multiplyScalar(10));
     camera.lookAt(lookTarget);
     camera.updateMatrixWorld(true);
 
