@@ -190,8 +190,8 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
 
     if (keys["KeyW"] ?? false) move.add(forward);
     if (keys["KeyS"] ?? false) move.sub(forward);
-    if (keys["KeyA"] ?? false) move.add(right);
-    if (keys["KeyD"] ?? false) move.sub(right);
+    if (keys["KeyA"] ?? false) move.sub(right);
+    if (keys["KeyD"] ?? false) move.add(right);
 
     // Mobile joystick input
     const [moveX, moveY] = mobileMoveRef.current;
