@@ -26,16 +26,48 @@ export default function App(): React.JSX.Element {
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
   }, []);
 
-  // Restart on click/Enter/Space when game over
+  // Restart on click/Enter/Space when game over or mission complete
   useEffect(() => {
     if (!gameOver && !missionComplete) return;
+
     const handleRestartKey = (e: KeyboardEvent): void => {
       if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+        document.exitPointerLock();
         handleStart();
       }
     };
+
+    // Global mousedown: exit pointer lock first, then restart on next click
+    let clickCount = 0;
+    const handleMouseDown = (): void => {
+      if (document.pointerLockElement) {
+        // First click: exit pointer lock
+        document.exitPointerLock();
+        clickCount = 0;
+      } else {
+        // Second click (pointer already free): restart
+        clickCount++;
+        if (clickCount >= 1) {
+          handleStart();
+        }
+      }
+    };
+
+    // Also listen for pointerlockchange to force exit
+    const handlePointerLockChange = (): void => {
+      if ((gameOver || missionComplete) && document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    };
+
     window.addEventListener("keydown", handleRestartKey);
-    return () => window.removeEventListener("keydown", handleRestartKey);
+    window.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    return () => {
+      window.removeEventListener("keydown", handleRestartKey);
+      window.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("pointerlockchange", handlePointerLockChange);
+    };
   }, [gameOver, missionComplete, handleStart]);
 
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
