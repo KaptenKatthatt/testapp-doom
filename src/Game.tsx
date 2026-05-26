@@ -452,10 +452,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
               });
               onMissionComplete();
             }
+            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+            audioManager.play(deathSounds[e.type] || 'imp_death');
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
-          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
-          audioManager.play(deathSounds[e.type] || 'imp_death');
           return { ...e, health: newHealth, hitFlash: 1 };
         });
         return updated;
@@ -648,6 +648,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('item_pickup'); }
       return updated;
     });
+
+    // Reset use action after processing
+    if (useActionRef) useActionRef.current = false;
 
     handlePlayerState();
   });

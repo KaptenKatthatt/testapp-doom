@@ -4,6 +4,7 @@
 class AudioManager {
   private audioContext: AudioContext | null = null;
   private buffers: Map<string, AudioBuffer> = new Map();
+  private musicBuffer: AudioBuffer | null = null;
   private musicSource: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
@@ -121,12 +122,15 @@ class AudioManager {
     if (!this.loaded || !this.audioContext || !this.musicGain || this.musicPlaying) return;
 
     try {
-      const response = await fetch('/audio/e1m1.ogg');
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      // Cache the music buffer
+      if (!this.musicBuffer) {
+        const response = await fetch('/audio/e1m1.ogg');
+        const arrayBuffer = await response.arrayBuffer();
+        this.musicBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      }
 
       this.musicSource = this.audioContext.createBufferSource();
-      this.musicSource.buffer = audioBuffer;
+      this.musicSource.buffer = this.musicBuffer;
       this.musicSource.loop = true;
       this.musicSource.connect(this.musicGain);
       this.musicSource.start(0);

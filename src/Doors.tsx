@@ -1,21 +1,23 @@
 // Door system for E1M1
-// Doors auto-open when player approaches, close after a timer
-// Secret walls open with USE button (E key)
+// ALL doors require USE button (E key) — no auto-open, like original Doom
+// Secret walls stay open forever once opened
+// Regular doors auto-close after a timer
+
+import { audioManager } from "./Audio";
 
 export interface DoorData {
   id: number;
-  position: [number, number, number]; // center position
-  size: [number, number, number]; // width, height, depth
+  position: [number, number, number]; // original center position (never changes)
+  size: [number, number, number]; // original width, height, depth (never changes)
   state: 'closed' | 'opening' | 'open' | 'closing';
   timer: number; // time in current state
-  autoClose: number; // seconds before auto-closing (4.0 like Doom)
-  isSecret: boolean; // secret walls require USE button
+  autoClose: number; // seconds before auto-closing (4.0 for regular doors)
+  isSecret: boolean; // secret walls — stay open forever once opened
   triggerDistance: number; // how close player needs to be (2.5 for doors)
 }
 
 export const INITIAL_DOORS: DoorData[] = [
   // E1M1 doors will be defined when rebuilding the level
-  // Placeholder for now
 ];
 
 export function updateDoor(door: DoorData, dt: number, playerPos: [number, number, number], useAction: boolean): DoorData {
@@ -30,35 +32,31 @@ export function updateDoor(door: DoorData, dt: number, playerPos: [number, numbe
   switch (state) {
     case 'closed':
       timer = 0;
-      if (door.isSecret) {
-        // Secret walls need USE button
-        if (useAction && nearPlayer) {
-          state = 'opening';
-          timer = 0;
-        }
-      } else {
-        // Regular doors auto-open when player is near
-        if (nearPlayer) {
-          state = 'opening';
-          timer = 0;
-        }
+      // ALL doors require USE button (E key) — no auto-open
+      if (useAction && nearPlayer) {
+        state = 'opening';
+        timer = 0;
+        audioManager.play('door_open');
       }
       break;
 
     case 'opening':
-      if (timer >= 1.0) { // 1 second to open
+      if (timer >= 1.0) {
         state = 'open';
         timer = 0;
       }
       break;
 
     case 'open':
+      // Secret walls stay open forever
+      if (door.isSecret) break;
+
       // Auto-close after delay
       if (timer >= door.autoClose) {
-        // Don't close if player is standing in the doorway
         if (!nearPlayer) {
           state = 'closing';
           timer = 0;
+          audioManager.play('door_close');
         } else {
           timer = 0; // reset timer while player is in doorway
         }
@@ -66,7 +64,7 @@ export function updateDoor(door: DoorData, dt: number, playerPos: [number, numbe
       break;
 
     case 'closing':
-      if (timer >= 1.0) { // 1 second to close
+      if (timer >= 1.0) {
         state = 'closed';
         timer = 0;
       }
@@ -74,33 +72,36 @@ export function updateDoor(door: DoorData, dt: number, playerPos: [number, numbe
       if (nearPlayer) {
         state = 'opening';
         timer = 0;
+        audioManager.play('door_open');
       }
       break;
   }
 
-  // Calculate door height based on open progress
+  return { ...door, state, timer };
+}
+
+// Get the visual dimensions/position of a door based on its open state
+export function getDoorVisual(door: DoorData): {
+  position: [number, number, number];
+  size: [number, number, number];
+} {
   let openProgress = 0;
-  if (state === 'opening') {
-    openProgress = Math.min(timer / 1.0, 1.0);
-  } else if (state === 'open') {
+  if (door.state === 'opening') {
+    openProgress = Math.min(door.timer / 1.0, 1.0);
+  } else if (door.state === 'open') {
     openProgress = 1.0;
-  } else if (state === 'closing') {
-    openProgress = Math.max(1.0 - timer / 1.0, 0.0);
+  } else if (door.state === 'closing') {
+    openProgress = Math.max(1.0 - door.timer / 1.0, 0.0);
   }
 
-  // Door slides up when opening (shrinks from 4 to nearly 0)
+  // Door slides up when opening
   const visibleHeight = door.size[1] * (1.0 - openProgress);
   const yOffset = (door.size[1] - visibleHeight) / 2;
 
   return {
-    ...door,
-    state,
-    timer,
-    // Store visible dimensions for rendering
-    size: [door.size[0], visibleHeight, door.size[2]],
-    position: [door.position[0], door.position[1] + yOffset, door.position[2]] as [number, number, number],
-    // Keep original size for collision reset
-  } as DoorData;
+    position: [door.position[0], door.position[1] + yOffset, door.position[2]],
+    size: [door.size[0], Math.max(visibleHeight, 0.01), door.size[2]],
+  };
 }
 
 // Check if a door is open enough to walk through
@@ -108,11 +109,9 @@ export function isDoorPassable(door: DoorData): boolean {
   return door.state === 'open' || (door.state === 'opening' && door.timer > 0.5);
 }
 
-// Get collision box for a door (only when closed or closing)
+// Get collision box for a door (only when closed or early opening)
 export function getDoorCollisionBox(door: DoorData): { min: [number, number, number]; max: [number, number, number] } | null {
   if (isDoorPassable(door)) return null;
-
-  // For opening doors, fade out collision
   if (door.state === 'opening' && door.timer > 0.3) return null;
 
   const [w, h, d] = door.size;
