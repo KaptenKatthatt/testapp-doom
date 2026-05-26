@@ -41,6 +41,7 @@ export default function App(): React.JSX.Element {
   const [gameKey, setGameKey] = useState(0);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
+  const mobilePitchRef = useRef(0);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -91,8 +92,9 @@ export default function App(): React.JSX.Element {
     mobileMoveRef.current = [dx, dy];
   }, []);
 
-  const handleMobileLook = useCallback((dx: number): void => {
-    mobileLookRef.current += dx;
+  const handleMobileLook = useCallback((dx: number, dy: number): void => {
+    mobileLookRef.current = dx;
+    mobilePitchRef.current = dy;
   }, []);
 
   const handleShootStart = useCallback((): void => {
@@ -168,6 +170,7 @@ export default function App(): React.JSX.Element {
           }}
           mobileMoveRef={mobileMoveRef}
           mobileLookRef={mobileLookRef}
+          mobilePitchRef={mobilePitchRef}
         />
       </Canvas>
       <HUD
