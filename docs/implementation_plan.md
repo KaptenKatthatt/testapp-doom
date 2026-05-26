@@ -13,10 +13,14 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Pass the `pullback` factor as a prop to the `Weapons` component.
     *   In `src/Weapons.tsx`, adjust the weapon group's position (move it backward/downward) and tilt it down based on the `pullback` progress. This creates a highly premium "tactical weapon pullback" animation when standing near walls.
 
-### 2. Door Interaction Bug (E Key)
+### 2. Door Interaction Bug (E Key) & Double-Door static collision fix
 
-*   **Problem**: In `src/Game.tsx`, the `useActionRef.current` reference is reset to `false` immediately *before* it is evaluated in the door update loop. This causes doors to never receive the "use action" trigger and therefore they never open when the E key is pressed.
-*   **Solution**: Swap the order of these operations in `src/Game.tsx`. Evaluate/store the `useAction` state first to update the doors, and then reset the ref's value to `false`.
+*   **Problem**: 
+    1. In `src/Game.tsx`, the `useActionRef.current` reference is reset to `false` immediately *before* it is evaluated in the door update loop. This causes doors to never receive the "use action" trigger and therefore they never open when the E key is pressed.
+    2. In `src/Level.tsx`, doors were included in `WALL_DATA` and processed into standard static wall meshes and wall collision boxes. When the door opened dynamically, a duplicate static door mesh and static collision box remained in place, preventing players from walking through the doorway.
+*   **Solution**: 
+    1. Swap the order of these operations in `src/Game.tsx`. Evaluate/store the `useAction` state first to update the doors, and then reset the ref's value to `false`.
+    2. Filter out doors from static level meshes and collision blocks in `Level.tsx` using `WALL_DATA.filter((w) => !w.isDoor)`. This leaves doors exclusively managed and dynamically rendered/collided by `Game.tsx`'s dynamic doors loop, allowing passage once opened.
 
 ### 3. Door Texture & Emissive Lighting
 
@@ -27,7 +31,20 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Apply the `doorTexture` as a `map` prop to the door `meshLambertMaterial`.
     *   Keep the distinct color tinting (`color={door.isSecret ? 0x553322 : 0xcc7744}`) to maintain standard vs. secret door differentiation while overlaying the high-quality Doom door texture.
 
-### 4. Code Duplication & Export Cleanups (Fallow Errors)
+### 4. HUD starting face & Kills font visibility
+
+*   **Problem**: The character's face in the lower status bar and the custom Doom font for values (like Kills, Health, Ammo) only render after the first action (like shooting), because setting `faceImgRef.current` does not trigger re-render on load, and custom fonts are not ready on initial mount.
+*   **Solution**:
+    *   Change `faceImgRef` to a React state `faceImg`.
+    *   Add a listener for `document.fonts.ready` to trigger a state update when the font loads.
+    *   Include both `faceImg` and `fontLoaded` in the canvas drawing `useEffect` dependency array, so the HUD renders correctly from the start.
+
+### 5. Starting Player Rotation
+
+*   **Problem**: The player starts the game looking directly into a wall instead of facing the room's main door.
+*   **Solution**: Rotate the starting player rotation in `Game.tsx` by 180 degrees (setting `rotation: -Math.PI / 2` instead of `Math.PI / 2`), so they face the door immediately upon start.
+
+### 6. Code Duplication & Export Cleanups (Fallow Errors)
 
 *   **Problem**: `npx fallow` reports errors for:
     1.  Unused files in `e2e/` (cjs files) and `generate-midi.cjs`.
@@ -38,7 +55,7 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Remove the `export` keyword from `isDoorPassable` in `src/Doors.tsx` since it is only used internally in that file.
     *   Extract the duplicate canvas noise generation loops in `src/Textures.tsx` into a reusable `addNoise(ctx, count, maxOpacity)` helper function.
 
-### 5. Code Refactoring (Reducing Large Files & Complexity)
+### 7. Code Refactoring (Reducing Large Files & Complexity)
 
 *   **Problem**: `src/Game.tsx` is very large (758 lines) and contains high cognitive complexity, especially in the `useFrame` main loop.
 *   **Solution**:

@@ -86,7 +86,7 @@ const INITIAL_PICKUPS: PickupData[] = [
 export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
-    rotation: Math.PI / 2,
+    rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,
     ammo: 50,
