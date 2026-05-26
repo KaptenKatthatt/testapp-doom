@@ -10,7 +10,6 @@ interface WeaponsProps {
 
 export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX.Element {
   const gunGroupRef = useRef<Group>(null);
-  const crosshairGroupRef = useRef<Group>(null);
   const muzzleRef = useRef<Mesh>(null);
   const muzzleRingRef = useRef<Mesh>(null);
   const recoilRef = useRef(0);
@@ -50,13 +49,6 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
       gunGroup.rotateX(-0.04 + recoil * 0.12);
       gunGroup.rotateY(0.015 + sway * 0.3);
       gunGroup.rotateZ(-0.06 + recoil * -0.08);
-    }
-
-    // Crosshair follows camera
-    const ch = crosshairGroupRef.current;
-    if (ch) {
-      ch.position.copy(camera.position);
-      ch.quaternion.copy(camera.quaternion);
     }
 
     // Muzzle flash: only visible for 70ms after shot
@@ -151,14 +143,6 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
         <mesh ref={muzzleRingRef} position={[0, 0.025, -0.45]} rotation={[0, 0, 0]} visible={false}>
           <ringGeometry args={[0.03, 0.08, 8]} />
           <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={2} />
-        </mesh>
-      </group>
-
-      {/* Crosshair - follows camera, always on top */}
-      <group ref={crosshairGroupRef} renderOrder={999}>
-        <mesh position={[0, 0, -1.5]} renderOrder={999}>
-          <circleGeometry args={[0.008, 12]} />
-          <meshBasicMaterial color={0xffffff} transparent opacity={0.7} depthTest={false} depthWrite={false} />
         </mesh>
       </group>
     </>

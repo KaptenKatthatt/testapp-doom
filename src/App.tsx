@@ -117,6 +117,21 @@ export default function App(): React.JSX.Element {
         ammo={playerState.ammo}
         kills={playerState.kills}
       />
+
+      {/* Crosshair - CSS overlay, zero lag */}
+      <div style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "4px",
+        height: "4px",
+        borderRadius: "50%",
+        background: "rgba(255,255,255,0.7)",
+        pointerEvents: "none",
+        zIndex: 15,
+      }} />
+
       <MobileControls
         onMove={handleMobileMove}
         onLook={handleMobileLook}
