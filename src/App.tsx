@@ -200,7 +200,7 @@ export default function App(): React.JSX.Element {
         left: 0,
         width: "100%",
         height: "100%",
-        background: "radial-gradient(ellipse at center, transparent 30%, rgba(200,0,0,0.35) 100%)",
+        background: "radial-gradient(ellipse at center, rgba(255,0,0,0.2) 0%, rgba(220,0,0,0.7) 60%, rgba(180,0,0,0.85) 100%)",
         opacity: playerState.damageFlash,
         pointerEvents: "none",
         zIndex: 14,

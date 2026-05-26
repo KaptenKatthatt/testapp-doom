@@ -328,7 +328,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Also trigger flash on ranged damage (already applied in setEnemies callback)
     // Fade damage flash
     if (player.damageFlash > 0) {
-      player.damageFlash = Math.max(0, player.damageFlash - dt * 3);
+      player.damageFlash = Math.max(0, player.damageFlash - dt * 2);
     }
 
     // Camera follow with pitch
