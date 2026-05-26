@@ -41,6 +41,7 @@ interface PlayerData {
   lastShot: number;
   lastContactDmg: number;
   damageFlash: number;
+  isMoving: boolean;
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
@@ -107,6 +108,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     lastShot: 0,
     lastContactDmg: 0,
     damageFlash: 0,
+    isMoving: false,
   });
   const keysRef = useRef<Record<string, boolean>>({});
   const projectilesRef = useRef<ProjectileData[]>([]);
@@ -295,6 +297,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       player.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, player.pitch));
     }
 
+    player.isMoving = move.length() > 0;
     if (move.length() > 0) {
       move.normalize().multiplyScalar(speed * dt);
     }
@@ -596,6 +599,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       <Weapons
         shooting={playerRef.current.shooting}
         lastShot={playerRef.current.lastShot}
+        isMoving={playerRef.current.isMoving}
       />
     </>
   );

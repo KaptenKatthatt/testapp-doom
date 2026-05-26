@@ -6,9 +6,10 @@ import type { Group, Mesh } from "three";
 interface WeaponsProps {
   readonly shooting: boolean;
   readonly lastShot: number;
+  readonly isMoving: boolean;
 }
 
-export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX.Element {
+export default function Weapons({ shooting, lastShot, isMoving }: WeaponsProps): React.JSX.Element {
   const gunGroupRef = useRef<Group>(null);
   const muzzleRef = useRef<Mesh>(null);
   const muzzleRingRef = useRef<Mesh>(null);
@@ -24,11 +25,11 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
 
     const recoil = recoilRef.current;
 
-    // Walking bob
+    // Walking bob (only when moving)
     const time = performance.now() / 1000;
-    const bobFreq = 10;
-    const sway = Math.sin(time * bobFreq) * 0.006;
-    const bob = Math.abs(Math.sin(time * bobFreq)) * 0.01;
+    const bobFreq = 6; // Slower, more natural walking rhythm
+    const sway = isMoving ? Math.sin(time * bobFreq) * 0.004 : 0;
+    const bob = isMoving ? Math.abs(Math.sin(time * bobFreq)) * 0.008 : 0;
 
     // Trigger recoil
     if (shooting && !prevShootingRef.current) {
