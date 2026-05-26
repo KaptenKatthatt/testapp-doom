@@ -178,6 +178,15 @@ class AudioManager {
   isLoaded(): boolean {
     return this.loaded;
   }
+
+  // Get current volumes
+  getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  getSfxVolume(): number {
+    return this.sfxVolume;
+  }
 }
 
 // Singleton

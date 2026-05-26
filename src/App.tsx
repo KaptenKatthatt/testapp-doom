@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
 import MobileControls from "./MobileControls";
+import AudioMenu from "./AudioMenu";
 import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
 
@@ -363,6 +364,7 @@ export default function App(): React.JSX.Element {
           </button>
         </div>
       )}
+      <AudioMenu />
     </div>
   );
 }
