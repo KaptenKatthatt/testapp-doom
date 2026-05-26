@@ -179,3 +179,50 @@ test.describe("DOOM - Integration", () => {
     await expect(canvas).toBeVisible();
   });
 });
+
+test.describe("DOOM - Mobile Controls", () => {
+  test("move and look zones exist after game start", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE_URL);
+    await page.waitForTimeout(300);
+    await page.click("body");
+    await page.waitForTimeout(2000);
+
+    const moveZone = page.locator('[data-testid="move-zone"]');
+    const lookZone = page.locator('[data-testid="look-zone"]');
+    await expect(moveZone).toBeAttached();
+    await expect(lookZone).toBeAttached();
+  });
+
+  test("touch zones have touchAction none", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE_URL);
+    await page.waitForTimeout(300);
+    await page.click("body");
+    await page.waitForTimeout(2000);
+
+    const touchAction = await page.evaluate(() => {
+      const moveZone = document.querySelector('[data-testid="move-zone"]') as HTMLElement | null;
+      const lookZone = document.querySelector('[data-testid="look-zone"]') as HTMLElement | null;
+      if (!moveZone || !lookZone) return null;
+      return {
+        move: window.getComputedStyle(moveZone).touchAction,
+        look: window.getComputedStyle(lookZone).touchAction,
+      };
+    });
+    expect(touchAction).not.toBeNull();
+    expect(touchAction!.move).toBe("none");
+    expect(touchAction!.look).toBe("none");
+  });
+
+  test("shoot button exists and is accessible", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE_URL);
+    await page.waitForTimeout(300);
+    await page.click("body");
+    await page.waitForTimeout(2000);
+
+    const shootBtn = page.locator('[data-testid="shoot-button"]');
+    await expect(shootBtn).toBeAttached();
+  });
+});
