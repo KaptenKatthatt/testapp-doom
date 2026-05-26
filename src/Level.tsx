@@ -45,7 +45,7 @@ const RE = 0xcc2222; // Exit red
 const WALL_DATA: Array<{
   x: number; y: number; z: number;
   w: number; h: number; d: number;
-  color: number; isDoor?: boolean;
+  color: number; isDoor?: boolean; noCollision?: boolean;
 }> = [
   // ═══════════════════════════════════════════════════
   // OUTER PERIMETER (fully sealed, corners overlap)
@@ -130,9 +130,9 @@ const WALL_DATA: Array<{
   // Alcove in start room SW corner
   { x: 0, y: 2, z: 8, w: 1.5, h: WH, d: 1, color: W2 },
   // Step at corridor → slime room transition
-  { x: 10, y: 0.5, z: 17, w: 4, h: 1, d: 1, color: M },
+  { x: 10, y: 0.5, z: 17, w: 4, h: 1, d: 1, color: M, noCollision: true },
   // Step at slime room → north corridor transition
-  { x: 12, y: 0.4, z: 31, w: 3, h: 0.8, d: 1, color: M },
+  { x: 12, y: 0.4, z: 31, w: 3, h: 0.8, d: 1, color: M, noCollision: true },
 ];
 
 interface WallMeshData {
@@ -156,7 +156,7 @@ function buildWallMeshes(): WallMeshData[] {
 const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
 export function getWalls(): WallBox[] {
-  return WALL_DATA.filter((w) => !w.isDoor).map((w) => ({
+  return WALL_DATA.filter((w) => !w.isDoor && !w.noCollision).map((w) => ({
     min: [w.x, 0, w.z] as [number, number, number],
     max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
   }));
@@ -356,15 +356,6 @@ export default function Level(): React.JSX.Element {
         </mesh>
       ))}
 
-      {/* ═══ HEALTH POTIONS (start room corners) ═══ */}
-      <mesh position={[1, 0.4, 1]}>
-        <boxGeometry args={[0.3, 0.6, 0.3]} />
-        <meshLambertMaterial color={0x44ff44} emissive={0x22ff22} emissiveIntensity={0.6} />
-      </mesh>
-      <mesh position={[9, 0.4, 1]}>
-        <boxGeometry args={[0.3, 0.6, 0.3]} />
-        <meshLambertMaterial color={0x44ff44} emissive={0x22ff22} emissiveIntensity={0.6} />
-      </mesh>
     </group>
   );
 }

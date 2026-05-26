@@ -57,10 +57,10 @@ interface PlayerData {
 const INITIAL_ENEMIES: EnemyData[] = [
   // L-Corridor zombiemen
   { id: 1, position: [2, 0, 12], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [2, 0, 12] as [number, number, number], hasAlerted: false },
-  { id: 2, position: [10, 0, 15], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 15] as [number, number, number], hasAlerted: false },
+  { id: 2, position: [10, 0, 16], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 16] as [number, number, number], hasAlerted: false },
   // Slime Room imps
-  { id: 3, position: [8, 0, 22], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [8, 0, 22] as [number, number, number], hasAlerted: false },
-  { id: 4, position: [18, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [18, 0, 26] as [number, number, number], hasAlerted: false },
+  { id: 3, position: [6, 0, 22], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 22] as [number, number, number], hasAlerted: false },
+  { id: 4, position: [20, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 26] as [number, number, number], hasAlerted: false },
   // Extra enemies
   { id: 5, position: [15, 0, 20], type: "demon", health: 80, maxHealth: 80, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [15, 0, 20] as [number, number, number], hasAlerted: false },
   { id: 6, position: [6, 0, 16], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [6, 0, 16] as [number, number, number], hasAlerted: false },
@@ -496,7 +496,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Pickup collection
     const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
       player.position,
-      pickups
+      pickups,
+      player.health
     );
     setPickups(updatedPickups);
     if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }

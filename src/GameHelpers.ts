@@ -268,7 +268,8 @@ export function checkSlimeDamageHelper(
 /** Helper to check for pickup items */
 export function updatePickupCollectionHelper(
   playerPos: THREE.Vector3,
-  pickups: PickupData[]
+  pickups: PickupData[],
+  playerHealth: number
 ): { updatedPickups: PickupData[]; healthBonus: number; ammoBonus: number; shotgunPickup: boolean } {
   let healthBonus = 0;
   let ammoBonus = 0;
@@ -279,7 +280,10 @@ export function updatePickupCollectionHelper(
     const dx = playerPos.x - p.position[0];
     const dz = playerPos.z - p.position[2];
     if (dx * dx + dz * dz < 1.5) {
-      if (p.type === "health") healthBonus = 25;
+      if (p.type === "health") {
+        if (playerHealth >= 100) return p; // Don't pick up health if already full
+        healthBonus = 25;
+      }
       else if (p.type === "ammo") ammoBonus = 20;
       else if (p.type === "shotgun") { ammoBonus = 8; shotgunPickup = true; }
       return { ...p, active: false };
