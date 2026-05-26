@@ -12,12 +12,12 @@ import {
 } from "./Textures";
 
 // E1M1-inspired level geometry
-const WALL_COLOR = 0x887766;
-const WALL_COLOR2 = 0x776655;
-const DOOR_COLOR = 0xaa6633;
-const METAL_COLOR = 0x666677;
-const GREEN_ACCENT = 0x448844;
-const DARK_WALL = 0x554433;
+const WALL_COLOR = 0xaa9988;
+const WALL_COLOR2 = 0x998877;
+const DOOR_COLOR = 0xcc7744;
+const METAL_COLOR = 0x888899;
+const GREEN_ACCENT = 0x55aa55;
+const DARK_WALL = 0x776655;
 
 const WALL_DATA: Array<{
   x: number; y: number; z: number;
@@ -137,34 +137,39 @@ export default function Level(): React.JSX.Element {
   return (
     <group>
       {/* Strong ambient so everything is visible */}
-      <ambientLight intensity={0.7} color="#bbaa99" />
-      <hemisphereLight args={["#ffeedd", "#332211", 0.4]} />
+      <ambientLight intensity={1.5} color="#eeccaa" />
+      <hemisphereLight args={["#ffeedd", "#665544", 0.8]} />
 
-      {/* Key point lights for atmosphere */}
-      <pointLight position={[3, 3.5, 4]} intensity={3.0} color="#ffaa66" />
-      <pointLight position={[8, 3.5, 8]} intensity={2.5} color="#ff9944" />
-      <pointLight position={[20, 3.5, 14]} intensity={2.0} color="#ffcc88" />
-      <pointLight position={[36, 3.5, 8]} intensity={1.5} color="#ff8844" />
-      <pointLight position={[14, 3.5, 26]} intensity={1.5} color="#ffaa66" />
-      <pointLight position={[38, 3.5, 28]} intensity={1.5} color="#88ff88" />
-      <pointLight position={[4, 3.5, 34]} intensity={1.0} color="#ff6666" />
+      {/* Key point lights for atmosphere - much stronger */}
+      <pointLight position={[3, 3.5, 4]} intensity={6.0} color="#ffaa66" distance={30} />
+      <pointLight position={[8, 3.5, 8]} intensity={5.0} color="#ff9944" distance={25} />
+      <pointLight position={[20, 3.5, 14]} intensity={4.0} color="#ffcc88" distance={30} />
+      <pointLight position={[36, 3.5, 8]} intensity={3.0} color="#ff8844" distance={25} />
+      <pointLight position={[14, 3.5, 26]} intensity={3.0} color="#ffaa66" distance={25} />
+      <pointLight position={[38, 3.5, 28]} intensity={3.0} color="#88ff88" distance={25} />
+      <pointLight position={[4, 3.5, 34]} intensity={2.0} color="#ff6666" distance={20} />
 
-      {/* Torch lights on walls */}
-      <pointLight position={[6, 3, 4]} intensity={1.0} color="#ff8833" />
-      <pointLight position={[16, 3, 18]} intensity={1.0} color="#ff8833" />
-      <pointLight position={[30, 3, 12]} intensity={0.8} color="#ff8833" />
-      <pointLight position={[40, 3, 20]} intensity={0.8} color="#88cc88" />
+      {/* Ceiling lights - uniform overhead lighting */}
+      <pointLight position={[10, 3.8, 16]} intensity={4.0} color="#ffffff" distance={20} />
+      <pointLight position={[28, 3.8, 16]} intensity={3.0} color="#ffffff" distance={20} />
+      <pointLight position={[40, 3.8, 30]} intensity={3.0} color="#ffffff" distance={20} />
+
+      {/* Torch lights on walls - brighter */}
+      <pointLight position={[6, 3, 4]} intensity={3.0} color="#ff8833" distance={15} />
+      <pointLight position={[16, 3, 18]} intensity={3.0} color="#ff8833" distance={15} />
+      <pointLight position={[30, 3, 12]} intensity={2.5} color="#ff8833" distance={15} />
+      <pointLight position={[40, 3, 20]} intensity={2.5} color="#88cc88" distance={15} />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]}>
         <planeGeometry args={[50, 50]} />
-        <meshLambertMaterial map={textures.floor} />
+        <meshLambertMaterial map={textures.floor} color={0x776655} emissive={0x221100} emissiveIntensity={0.2} />
       </mesh>
 
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
         <planeGeometry args={[50, 50]} />
-        <meshLambertMaterial map={textures.ceiling} />
+        <meshLambertMaterial map={textures.ceiling} color={0x666655} emissive={0x222211} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Walls */}
@@ -184,8 +189,8 @@ export default function Level(): React.JSX.Element {
         const materialProps: Record<string, unknown> = {
           map: wallTexture,
           color: w.color,
-          emissive: w.isDoor ? 0x442200 : isGreenSlime ? 0x112211 : isMetal ? 0x111122 : isDark ? 0x221100 : 0x111111,
-          emissiveIntensity: w.isDoor ? 0.4 : isGreenSlime ? 0.2 : 0.1,
+          emissive: w.isDoor ? 0x664400 : isGreenSlime ? 0x225522 : isMetal ? 0x222233 : isDark ? 0x332211 : 0x333322,
+          emissiveIntensity: w.isDoor ? 0.6 : isGreenSlime ? 0.4 : 0.35,
         };
 
         return (

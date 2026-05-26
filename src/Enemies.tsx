@@ -1,7 +1,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { Mesh, Group } from "three";
+import type { Mesh, Group, PointLight } from "three";
 import type { EnemyData, EnemyType } from "./types";
 
 const ENEMY_CONFIG: Record<EnemyType, {
@@ -10,19 +10,19 @@ const ENEMY_CONFIG: Record<EnemyType, {
   attackRange: number; attackCooldown: number; attackDamage: number;
 }> = {
   imp: {
-    bodyW: 0.8, bodyH: 1.6, bodyD: 0.6,
-    headSize: 0.5, color: 0xaa7733, speed: 1.5,
-    attackRange: 8, attackCooldown: 2, attackDamage: 8,
+    bodyW: 1.0, bodyH: 2.0, bodyD: 0.8,
+    headSize: 0.65, color: 0xcc6622, speed: 1.5,
+    attackRange: 8, attackCooldown: 2, attackDamage: 2,
   },
   demon: {
-    bodyW: 1.2, bodyH: 1.2, bodyD: 0.8,
-    headSize: 0.7, color: 0xaa3366, speed: 3,
-    attackRange: 2.5, attackCooldown: 1.2, attackDamage: 15,
+    bodyW: 1.5, bodyH: 1.6, bodyD: 1.0,
+    headSize: 0.9, color: 0xcc1144, speed: 3,
+    attackRange: 2.5, attackCooldown: 1.2, attackDamage: 2,
   },
   zombieman: {
-    bodyW: 0.7, bodyH: 1.7, bodyD: 0.5,
-    headSize: 0.45, color: 0x778877, speed: 1.0,
-    attackRange: 12, attackCooldown: 2.5, attackDamage: 6,
+    bodyW: 0.9, bodyH: 2.2, bodyD: 0.7,
+    headSize: 0.55, color: 0x99aa77, speed: 1.0,
+    attackRange: 12, attackCooldown: 2.5, attackDamage: 2,
   },
 };
 
@@ -42,6 +42,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const { position, type, hitFlash } = enemy;
   const config = ENEMY_CONFIG[type];
   const isDemon = type === "demon";
+  const isZombie = type === "zombieman";
   const eyeColor = isDemon ? "#ff0044" : "#ff4400";
   const healthPct = enemy.health / enemy.maxHealth;
   const flashColor = hitFlash > 0 ? 0xffffff : 0x000000;
@@ -50,23 +51,27 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   // Create procedural texture for this enemy type
   const bodyTexture = useMemo(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 32;
+    canvas.width = 64;
+    canvas.height = 64;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       return new THREE.CanvasTexture(canvas);
     }
-    const baseColor = type === "imp" ? [170, 119, 51] : type === "demon" ? [170, 51, 102] : [119, 136, 119];
+    const baseColor = type === "imp" ? [204, 102, 34] : type === "demon" ? [204, 17, 68] : [153, 170, 119];
     ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
-    ctx.fillRect(0, 0, 32, 32);
-    // Scale/skin detail
-    for (let i = 0; i < 60; i++) {
-      const x = Math.random() * 32;
-      const y = Math.random() * 32;
-      const a = Math.random() * 0.2;
-      ctx.fillStyle = `rgba(0,0,0,${a})`;
-      ctx.fillRect(x, y, 2, 1);
+    ctx.fillRect(0, 0, 64, 64);
+    // Scale/skin detail - more contrast for visibility
+    for (let i = 0; i < 100; i++) {
+      const x = Math.random() * 64;
+      const y = Math.random() * 64;
+      const bright = Math.random() > 0.5;
+      const a = Math.random() * 0.3;
+      ctx.fillStyle = bright ? `rgba(255,255,255,${a * 0.3})` : `rgba(0,0,0,${a})`;
+      ctx.fillRect(x, y, 2 + Math.random() * 2, 1 + Math.random());
     }
+    // Add bright belly/chest stripe for visibility at distance
+    ctx.fillStyle = `rgba(255,200,100,0.3)`;
+    ctx.fillRect(16, 24, 32, 16);
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
@@ -96,37 +101,37 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
           <meshLambertMaterial
             map={bodyTexture}
             color={config.color}
-            emissive={flashColor}
-            emissiveIntensity={flashIntensity + 0.15}
+            emissive={config.color}
+            emissiveIntensity={flashIntensity + 0.4}
           />
         </mesh>
 
         {/* Head */}
         <mesh position={[0, config.bodyH / 2 + config.headSize / 2, 0]}>
           <boxGeometry args={[config.headSize, config.headSize, config.headSize]} />
-          <meshLambertMaterial color={config.color} emissive={0x221100} emissiveIntensity={0.3} />
+          <meshLambertMaterial color={config.color} emissive={config.color} emissiveIntensity={0.5} />
         </mesh>
 
-        {/* Eyes - glowing */}
+        {/* Eyes - larger glowing */}
         <mesh
           ref={glowRef}
           position={[
-            isDemon ? -0.15 : -0.1,
+            isDemon ? -0.2 : -0.13,
             config.bodyH / 2 + config.headSize / 2 + 0.05,
-            isDemon ? -0.3 : -0.25,
+            isDemon ? -0.35 : -0.28,
           ]}
         >
-          <sphereGeometry args={[0.08, 8, 8]} />
+          <sphereGeometry args={[0.12, 8, 8]} />
           <meshBasicMaterial color={eyeColor} />
         </mesh>
         <mesh
           position={[
-            isDemon ? 0.15 : 0.1,
+            isDemon ? 0.2 : 0.13,
             config.bodyH / 2 + config.headSize / 2 + 0.05,
-            isDemon ? -0.3 : -0.25,
+            isDemon ? -0.35 : -0.28,
           ]}
         >
-          <sphereGeometry args={[0.08, 8, 8]} />
+          <sphereGeometry args={[0.12, 8, 8]} />
           <meshBasicMaterial color={eyeColor} />
         </mesh>
 
@@ -145,25 +150,33 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         )}
 
         {/* Arms */}
-        <mesh position={[-(config.bodyW / 2 + 0.2), config.bodyH * 0.1, 0]}>
-          <boxGeometry args={[0.25, config.bodyH * 0.4, 0.25]} />
-          <meshLambertMaterial color={config.color} emissive={0x110800} emissiveIntensity={0.2} />
+        <mesh position={[-(config.bodyW / 2 + 0.25), config.bodyH * 0.1, 0]}>
+          <boxGeometry args={[0.3, config.bodyH * 0.4, 0.3]} />
+          <meshLambertMaterial color={config.color} emissive={config.color} emissiveIntensity={0.3} />
         </mesh>
-        <mesh position={[config.bodyW / 2 + 0.2, config.bodyH * 0.1, 0]}>
-          <boxGeometry args={[0.25, config.bodyH * 0.4, 0.25]} />
-          <meshLambertMaterial color={config.color} emissive={0x110800} emissiveIntensity={0.2} />
+        <mesh position={[config.bodyW / 2 + 0.25, config.bodyH * 0.1, 0]}>
+          <boxGeometry args={[0.3, config.bodyH * 0.4, 0.3]} />
+          <meshLambertMaterial color={config.color} emissive={config.color} emissiveIntensity={0.3} />
         </mesh>
       </group>
 
-      {/* Health bar */}
-      <mesh position={[0, config.bodyH + 0.8, 0]}>
-        <planeGeometry args={[0.8, 0.06]} />
+      {/* Health bar - larger and more visible */}
+      <mesh position={[0, config.bodyH + 1.0, 0]}>
+        <planeGeometry args={[1.2, 0.1]} />
         <meshBasicMaterial color={0x440000} />
       </mesh>
-      <mesh position={[-0.4 + healthPct * 0.4, config.bodyH + 0.8, 0.01]}>
-        <planeGeometry args={[0.8 * healthPct, 0.06]} />
-        <meshBasicMaterial color={healthPct > 0.5 ? 0x00ff00 : 0xff4400} />
+      <mesh position={[-0.6 + healthPct * 0.6, config.bodyH + 1.0, 0.01]}>
+        <planeGeometry args={[1.2 * healthPct, 0.1]} />
+        <meshBasicMaterial color={healthPct > 0.5 ? 0x00ff00 : healthPct > 0.25 ? 0xff8800 : 0xff0000} />
       </mesh>
+
+      {/* Enemy glow light */}
+      <pointLight
+        position={[0, config.bodyH + 0.5, 0]}
+        color={type === "demon" ? "#ff0044" : type === "zombieman" ? "#88ff88" : "#ff6600"}
+        intensity={2.0}
+        distance={8}
+      />
     </group>
   );
 }

@@ -318,9 +318,7 @@ export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileL
 
           if (dist < attackRange && now - e.lastAttack > attackCooldown) {
             tookDamage = true;
-            damageAmount += e.type === "demon"
-              ? 12 + Math.random() * 5
-              : 5 + Math.random() * 5;
+            damageAmount += 2; // All enemies deal 2 damage per hit
             newAttack = now;
           }
         }

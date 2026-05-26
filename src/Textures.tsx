@@ -13,8 +13,8 @@ export function createWallTexture(): THREE.Texture {
   canvas.height = 128;
   const ctx = getCtx(canvas);
 
-  // Base color
-  ctx.fillStyle = "#665544";
+  // Base color - lighter for visibility
+  ctx.fillStyle = "#887766";
   ctx.fillRect(0, 0, 128, 128);
 
   // Brick pattern
@@ -25,20 +25,20 @@ export function createWallTexture(): THREE.Texture {
     for (let col = -1; col < 128 / brickW + 1; col++) {
       const x = col * brickW + offset;
       const y = row * brickH;
-      // Slight color variation per brick
-      const r = 90 + Math.random() * 30;
-      const g = 70 + Math.random() * 25;
-      const b = 50 + Math.random() * 20;
+      // Brighter brick colors for visibility
+      const r = 140 + Math.random() * 40;
+      const g = 110 + Math.random() * 35;
+      const b = 80 + Math.random() * 30;
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x + 1, y + 1, brickW - 2, brickH - 2);
     }
-    // Mortar lines
-    ctx.fillStyle = "#443322";
+    // Mortar lines - lighter
+    ctx.fillStyle = "#665544";
     ctx.fillRect(0, row * brickH, 128, 1);
   }
-  // Vertical mortar
+  // Vertical mortar - lighter
   for (let col = 0; col < 128 / brickW + 1; col++) {
-    ctx.fillStyle = "#443322";
+    ctx.fillStyle = "#665544";
     for (let row = 0; row < 128 / brickH; row++) {
       const offset = row % 2 === 0 ? 0 : brickW / 2;
       ctx.fillRect(col * brickW + offset, row * brickH, 1, brickH);
@@ -68,17 +68,17 @@ export function createFloorTexture(): THREE.Texture {
   canvas.height = 128;
   const ctx = getCtx(canvas);
 
-  // Base dark stone
-  ctx.fillStyle = "#554433";
+  // Base dark stone - lighter for visibility
+  ctx.fillStyle = "#776655";
   ctx.fillRect(0, 0, 128, 128);
 
   // Tile grid
   const tileSize = 32;
   for (let row = 0; row < 128 / tileSize; row++) {
     for (let col = 0; col < 128 / tileSize; col++) {
-      const r = 70 + Math.random() * 25;
-      const g = 55 + Math.random() * 20;
-      const b = 40 + Math.random() * 15;
+      const r = 110 + Math.random() * 30;
+      const g = 90 + Math.random() * 25;
+      const b = 70 + Math.random() * 20;
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(col * tileSize + 1, row * tileSize + 1, tileSize - 2, tileSize - 2);
 
@@ -95,7 +95,7 @@ export function createFloorTexture(): THREE.Texture {
   }
 
   // Grout lines
-  ctx.fillStyle = "#332211";
+  ctx.fillStyle = "#554433";
   for (let i = 0; i <= 128; i += tileSize) {
     ctx.fillRect(i, 0, 1, 128);
     ctx.fillRect(0, i, 128, 1);
@@ -124,13 +124,13 @@ export function createCeilingTexture(): THREE.Texture {
   canvas.height = 128;
   const ctx = getCtx(canvas);
 
-  // Base
-  ctx.fillStyle = "#444433";
+  // Base - lighter
+  ctx.fillStyle = "#666655";
   ctx.fillRect(0, 0, 128, 128);
 
   // Panel lines
   const panelSize = 64;
-  ctx.fillStyle = "#333322";
+  ctx.fillStyle = "#555544";
   for (let i = 0; i <= 128; i += panelSize) {
     ctx.fillRect(i, 0, 2, 128);
     ctx.fillRect(0, i, 128, 2);
