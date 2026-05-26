@@ -76,15 +76,20 @@ export default function Weapons({ shooting, lastShot }: WeaponsProps): React.JSX
         </mesh>
       </group>
 
-      {/* Crosshair */}
-      <group position={[0, 0, -2]}>
-        <mesh>
-          <planeGeometry args={[0.02, 0.08]} />
-          <meshBasicMaterial color={0x00ff00} transparent opacity={0.7} depthTest={false} />
+      {/* Crosshair - always visible on top */}
+      <group position={[0, 0, -2]} renderOrder={999}>
+        <mesh renderOrder={999}>
+          <planeGeometry args={[0.03, 0.12]} />
+          <meshBasicMaterial color={0x00ff00} transparent opacity={0.9} depthTest={false} depthWrite={false} />
         </mesh>
-        <mesh>
-          <planeGeometry args={[0.08, 0.02]} />
-          <meshBasicMaterial color={0x00ff00} transparent opacity={0.7} depthTest={false} />
+        <mesh renderOrder={999}>
+          <planeGeometry args={[0.12, 0.03]} />
+          <meshBasicMaterial color={0x00ff00} transparent opacity={0.9} depthTest={false} depthWrite={false} />
+        </mesh>
+        {/* Center dot */}
+        <mesh renderOrder={999}>
+          <circleGeometry args={[0.015, 16]} />
+          <meshBasicMaterial color={0xffffff} transparent opacity={0.8} depthTest={false} depthWrite={false} />
         </mesh>
       </group>
     </>

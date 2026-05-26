@@ -24,9 +24,9 @@ const WALL_DATA: Array<{
   w: number; h: number; d: number;
   color: number; isDoor?: boolean;
 }> = [
-  // === OUTER WALLS ===
-  { x: -2, y: 2, z: 0, w: 1, h: 4, d: 44, color: WALL_COLOR },
-  { x: 46, y: 2, z: 0, w: 1, h: 4, d: 44, color: WALL_COLOR },
+  // === OUTER WALLS (fully sealed) ===
+  { x: -2, y: 2, z: 0, w: 1, h: 4, d: 48, color: WALL_COLOR },
+  { x: 46, y: 2, z: 0, w: 1, h: 4, d: 48, color: WALL_COLOR },
   { x: 0, y: 2, z: -2, w: 48, h: 4, d: 1, color: WALL_COLOR },
   { x: 0, y: 2, z: 46, w: 48, h: 4, d: 1, color: WALL_COLOR },
 
