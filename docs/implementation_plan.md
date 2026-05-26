@@ -13,10 +13,14 @@ This plan outlines the changes required to address the weapon wall-clipping bug,
     *   Pass the `pullback` factor as a prop to the `Weapons` component.
     *   In `src/Weapons.tsx`, adjust the weapon group's position (move it backward/downward) and tilt it down based on the `pullback` progress. This creates a highly premium "tactical weapon pullback" animation when standing near walls.
 
-### 2. Door Interaction Bug (E Key)
+### 2. Door Interaction Bug (E Key) & Double-Door static collision fix
 
-*   **Problem**: In `src/Game.tsx`, the `useActionRef.current` reference is reset to `false` immediately *before* it is evaluated in the door update loop. This causes doors to never receive the "use action" trigger and therefore they never open when the E key is pressed.
-*   **Solution**: Swap the order of these operations in `src/Game.tsx`. Evaluate/store the `useAction` state first to update the doors, and then reset the ref's value to `false`.
+*   **Problem**: 
+    1. In `src/Game.tsx`, the `useActionRef.current` reference is reset to `false` immediately *before* it is evaluated in the door update loop. This causes doors to never receive the "use action" trigger and therefore they never open when the E key is pressed.
+    2. In `src/Level.tsx`, doors were included in `WALL_DATA` and processed into standard static wall meshes and wall collision boxes. When the door opened dynamically, a duplicate static door mesh and static collision box remained in place, preventing players from walking through the doorway.
+*   **Solution**: 
+    1. Swap the order of these operations in `src/Game.tsx`. Evaluate/store the `useAction` state first to update the doors, and then reset the ref's value to `false`.
+    2. Filter out doors from static level meshes and collision blocks in `Level.tsx` using `WALL_DATA.filter((w) => !w.isDoor)`. This leaves doors exclusively managed and dynamically rendered/collided by `Game.tsx`'s dynamic doors loop, allowing passage once opened.
 
 ### 3. Door Texture & Emissive Lighting
 
