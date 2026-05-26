@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
@@ -21,6 +21,18 @@ export default function App(): React.JSX.Element {
     setGameOver(false);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
   }, []);
+
+  // Restart on click/Enter/Space when game over
+  useEffect(() => {
+    if (!gameOver) return;
+    const handleRestartKey = (e: KeyboardEvent): void => {
+      if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("keydown", handleRestartKey);
+    return () => window.removeEventListener("keydown", handleRestartKey);
+  }, [gameOver]);
 
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];
@@ -124,7 +136,9 @@ export default function App(): React.JSX.Element {
             fontFamily: "monospace",
             color: "#fff",
             zIndex: 20,
+            cursor: "pointer",
           }}
+          onClick={(): void => { window.location.reload(); }}
         >
           <h1
             style={{
@@ -137,11 +151,9 @@ export default function App(): React.JSX.Element {
           <p
             style={{
               fontSize: "18px",
-              cursor: "pointer",
             }}
-            onClick={(): void => { window.location.reload(); }}
           >
-            Tap to restart
+            Click anywhere to restart
           </p>
         </div>
       )}
