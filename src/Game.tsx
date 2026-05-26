@@ -449,22 +449,47 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
         for (const e of prev) {
           if (!e.alive) continue;
-          const ePos = new THREE.Vector3(e.position[0], 1, e.position[2]);
-          const dist = ePos.distanceTo(camera.position);
-          if (dist > 50) continue;
+          // Check hit at multiple body heights: torso (y=1), head (y=2.5)
+          for (const hitY of [1, 2.5]) {
+            const ePos = new THREE.Vector3(e.position[0], hitY, e.position[2]);
+            const dist = ePos.distanceTo(camera.position);
+            if (dist > 50) continue;
 
-          const dir = new THREE.Vector3();
-          camera.getWorldDirection(dir);
-          const toEnemy = ePos.clone().sub(camera.position).normalize();
-          const angle = dir.angleTo(toEnemy);
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const toEnemy = ePos.clone().sub(camera.position).normalize();
+            const angle = dir.angleTo(toEnemy);
 
-          const hitRange = Math.max(0.12, 0.45 / (dist / 5));
-          if (angle < hitRange && dist < closestDist) {
-            // Can't shoot through walls
-            if (!hasLineOfSight(camera.position.x, camera.position.z, e.position[0], e.position[2])) continue;
-            closestDist = dist;
-            closestEnemy = e;
-            closestDamage = 15 + Math.random() * 10;
+            const hitRange = Math.max(0.12, 0.45 / (dist / 5));
+            if (angle < hitRange && dist < closestDist) {
+              // Can't shoot through walls — check at the actual hit height
+              // Use 3D raycast to see if line from camera to hit point is clear
+              const rayDir = ePos.clone().sub(camera.position).normalize();
+              const rayLen = camera.position.distanceTo(ePos);
+              let blocked = false;
+              const raySteps = Math.ceil(rayLen * 2);
+              for (let s = 1; s < raySteps; s++) {
+                const t = s / raySteps;
+                const px = camera.position.x + rayDir.x * rayLen * t;
+                const py = camera.position.y + rayDir.y * rayLen * t;
+                const pz = camera.position.z + rayDir.z * rayLen * t;
+                // Check if this point is inside any wall
+                for (const wall of walls) {
+                  if (px >= wall.min[0] && px <= wall.max[0] &&
+                      py >= wall.min[1] && py <= wall.max[1] &&
+                      pz >= wall.min[2] && pz <= wall.max[2]) {
+                    blocked = true;
+                    break;
+                  }
+                }
+                if (blocked) break;
+              }
+              if (blocked) continue;
+              closestDist = dist;
+              closestEnemy = e;
+              closestDamage = 15 + Math.random() * 10;
+              break; // Hit this enemy, no need to check other heights
+            }
           }
         }
 
