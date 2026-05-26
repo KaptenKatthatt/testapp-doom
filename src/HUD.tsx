@@ -1,85 +1,23 @@
 import { useEffect, useRef } from "react";
 
-type FaceExpression = "normal" | "hurt" | "pain" | "critical";
-
 interface HUDProps {
   readonly health: number;
   readonly ammo: number;
   readonly kills: number;
 }
 
-function drawEyes(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  pupilColor: string,
-  eyeWidth: number,
-  eyeHeight: number,
-  pupilWidth: number,
-  pupilHeight: number,
-  pupilOffX: number,
-  pupilOffY: number,
-): void {
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(x - 5, y, eyeWidth, eyeHeight);
-  ctx.fillRect(x + 2, y, eyeWidth, eyeHeight);
-  ctx.fillStyle = pupilColor;
-  ctx.fillRect(x - 4 + pupilOffX, y + 1 + pupilOffY, pupilWidth, pupilHeight);
-  ctx.fillRect(x + 3 + pupilOffX, y + 1 + pupilOffY, pupilWidth, pupilHeight);
-}
-
-function drawDoomFace(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  expression: FaceExpression,
-  scale: number,
-): void {
-  const size = 18 * scale;
-
-  // Head
-  ctx.fillStyle = "#cc9966";
-  ctx.fillRect(x - size / 2, y, size, size);
-
-  // Hair
-  ctx.fillStyle = "#664433";
-  ctx.fillRect(x - size / 2, y, size, 5 * scale);
-
-  const es = scale; // eye scale
-  switch (expression) {
-    case "normal":
-      drawEyes(ctx, x, y + 6 * scale, "#000000", 3 * es, 3 * es, 2 * es, 2 * es, 0, 0);
-      ctx.fillStyle = "#993333";
-      ctx.fillRect(x - 3 * scale, y + 13 * scale, 6 * scale, 2 * scale);
-      break;
-    case "hurt":
-      drawEyes(ctx, x, y + 7 * scale, "#000000", 3 * es, 2 * es, 2 * es, 2 * es, 0, 0);
-      ctx.fillStyle = "#993333";
-      ctx.fillRect(x - 4 * scale, y + 13 * scale, 8 * scale, 2 * scale);
-      break;
-    case "pain":
-      drawEyes(ctx, x, y + 5 * scale, "#000000", 4 * es, 4 * es, 2 * es, 2 * es, 0, 1 * scale);
-      ctx.fillStyle = "#993333";
-      ctx.fillRect(x - 3 * scale, y + 12 * scale, 6 * scale, 4 * scale);
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(x - 2 * scale, y + 13 * scale, 4 * scale, 2 * scale);
-      break;
-    case "critical":
-      drawEyes(ctx, x, y + 6 * scale, "#cc0000", 4 * es, 3 * es, 2 * es, 2 * es, 0, 1 * scale);
-      ctx.fillStyle = "#664433";
-      ctx.fillRect(x - 6 * scale, y + 5 * scale, 5 * scale, 2 * scale);
-      ctx.fillRect(x + 2 * scale, y + 5 * scale, 5 * scale, 2 * scale);
-      ctx.fillStyle = "#993333";
-      ctx.fillRect(x - 4 * scale, y + 13 * scale, 8 * scale, 3 * scale);
-      break;
-  }
-}
-
 export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const faceImgRef = useRef<HTMLImageElement | null>(null);
 
-  const face: FaceExpression =
-    health > 75 ? "normal" : health > 50 ? "hurt" : health > 25 ? "pain" : "critical";
+  // Load Doom face image once
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/doom-face.jpg";
+    img.onload = () => {
+      faceImgRef.current = img;
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -87,7 +25,6 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Make canvas resolution match display size
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const displayW = Math.round(rect.width * dpr);
@@ -100,72 +37,101 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
 
     const w = canvas.width;
     const h = canvas.height;
-    const s = h / 100; // Scale factor based on height (base = 100px)
+    const s = h / 100; // Scale factor (base 100px height)
 
     ctx.clearRect(0, 0, w, h);
 
-    // Bottom HUD bar (Doom style) - full width
-    ctx.fillStyle = "#555555";
+    // === Bottom HUD bar (Doom style) ===
+    ctx.fillStyle = "#444444";
     ctx.fillRect(0, 0, w, h);
 
-    // Border lines
-    ctx.fillStyle = "#888888";
+    // Top border (bright edge)
+    ctx.fillStyle = "#777777";
     ctx.fillRect(0, 0, w, 2 * s);
+    // Bottom border (dark edge)
     ctx.fillStyle = "#222222";
     ctx.fillRect(0, h - 2 * s, w, 2 * s);
 
-    // Section widths proportional to canvas width
+    // Section dividers
     const sectionW = w / 4;
-    const padding = 20 * s;
-    const labelFont = `bold ${Math.round(14 * s)}px monospace`;
-    const valueFont = `bold ${Math.round(36 * s)}px monospace`;
-    const smallFont = `${Math.round(11 * s)}px monospace`;
+    ctx.fillStyle = "#333333";
+    ctx.fillRect(sectionW, 4 * s, 2 * s, h - 8 * s);
+    ctx.fillRect(sectionW * 2, 4 * s, 2 * s, h - 8 * s);
+    ctx.fillRect(sectionW * 3, 4 * s, 2 * s, h - 8 * s);
 
-    // AMMO section (left quarter)
-    const ammoX = padding;
+    // === Font setup ===
+    const doomFont = (size: number): string => `bold ${Math.round(size)}px "DooM", monospace`;
+    const labelSize = Math.round(12 * s);
+    const valueSize = Math.round(40 * s);
+
+    // === AMMO section (left quarter) ===
+    const ammoX = 16 * s;
+    ctx.textAlign = "left";
     ctx.fillStyle = "#aaaaaa";
-    ctx.font = labelFont;
-    ctx.fillText("AMMO", ammoX, 22 * s);
+    ctx.font = doomFont(labelSize);
+    ctx.fillText("AMMO", ammoX, 20 * s);
     ctx.fillStyle = ammo > 20 ? "#ffcc00" : "#ff3300";
-    ctx.font = valueFont;
-    ctx.fillText(String(ammo).padStart(3, "0"), ammoX, 58 * s);
+    ctx.font = doomFont(valueSize);
+    ctx.fillText(String(ammo).padStart(3, "0"), ammoX, 62 * s);
 
-    // HEALTH section (second quarter)
-    const healthX = sectionW + padding;
+    // === HEALTH section (second quarter) ===
+    const healthX = sectionW + 16 * s;
     ctx.fillStyle = "#aaaaaa";
-    ctx.font = labelFont;
-    ctx.fillText("HEALTH", healthX, 22 * s);
+    ctx.font = doomFont(labelSize);
+    ctx.fillText("HEALTH", healthX, 20 * s);
     const healthColor = health > 50 ? "#00cc00" : health > 25 ? "#ccaa00" : "#cc0000";
     ctx.fillStyle = healthColor;
-    ctx.font = valueFont;
-    ctx.fillText(String(health).padStart(3, "0"), healthX, 58 * s);
+    ctx.font = doomFont(valueSize);
+    ctx.fillText(String(health).padStart(3, "0"), healthX, 62 * s);
 
     // Health bar
-    const barX = healthX;
-    const barW = 100 * s;
     ctx.fillStyle = "#333333";
-    ctx.fillRect(barX, 66 * s, barW, 6 * s);
+    ctx.fillRect(healthX, 70 * s, 100 * s, 6 * s);
     ctx.fillStyle = healthColor;
-    ctx.fillRect(barX, 66 * s, barW * (health / 100), 6 * s);
+    ctx.fillRect(healthX, 70 * s, 100 * s * (health / 100), 6 * s);
 
-    // Doom face (center)
-    const faceX = sectionW * 2 + sectionW / 2;
-    drawDoomFace(ctx, faceX, 16 * s, face, s);
+    // === DOOM FACE (center section) ===
+    const faceCenterX = sectionW * 2 + sectionW / 2;
+    // Draw face background (dark border like in Doom)
+    const faceSize = 70 * s; // Big! Like in Doom
+    const faceX = faceCenterX - faceSize / 2;
+    const faceY = (h - faceSize) / 2;
 
-    // KILLS section (right quarter)
-    const killsX = sectionW * 3 + padding;
+    // Dark background behind face
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(faceX - 4 * s, faceY - 4 * s, faceSize + 8 * s, faceSize + 8 * s);
+
+    // Draw the actual Doom face image
+    const faceImg = faceImgRef.current;
+    if (faceImg) {
+      ctx.drawImage(faceImg, faceX, faceY, faceSize, faceSize);
+    } else {
+      // Fallback: simple colored square while image loads
+      ctx.fillStyle = "#cc9966";
+      ctx.fillRect(faceX, faceY, faceSize, faceSize);
+    }
+
+    // === KILLS section (right quarter) ===
+    const killsX = sectionW * 3 + 16 * s;
+    ctx.textAlign = "left";
     ctx.fillStyle = "#aaaaaa";
-    ctx.font = labelFont;
-    ctx.fillText("KILLS", killsX, 22 * s);
+    ctx.font = doomFont(labelSize);
+    ctx.fillText("KILLS", killsX, 20 * s);
     ctx.fillStyle = "#dddddd";
-    ctx.font = valueFont;
-    ctx.fillText(String(kills), killsX, 58 * s);
+    ctx.font = doomFont(valueSize);
+    ctx.fillText(String(kills), killsX, 62 * s);
 
     // Weapon name
+    ctx.fillStyle = "#666666";
+    ctx.font = doomFont(Math.round(10 * s));
+    ctx.fillText("SHOTGUN", ammoX, 80 * s);
+
+    // Arms indicator (like Doom) - small
     ctx.fillStyle = "#888888";
-    ctx.font = smallFont;
-    ctx.fillText("PISTOL", ammoX, 76 * s);
-  }, [health, ammo, kills, face]);
+    ctx.font = doomFont(Math.round(9 * s));
+    ctx.fillText("ARMS", killsX, 80 * s);
+
+  }, [health, ammo, kills]);
 
   return (
     <canvas
