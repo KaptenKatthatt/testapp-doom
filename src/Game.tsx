@@ -465,6 +465,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           }
           return { ...e, health: newHealth, hitFlash: 1 };
         });
+        enemiesRef.current = updated;
         return updated;
       });
     }    // Enemy AI + projectile spawning
@@ -479,6 +480,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     );
     projectileIdRef.current += spawnedProjectiles.length;
     projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
+    enemiesRef.current = updatedEnemies;
     setEnemies(updatedEnemies);
 
     // Update projectiles
