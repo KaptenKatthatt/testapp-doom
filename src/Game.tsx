@@ -454,8 +454,6 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
     // Enemy AI + projectile spawning
     setEnemies((prev: EnemyData[]): EnemyData[] => {
-      let tookDamage = false;
-      let damageAmount = 0;
       const updated = prev.map((e: EnemyData): EnemyData => {
         if (!e.alive) {
           if (e.hitFlash > 0) {
@@ -511,11 +509,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
           // Only attack if enemy can see the player
           if (canSeePlayer && dist < attackRange && now - e.lastAttack > attackCooldown) {
-            tookDamage = true;
-            damageAmount += 2; // All enemies deal 2 damage per hit
             newAttack = now;
 
-            // Spawn projectile from enemy toward player
+            // Spawn projectile from enemy toward player (damage applied on hit)
             const projDir: [number, number, number] = [ndx, 0, ndz];
             const projPos: [number, number, number] = [e.position[0], 1, e.position[2]];
             const projColor = PROJECTILE_COLORS[e.type] ?? "#ff6600";
@@ -539,16 +535,6 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           hitFlash: newHitFlash,
         };
       });
-
-      if (tookDamage) {
-        player.health = Math.max(0, player.health - damageAmount);
-        player.timesHit++;
-        player.damageFlash = 1;
-        if (player.health <= 0) {
-          gameActiveRef.current = false;
-          onGameOver();
-        }
-      }
 
       return updated;
     });
@@ -590,6 +576,14 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           const dx = p.position[0] - player.position.x;
           const dz = p.position[2] - player.position.z;
           if (dx * dx + dz * dz < 0.8) {
+            // Enemy projectile hit player — apply damage
+            player.health = Math.max(0, player.health - 2);
+            player.timesHit++;
+            player.damageFlash = 1;
+            if (player.health <= 0) {
+              gameActiveRef.current = false;
+              onGameOver();
+            }
             return false; // Remove projectile on player hit
           }
         }
