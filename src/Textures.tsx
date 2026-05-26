@@ -6,6 +6,16 @@ function getCtx(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   return ctx;
 }
 
+function addNoise(ctx: CanvasRenderingContext2D, count: number, maxOpacity: number): void {
+  for (let i = 0; i < count; i++) {
+    const x = Math.random() * 128;
+    const y = Math.random() * 128;
+    const a = Math.random() * maxOpacity;
+    ctx.fillStyle = `rgba(0,0,0,${a})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+}
+
 /** Create a procedural wall texture - brownish brick/stone pattern */
 export function createWallTexture(): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -46,13 +56,7 @@ export function createWallTexture(): THREE.Texture {
   }
 
   // Noise/grain
-  for (let i = 0; i < 500; i++) {
-    const x = Math.random() * 128;
-    const y = Math.random() * 128;
-    const a = Math.random() * 0.15;
-    ctx.fillStyle = `rgba(0,0,0,${a})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
+  addNoise(ctx, 500, 0.15);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
@@ -102,13 +106,7 @@ export function createFloorTexture(): THREE.Texture {
   }
 
   // Noise
-  for (let i = 0; i < 800; i++) {
-    const x = Math.random() * 128;
-    const y = Math.random() * 128;
-    const a = Math.random() * 0.1;
-    ctx.fillStyle = `rgba(0,0,0,${a})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
+  addNoise(ctx, 800, 0.1);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
@@ -149,13 +147,7 @@ export function createCeilingTexture(): THREE.Texture {
   }
 
   // Noise
-  for (let i = 0; i < 600; i++) {
-    const x = Math.random() * 128;
-    const y = Math.random() * 128;
-    const a = Math.random() * 0.08;
-    ctx.fillStyle = `rgba(0,0,0,${a})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
+  addNoise(ctx, 600, 0.08);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;

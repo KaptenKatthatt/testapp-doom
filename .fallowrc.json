@@ -1,0 +1,14 @@
+{
+  "ignorePatterns": [
+    "e2e/**",
+    "generate-midi.cjs"
+  ],
+  "ignoreDependencies": [
+    "midi-writer-js"
+  ],
+  "health": {
+    "maxCyclomatic": 50,
+    "maxCognitive": 70,
+    "maxLines": 600
+  }
+}

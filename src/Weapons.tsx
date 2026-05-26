@@ -7,9 +7,10 @@ interface WeaponsProps {
   readonly shooting: boolean;
   readonly lastShot: number;
   readonly isMoving: boolean;
+  readonly pullbackRef: React.MutableRefObject<number>;
 }
 
-export default function Weapons({ shooting, lastShot, isMoving }: WeaponsProps): React.JSX.Element {
+export default function Weapons({ shooting, lastShot, isMoving, pullbackRef }: WeaponsProps): React.JSX.Element {
   const gunGroupRef = useRef<Group>(null);
   const muzzleRef = useRef<Mesh>(null);
   const muzzleRingRef = useRef<Mesh>(null);
@@ -39,17 +40,18 @@ export default function Weapons({ shooting, lastShot, isMoving }: WeaponsProps):
 
     const gunGroup = gunGroupRef.current;
     if (gunGroup) {
+      const pullback = pullbackRef?.current ?? 0;
       const offset = new THREE.Vector3(
-        0.22 + sway,
-        -0.22 + bob - recoil * 0.08,
-        -0.45 + recoil * 0.12,
+        0.22 + sway - pullback * 0.08,
+        -0.22 + bob - recoil * 0.08 - pullback * 0.25,
+        -0.45 + recoil * 0.12 + pullback * 0.35,
       );
       offset.applyQuaternion(camera.quaternion);
       gunGroup.position.copy(camera.position).add(offset);
       gunGroup.quaternion.copy(camera.quaternion);
-      gunGroup.rotateX(-0.04 + recoil * 0.12);
-      gunGroup.rotateY(0.015 + sway * 0.3);
-      gunGroup.rotateZ(-0.06 + recoil * -0.08);
+      gunGroup.rotateX(-0.04 + recoil * 0.12 - pullback * 0.6);
+      gunGroup.rotateY(0.015 + sway * 0.3 - pullback * 0.2);
+      gunGroup.rotateZ(-0.06 + recoil * -0.08 + pullback * 0.15);
     }
 
     // Muzzle flash: only visible for 70ms after shot
