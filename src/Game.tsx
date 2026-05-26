@@ -486,23 +486,45 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           // Check line of sight before moving or attacking
           const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
 
-          if (dist > 1.2 && canSeePlayer) {
+          if (dist > 1.2) {
+            // Direct movement toward player
             const proposedX = e.position[0] + ndx * eSpeed * dt;
             const proposedZ = e.position[2] + ndz * eSpeed * dt;
-            // Wall collision for enemies
+
             if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
+              // Can move directly toward player
               newX = proposedX;
               newZ = proposedZ;
             } else {
-              // Try sliding along X only
-              const slideX = e.position[0] + ndx * eSpeed * dt;
-              if (!checkCollision(new THREE.Vector3(slideX, 0, e.position[2]), 0.6)) {
-                newX = slideX;
+              // Blocked — try wall sliding (X or Z independently)
+              let movedX = false;
+              let movedZ = false;
+              const slideXPos = e.position[0] + ndx * eSpeed * dt;
+              const slideZPos = e.position[2] + ndz * eSpeed * dt;
+
+              if (!checkCollision(new THREE.Vector3(slideXPos, 0, e.position[2]), 0.6)) {
+                newX = slideXPos;
+                movedX = true;
               }
-              // Try sliding along Z only
-              const slideZ = e.position[2] + ndz * eSpeed * dt;
-              if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZ), 0.6)) {
-                newZ = slideZ;
+              if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZPos), 0.6)) {
+                newZ = slideZPos;
+                movedZ = true;
+              }
+
+              // If still stuck, try perpendicular directions to navigate around corners
+              if (!movedX && !movedZ) {
+                // Try sliding along walls perpendicular to desired direction
+                const perpX = -ndz * eSpeed * dt; // Perpendicular to desired direction
+                const perpZ = ndx * eSpeed * dt;
+
+                // Try both perpendicular directions
+                if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
+                  newX = e.position[0] + perpX;
+                  newZ = e.position[2] + perpZ;
+                } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
+                  newX = e.position[0] - perpX;
+                  newZ = e.position[2] - perpZ;
+                }
               }
             }
           }
