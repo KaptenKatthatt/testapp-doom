@@ -55,6 +55,7 @@ export default function Editor() {
   const [tool, setTool] = useState<CellType>('wall');
   const [isDragging, setIsDragging] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [reachableCells, setReachableCells] = useState<Set<string> | null>(null);
   const [exportCode, setExportCode] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playerPos, setPlayerPos] = useState<[number, number] | null>(null);
@@ -76,6 +77,11 @@ export default function Editor() {
         if (!cell) continue;
         ctx.fillStyle = CELL_COLORS[cell.type];
         ctx.fillRect(x * CELL_SIZE, z * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        // Show reachable overlay
+        if (reachableCells && !reachableCells.has(`${x},${z}`) && cell.type !== 'wall') {
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+          ctx.fillRect(x * CELL_SIZE, z * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
       }
     }
 
@@ -243,31 +249,157 @@ export default function Editor() {
 
   const validate = () => {
     const errors: string[] = [];
-    if (!playerPos) errors.push('❌ No player start position');
+    const warnings: string[] = [];
 
-    let hasEnemy = false;
-    for (let z = 0; z < GRID_H && !hasEnemy; z++) {
-      for (let x = 0; x < GRID_W && !hasEnemy; x++) {
-        if ((ENTITY_TYPES as readonly string[]).includes(getCell(grid, x, z).type)) hasEnemy = true;
-      }
+    // 1. Check player start
+    if (!playerPos) {
+      errors.push('❌ No player start position — place one with 👤 tool');
     }
-    if (!hasEnemy) errors.push('❌ No enemies placed');
 
+    // 2. Check enemies exist
+    let enemyCount = 0;
     for (let z = 0; z < GRID_H; z++) {
       for (let x = 0; x < GRID_W; x++) {
         const t = getCell(grid, x, z).type;
-        if ((ENTITY_TYPES as readonly string[]).includes(t)) {
-          let wc = 0;
-          if (getCell(grid, x, z-1).type === 'wall') wc++;
-          if (getCell(grid, x, z+1).type === 'wall') wc++;
-          if (getCell(grid, x-1, z).type === 'wall') wc++;
-          if (getCell(grid, x+1, z).type === 'wall') wc++;
-          if (wc >= 3) errors.push(`⚠️ ${t} at (${x},${z}) may be stuck in walls`);
+        if ((ENTITY_TYPES as readonly string[]).includes(t)) enemyCount++;
+      }
+    }
+    if (enemyCount === 0) errors.push('❌ No enemies placed');
+
+    // 3. Flood fill from player start — find all reachable cells
+    let visited: Set<string> = new Set();
+    if (playerPos) {
+      visited = new Set<string>();
+      const queue: [number, number][] = [[playerPos[0], playerPos[1]]];
+      visited.add(`${playerPos[0]},${playerPos[1]}`);
+
+      while (queue.length > 0) {
+        const [cx, cz] = queue.shift()!;
+        // 4-directional flood fill (only through empty/entity/door cells)
+        for (const dir of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const dx = dir[0]!;
+          const dz = dir[1]!;
+          const nx = cx + dx;
+          const nz = cz + dz;
+          const key = `${nx},${nz}`;
+          if (visited.has(key)) continue;
+          if (nx < 0 || nx >= GRID_W || nz < 0 || nz >= GRID_H) continue;
+          const cell = getCell(grid, nx, nz);
+          if (cell.type === 'wall') continue; // walls block
+          visited.add(key);
+          queue.push([nx, nz]);
+        }
+      }
+
+      // Check all enemies are reachable
+      for (let z = 0; z < GRID_H; z++) {
+        for (let x = 0; x < GRID_W; x++) {
+          const t = getCell(grid, x, z).type;
+          if ((ENTITY_TYPES as readonly string[]).includes(t)) {
+            if (!visited.has(`${x},${z}`)) {
+              errors.push(`❌ ${t} at (${x},${z}) is NOT reachable from player start`);
+            }
+          }
+          if ((PICKUP_TYPES as readonly string[]).includes(t)) {
+            if (!visited.has(`${x},${z}`)) {
+              errors.push(`❌ ${t} pickup at (${x},${z}) is NOT reachable from player start`);
+            }
+          }
+        }
+      }
+
+      // Check all doors are reachable
+      for (let z = 0; z < GRID_H; z++) {
+        for (let x = 0; x < GRID_W; x++) {
+          if (getCell(grid, x, z).type === 'door' && !visited.has(`${x},${z}`)) {
+            warnings.push(`⚠️ Door at (${x},${z}) is not reachable`);
+          }
+        }
+      }
+
+      // Count unreachable empty cells (potential sealed-off rooms)
+      let unreachableEmpty = 0;
+      for (let z = 0; z < GRID_H; z++) {
+        for (let x = 0; x < GRID_W; x++) {
+          const t = getCell(grid, x, z).type;
+          if (t === 'empty' && !visited.has(`${x},${z}`)) unreachableEmpty++;
+        }
+      }
+      if (unreachableEmpty > 5) {
+        warnings.push(`⚠️ ${unreachableEmpty} empty cells are unreachable (possible sealed rooms)`);
+      }
+    }
+
+    // 4. Passage width check — corridors must be at least 2 cells wide
+    // Check for 1-cell-wide gaps between walls (horizontal and vertical)
+    for (let z = 1; z < GRID_H - 1; z++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        const t = getCell(grid, x, z).type;
+        if (t === 'wall' || t === 'empty') continue;
+
+        // Entity in a 1-wide passage (walls on both sides east-west)
+        if (getCell(grid, x - 1, z).type === 'wall' && getCell(grid, x + 1, z).type === 'wall') {
+          // Check if north or south is open (it's a 1-wide corridor)
+          if (getCell(grid, x, z - 1).type !== 'wall' && getCell(grid, x, z + 1).type !== 'wall') {
+            warnings.push(`⚠️ ${t} at (${x},${z}) is in a 1-wide passage (E-W walls). Monsters need 2+ width`);
+          }
+        }
+        // Entity in a 1-wide passage (walls on both sides north-south)
+        if (getCell(grid, x, z - 1).type === 'wall' && getCell(grid, x, z + 1).type === 'wall') {
+          if (getCell(grid, x - 1, z).type !== 'wall' && getCell(grid, x + 1, z).type !== 'wall') {
+            warnings.push(`⚠️ ${t} at (${x},${z}) is in a 1-wide passage (N-S walls). Monsters need 2+ width`);
+          }
         }
       }
     }
 
-    alert(errors.length === 0 ? '✅ Level looks good!' : errors.join('\n'));
+    // 5. Door placement check — must have open space on at least 2 opposite sides
+    for (let z = 1; z < GRID_H - 1; z++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        if (getCell(grid, x, z).type !== 'door') continue;
+        const openN = getCell(grid, x, z - 1).type !== 'wall';
+        const openS = getCell(grid, x, z + 1).type !== 'wall';
+        const openE = getCell(grid, x + 1, z).type !== 'wall';
+        const openW = getCell(grid, x - 1, z).type !== 'wall';
+
+        // Door needs passage on at least 2 sides (opposite sides ideal)
+        const passableSides = [openN, openS, openE, openW].filter(Boolean).length;
+        if (passableSides < 2) {
+          errors.push(`❌ Door at (${x},${z}) has only ${passableSides} open sides (needs at least 2)`);
+        } else if (!((openN && openS) || (openE && openW))) {
+          warnings.push(`⚠️ Door at (${x},${z}) open sides aren't opposite — may not work as expected`);
+        }
+      }
+    }
+
+    // 6. Enemy stuck check — enemy surrounded by 3+ walls
+    for (let z = 0; z < GRID_H; z++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const t = getCell(grid, x, z).type;
+        if (!(ENTITY_TYPES as readonly string[]).includes(t)) continue;
+        let wallCount = 0;
+        if (getCell(grid, x, z - 1).type === 'wall') wallCount++;
+        if (getCell(grid, x, z + 1).type === 'wall') wallCount++;
+        if (getCell(grid, x - 1, z).type === 'wall') wallCount++;
+        if (getCell(grid, x + 1, z).type === 'wall') wallCount++;
+        if (wallCount >= 3) errors.push(`❌ ${t} at (${x},${z}) is surrounded by walls on ${wallCount} sides — will be stuck!`);
+      }
+    }
+
+    // Report
+    const all = [...errors, ...warnings];
+    if (all.length === 0) {
+      alert('✅ Level looks good! All checks passed:\n• Player start exists\n• All enemies/pickups reachable\n• No stuck enemies\n• No 1-wide passages with entities\n• All doors have open access');
+    } else {
+      alert(errors.length > 0
+        ? `Found ${errors.length} error(s) and ${warnings.length} warning(s):\n\n${all.join('\n')}`
+        : `${warnings.length} warning(s):\n\n${warnings.join('\n')}`);
+    }
+
+    // Show reachable cells visually (red overlay = unreachable)
+    if (playerPos && visited) {
+      setReachableCells(visited);
+    }
   };
 
   return (
@@ -296,6 +428,7 @@ export default function Editor() {
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button onClick={validate} style={btnStyle}>✅ Validate</button>
+        <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
         <a href="/" style={{ ...btnStyle, textDecoration: 'none' }}>🎮 Play</a>
