@@ -1,10 +1,51 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 
 interface MobileControlsProps {
   readonly onMove: (dx: number, dy: number) => void;
-  readonly onLook: (dx: number) => void;
+  readonly onLook: (dx: number, dy: number) => void;
   readonly onShootStart: () => void;
   readonly onShootEnd: () => void;
+}
+
+interface JoystickVisual {
+  active: boolean;
+  originX: number;
+  originY: number;
+  knobX: number;
+  knobY: number;
+}
+
+const JOYSTICK_RADIUS = 55;
+const RING_SIZE = JOYSTICK_RADIUS * 2;
+const KNOB_SIZE = 46;
+
+function getZoneLocal(clientX: number, clientY: number, el: HTMLDivElement): [number, number] {
+  const rect = el.getBoundingClientRect();
+  return [clientX - rect.left, clientY - rect.top];
+}
+
+function clampToZone(x: number, y: number, el: HTMLDivElement): [number, number] {
+  const rect = el.getBoundingClientRect();
+  return [
+    Math.max(JOYSTICK_RADIUS, Math.min(rect.width - JOYSTICK_RADIUS, x)),
+    Math.max(JOYSTICK_RADIUS, Math.min(rect.height - JOYSTICK_RADIUS, y)),
+  ];
+}
+
+function computeKnob(localX: number, localY: number, ox: number, oy: number): { knobX: number; knobY: number; nx: number; ny: number } {
+  const dx = localX - ox;
+  const dy = localY - oy;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const clamped = Math.min(len, JOYSTICK_RADIUS);
+  const scale = len > 0 ? clamped / len : 0;
+  const cdx = dx * scale;
+  const cdy = dy * scale;
+  return {
+    knobX: ox + cdx,
+    knobY: oy + cdy,
+    nx: cdx / JOYSTICK_RADIUS,
+    ny: cdy / JOYSTICK_RADIUS,
+  };
 }
 
 export default function MobileControls({
@@ -14,164 +55,174 @@ export default function MobileControls({
   onShootEnd,
 }: MobileControlsProps): React.JSX.Element {
   const [isMobile, setIsMobile] = useState(false);
-  const moveStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lookLastRef = useRef<number | null>(null);
+  const [moveJoystick, setMoveJoystick] = useState<JoystickVisual>({
+    active: false, originX: 0, originY: 0, knobX: 0, knobY: 0,
+  });
+  const [lookJoystick, setLookJoystick] = useState<JoystickVisual>({
+    active: false, originX: 0, originY: 0, knobX: 0, knobY: 0,
+  });
+
+  const moveTouchIdRef = useRef<number | null>(null);
+  const lookTouchIdRef = useRef<number | null>(null);
+  const moveOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const lookOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const moveZoneRef = useRef<HTMLDivElement>(null);
+  const lookZoneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const hasTouchScreen =
-      "ontouchstart" in window || navigator.maxTouchPoints > 0;
-    setIsMobile(hasTouchScreen);
+    setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  const handleMoveStart = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>): void => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      if (!touch) return;
-      moveStartRef.current = { x: touch.clientX, y: touch.clientY };
-    },
-    [],
-  );
+  // ── Move zone handlers ──────────────────────────────────────────────────────
 
-  const handleMoveMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>): void => {
-      e.preventDefault();
-      if (!moveStartRef.current) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dx = (touch.clientX - moveStartRef.current.x) / 60;
-      const dy = (touch.clientY - moveStartRef.current.y) / 60;
-      onMove(
-        Math.max(-1, Math.min(1, dx)),
-        Math.max(-1, Math.min(1, dy)),
-      );
-    },
-    [onMove],
-  );
+  const handleMoveStart = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (moveTouchIdRef.current !== null || !moveZoneRef.current) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const [lx, ly] = getZoneLocal(touch.clientX, touch.clientY, moveZoneRef.current);
+    const [ox, oy] = clampToZone(lx, ly, moveZoneRef.current);
+    moveTouchIdRef.current = touch.identifier;
+    moveOriginRef.current = { x: ox, y: oy };
+    setMoveJoystick({ active: true, originX: ox, originY: oy, knobX: ox, knobY: oy });
+  }, []);
 
-  const handleMoveEnd = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>): void => {
-      e.preventDefault();
-      moveStartRef.current = null;
-      onMove(0, 0);
-    },
-    [onMove],
-  );
+  const handleMoveMove = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (moveTouchIdRef.current === null || !moveOriginRef.current || !moveZoneRef.current) return;
+    const touch = Array.from(e.touches).find(t => t.identifier === moveTouchIdRef.current);
+    if (!touch) return;
+    const [lx, ly] = getZoneLocal(touch.clientX, touch.clientY, moveZoneRef.current);
+    const { x: ox, y: oy } = moveOriginRef.current;
+    const { knobX, knobY, nx, ny } = computeKnob(lx, ly, ox, oy);
+    onMove(nx, ny);
+    setMoveJoystick(prev => ({ ...prev, knobX, knobY }));
+  }, [onMove]);
 
-  const handleLookMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>): void => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      if (!touch) return;
-      if (lookLastRef.current !== null) {
-        const dx = touch.clientX - lookLastRef.current;
-        onLook(dx * 0.003);
-      }
-      lookLastRef.current = touch.clientX;
-    },
-    [onLook],
-  );
+  const handleMoveEnd = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (!Array.from(e.changedTouches).some(t => t.identifier === moveTouchIdRef.current)) return;
+    moveTouchIdRef.current = null;
+    moveOriginRef.current = null;
+    onMove(0, 0);
+    setMoveJoystick(prev => ({ ...prev, active: false }));
+  }, [onMove]);
 
-  const handleLookEnd = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>): void => {
-      e.preventDefault();
-      lookLastRef.current = null;
-    },
-    [],
-  );
+  // ── Look zone handlers ──────────────────────────────────────────────────────
+
+  const handleLookStart = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (lookTouchIdRef.current !== null || !lookZoneRef.current) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const [lx, ly] = getZoneLocal(touch.clientX, touch.clientY, lookZoneRef.current);
+    const [ox, oy] = clampToZone(lx, ly, lookZoneRef.current);
+    lookTouchIdRef.current = touch.identifier;
+    lookOriginRef.current = { x: ox, y: oy };
+    setLookJoystick({ active: true, originX: ox, originY: oy, knobX: ox, knobY: oy });
+  }, []);
+
+  const handleLookMove = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (lookTouchIdRef.current === null || !lookOriginRef.current || !lookZoneRef.current) return;
+    const touch = Array.from(e.touches).find(t => t.identifier === lookTouchIdRef.current);
+    if (!touch) return;
+    const [lx, ly] = getZoneLocal(touch.clientX, touch.clientY, lookZoneRef.current);
+    const { x: ox, y: oy } = lookOriginRef.current;
+    const { knobX, knobY, nx, ny } = computeKnob(lx, ly, ox, oy);
+    onLook(nx, ny);
+    setLookJoystick(prev => ({ ...prev, knobX, knobY }));
+  }, [onLook]);
+
+  const handleLookEnd = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    if (!Array.from(e.changedTouches).some(t => t.identifier === lookTouchIdRef.current)) return;
+    lookTouchIdRef.current = null;
+    lookOriginRef.current = null;
+    onLook(0, 0);
+    setLookJoystick(prev => ({ ...prev, active: false }));
+  }, [onLook]);
 
   if (!isMobile) return <></>;
 
+  const ringStyle = (j: JoystickVisual): React.CSSProperties => ({
+    position: "absolute",
+    left: j.originX - JOYSTICK_RADIUS,
+    top: j.originY - JOYSTICK_RADIUS,
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: "50%",
+    background: "rgba(255, 255, 255, 0.08)",
+    border: "2px solid rgba(255, 255, 255, 0.35)",
+    pointerEvents: "none",
+  });
+
+  const knobStyle = (j: JoystickVisual): React.CSSProperties => ({
+    position: "absolute",
+    left: (j.knobX - j.originX) + JOYSTICK_RADIUS - KNOB_SIZE / 2,
+    top: (j.knobY - j.originY) + JOYSTICK_RADIUS - KNOB_SIZE / 2,
+    width: KNOB_SIZE,
+    height: KNOB_SIZE,
+    borderRadius: "50%",
+    background: "rgba(255, 255, 255, 0.45)",
+    pointerEvents: "none",
+  });
+
   return (
     <>
-      {/* Left side - Movement joystick */}
+      {/* Left zone – movement */}
       <div
+        ref={moveZoneRef}
+        data-testid="move-zone"
         onTouchStart={handleMoveStart}
         onTouchMove={handleMoveMove}
         onTouchEnd={handleMoveEnd}
+        onTouchCancel={handleMoveEnd}
         style={{
           position: "absolute",
           left: 0,
-          bottom: "100px",
+          bottom: 0,
           width: "50%",
-          height: "calc(100% - 100px)",
+          height: "50%",
           zIndex: 15,
           touchAction: "none",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            left: 40,
-            bottom: 40,
-            width: 120,
-            height: 120,
-            borderRadius: "50%",
-            background: "rgba(255, 255, 255, 0.15)",
-            border: "2px solid rgba(255, 255, 255, 0.3)",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.4)",
-              pointerEvents: "none",
-            }}
-          />
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            left: 30,
-            bottom: 20,
-            color: "rgba(255,255,255,0.5)",
-            fontFamily: "monospace",
-            fontSize: 10,
-            pointerEvents: "none",
-          }}
-        >
-          MOVE
-        </div>
+        {moveJoystick.active && (
+          <div style={ringStyle(moveJoystick)}>
+            <div style={knobStyle(moveJoystick)} />
+          </div>
+        )}
       </div>
 
-      {/* Right side - Look zone */}
+      {/* Right zone – look */}
       <div
-        onTouchStart={(): void => { lookLastRef.current = null; }}
+        ref={lookZoneRef}
+        data-testid="look-zone"
+        onTouchStart={handleLookStart}
         onTouchMove={handleLookMove}
         onTouchEnd={handleLookEnd}
+        onTouchCancel={handleLookEnd}
         style={{
           position: "absolute",
           right: 0,
-          bottom: "100px",
+          bottom: 0,
           width: "50%",
-          height: "calc(100% - 100px)",
+          height: "50%",
           zIndex: 15,
           touchAction: "none",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            right: 30,
-            bottom: 20,
-            color: "rgba(255,255,255,0.5)",
-            fontFamily: "monospace",
-            fontSize: 10,
-            pointerEvents: "none",
-          }}
-        >
-          LOOK
-        </div>
+        {lookJoystick.active && (
+          <div style={ringStyle(lookJoystick)}>
+            <div style={knobStyle(lookJoystick)} />
+          </div>
+        )}
       </div>
 
-      {/* Shoot button with pistol SVG icon */}
+      {/* Shoot button */}
       <button
+        data-testid="shoot-button"
         onTouchStart={(e: React.TouchEvent<HTMLButtonElement>): void => {
           e.preventDefault();
           onShootStart();
@@ -183,7 +234,7 @@ export default function MobileControls({
         style={{
           position: "absolute",
           right: 20,
-          bottom: "calc(100px + 20px)",
+          bottom: 20,
           width: 80,
           height: 80,
           borderRadius: "50%",
@@ -202,16 +253,10 @@ export default function MobileControls({
         }}
       >
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Pistol icon - pointed right */}
-          {/* Barrel */}
           <rect x="18" y="8" width="20" height="6" rx="2" fill="#fff" />
-          {/* Body */}
           <rect x="8" y="8" width="12" height="14" rx="2" fill="#fff" />
-          {/* Trigger guard */}
           <rect x="10" y="22" width="6" height="8" rx="1" fill="#fff" />
-          {/* Grip */}
           <rect x="6" y="18" width="8" height="16" rx="2" fill="#ddd" />
-          {/* Muzzle flash hint */}
           <circle cx="40" cy="11" r="3" fill="#ff0" opacity="0.8" />
         </svg>
       </button>
