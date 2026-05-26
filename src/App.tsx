@@ -24,6 +24,10 @@ export default function App(): React.JSX.Element {
     setMissionComplete(false);
     setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
+    // Request pointer lock after a short delay so the canvas is ready
+    setTimeout(() => {
+      document.body.requestPointerLock();
+    }, 100);
   }, []);
 
   // Restart on click/Enter/Space when game over or mission complete
