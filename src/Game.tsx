@@ -5,14 +5,17 @@ import Level, { getWalls } from "./Level";
 import Enemies from "./Enemies";
 import Weapons from "./Weapons";
 import Pickups from "./Pickups";
+import Projectiles from "./Projectiles";
 import type {
   PlayerState,
   EnemyData,
   PickupData,
   WallBox,
+  ProjectileData,
 } from "./types";
 
 const COLLISION_MARGIN = 0.4;
+const PROJECTILE_SPEED = 12;
 
 interface GameProps {
   readonly onPlayerState: (state: PlayerState) => void;
@@ -73,10 +76,16 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   zombieman: 2.5,
 };
 
-export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
+const PROJECTILE_COLORS: Record<string, string> = {
+  imp: "#ff6600",
+  demon: "#ff0044",
+  zombieman: "#88ff44",
+};
+
+export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
-    rotation: Math.PI / 2, // Face east toward the door opening
+    rotation: Math.PI / 2,
     health: 100,
     ammo: 50,
     kills: 0,
@@ -84,9 +93,12 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
     lastShot: 0,
   });
   const keysRef = useRef<Record<string, boolean>>({});
+  const projectilesRef = useRef<ProjectileData[]>([]);
+  const projectileIdRef = useRef(0);
   const { camera } = useThree();
   const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
   const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
+  const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
   const walls: WallBox[] = useMemo(() => getWalls(), []);
 
@@ -129,7 +141,6 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       }
     };
 
-    // Mobile shoot events
     const handleGameShoot = ((e: Event): void => {
       const detail = (e as CustomEvent<{ shooting: boolean }>).detail;
       playerRef.current.shooting = detail.shooting;
@@ -159,6 +170,16 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       const dx = pos.x - closestX;
       const dz = pos.z - closestZ;
       if (dx * dx + dz * dz < radius * radius) {
+        return true;
+      }
+    }
+    return false;
+  }, [walls]);
+
+  // Check if a point hits a wall (for projectiles)
+  const checkWallHit = useCallback((x: number, z: number): boolean => {
+    for (const wall of walls) {
+      if (x >= wall.min[0] && x <= wall.max[0] && z >= wall.min[2] && z <= wall.max[2]) {
         return true;
       }
     }
@@ -216,13 +237,11 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
     if (!checkCollision(newPos)) {
       player.position.copy(newPos);
     } else {
-      // Try sliding along X
       const slideX = player.position.clone();
       slideX.x += move.x;
       if (!checkCollision(slideX)) {
         player.position.x = slideX.x;
       }
-      // Try sliding along Z
       const slideZ = player.position.clone();
       slideZ.z += move.z;
       if (!checkCollision(slideZ)) {
@@ -230,7 +249,7 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       }
     }
 
-    // Camera follow - use lookAt approach for correct rotation
+    // Camera follow
     camera.position.set(player.position.x, player.position.y, player.position.z);
     const lookTarget = new THREE.Vector3(
       player.position.x - Math.sin(player.rotation) * 10,
@@ -245,7 +264,6 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       player.ammo--;
       player.lastShot = now;
 
-      // Raycast hit detection
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
       raycaster.far = 50;
@@ -278,7 +296,7 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       });
     }
 
-    // Enemy AI
+    // Enemy AI + projectile spawning
     setEnemies((prev: EnemyData[]): EnemyData[] => {
       let tookDamage = false;
       let damageAmount = 0;
@@ -320,6 +338,21 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
             tookDamage = true;
             damageAmount += 2; // All enemies deal 2 damage per hit
             newAttack = now;
+
+            // Spawn projectile from enemy toward player
+            const projDir: [number, number, number] = [ndx, 0, ndz];
+            const projPos: [number, number, number] = [e.position[0], 1, e.position[2]];
+            const projColor = PROJECTILE_COLORS[e.type] ?? "#ff6600";
+            const proj: ProjectileData = {
+              id: projectileIdRef.current++,
+              position: projPos,
+              direction: projDir,
+              speed: PROJECTILE_SPEED,
+              fromEnemy: true,
+              color: projColor,
+              life: 3,
+            };
+            projectilesRef.current = [...projectilesRef.current, proj];
           }
         }
 
@@ -332,12 +365,37 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       });
 
       if (tookDamage) {
-        // God mode: health never goes below 1, player can't die
-        player.health = Math.max(1, player.health - damageAmount);
+        player.health = Math.max(0, player.health - damageAmount);
+        if (player.health <= 0) {
+          onGameOver();
+        }
       }
 
       return updated;
     });
+
+    // Update projectiles
+    projectilesRef.current = projectilesRef.current
+      .map((p: ProjectileData): ProjectileData => ({
+        ...p,
+        position: [
+          p.position[0] + p.direction[0] * p.speed * dt,
+          p.position[1] + p.direction[1] * p.speed * dt,
+          p.position[2] + p.direction[2] * p.speed * dt,
+        ] as [number, number, number],
+        life: p.life - dt,
+      }))
+      .filter((p: ProjectileData): boolean => {
+        // Remove if expired
+        if (p.life <= 0) return false;
+        // Remove if hit wall
+        if (checkWallHit(p.position[0], p.position[2])) return false;
+        // Remove if out of bounds
+        if (Math.abs(p.position[0]) > 60 || Math.abs(p.position[2]) > 60) return false;
+        return true;
+      });
+
+    setProjectiles([...projectilesRef.current]);
 
     // Pickup collection
     setPickups((prev: PickupData[]): PickupData[] => {
@@ -367,6 +425,7 @@ export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMov
       <Level />
       <Enemies enemies={enemies} />
       <Pickups pickups={pickups} />
+      <Projectiles projectiles={projectiles} />
       <Weapons
         shooting={playerRef.current.shooting}
         lastShot={playerRef.current.lastShot}

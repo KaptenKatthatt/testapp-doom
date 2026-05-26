@@ -30,3 +30,13 @@ export interface WallBox {
   min: [number, number, number];
   max: [number, number, number];
 }
+
+export interface ProjectileData {
+  id: number;
+  position: [number, number, number];
+  direction: [number, number, number];
+  speed: number;
+  fromEnemy: boolean;
+  color: string;
+  life: number; // seconds remaining
+}
