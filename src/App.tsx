@@ -269,7 +269,7 @@ export default function App(): React.JSX.Element {
             fontFamily: "monospace",
             color: "#cc8800",
             zIndex: 100,
-            cursor: "crosshair",
+            cursor: "url(/doom-cursor.png) 16 16, crosshair",
             overflow: "hidden",
             padding: "20px",
             boxSizing: "border-box",
@@ -330,7 +330,7 @@ export default function App(): React.JSX.Element {
               background: "#663300",
               color: "#ffcc00",
               border: "2px solid #aa5500",
-              cursor: "crosshair",
+              cursor: "url(/doom-cursor.png) 16 16, crosshair",
               letterSpacing: "2px",
               marginTop: "8px",
             }}
