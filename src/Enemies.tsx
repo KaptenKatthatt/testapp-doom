@@ -1,7 +1,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { Mesh, Group, PointLight } from "three";
+import type { Mesh, Group } from "three";
 import type { EnemyData, EnemyType } from "./types";
 
 const ENEMY_CONFIG: Record<EnemyType, {
@@ -42,10 +42,8 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const { position, type, hitFlash } = enemy;
   const config = ENEMY_CONFIG[type];
   const isDemon = type === "demon";
-  const isZombie = type === "zombieman";
   const eyeColor = isDemon ? "#ff0044" : "#ff4400";
   const healthPct = enemy.health / enemy.maxHealth;
-  const flashColor = hitFlash > 0 ? 0xffffff : 0x000000;
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
 
   // Create procedural texture for this enemy type

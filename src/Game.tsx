@@ -73,7 +73,7 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   zombieman: 2.5,
 };
 
-export default function Game({ onPlayerState, onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver: _onGameOver, mobileMoveRef, mobileLookRef }: GameProps): React.JSX.Element {
   const playerRef = useRef<PlayerData>({
     position: new THREE.Vector3(3, 1.7, 4),
     rotation: Math.PI / 2, // Face east toward the door opening
