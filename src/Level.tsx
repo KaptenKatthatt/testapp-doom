@@ -129,10 +129,6 @@ const WALL_DATA: Array<{
   // ═══════════════════════════════════════════════════
   // Alcove in start room SW corner
   { x: 0, y: 2, z: 8, w: 1.5, h: WH, d: 1, color: W2 },
-  // Step at corridor → slime room transition
-  { x: 10, y: 0.5, z: 17, w: 4, h: 1, d: 1, color: M, noCollision: true },
-  // Step at slime room → north corridor transition
-  { x: 12, y: 0.4, z: 31, w: 3, h: 0.8, d: 1, color: M, noCollision: true },
 ];
 
 interface WallMeshData {

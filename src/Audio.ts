@@ -106,14 +106,23 @@ class AudioManager {
   }
 
   // Play a sound effect
-  play(name: string): void {
+  play(name: string, volumeScale = 1.0): void {
     if (!this.loaded || !this.audioContext || !this.sfxGain) return;
     const buffer = this.buffers.get(name);
     if (!buffer) return;
 
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.sfxGain);
+
+    if (volumeScale !== 1.0) {
+      const localGain = this.audioContext.createGain();
+      localGain.gain.value = volumeScale;
+      source.connect(localGain);
+      localGain.connect(this.sfxGain);
+    } else {
+      source.connect(this.sfxGain);
+    }
+
     source.start(0);
   }
 
