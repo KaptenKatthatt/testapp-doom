@@ -69,9 +69,9 @@ const INITIAL_PICKUPS: PickupData[] = [
 ];
 
 const ENEMY_SPEEDS: Record<string, number> = {
-  imp: 1.5,
-  demon: 3,
-  zombieman: 1.0,
+  imp: 3.0,
+  demon: 5.0,
+  zombieman: 2.5,
 };
 
 const ENEMY_ATTACK_RANGES: Record<string, number> = {
@@ -81,8 +81,8 @@ const ENEMY_ATTACK_RANGES: Record<string, number> = {
 };
 
 const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
-  imp: 2,
-  demon: 1.2,
+  imp: 1.5,
+  demon: 0.8,
   zombieman: 2.5,
 };
 
