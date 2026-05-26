@@ -13,18 +13,20 @@ export default function App(): React.JSX.Element {
     kills: 0,
   });
   const [gameOver, setGameOver] = useState(false);
+  const [missionComplete, setMissionComplete] = useState(false);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
     setGameOver(false);
+    setMissionComplete(false);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
   }, []);
 
   // Restart on click/Enter/Space when game over
   useEffect(() => {
-    if (!gameOver) return;
+    if (!gameOver && !missionComplete) return;
     const handleRestartKey = (e: KeyboardEvent): void => {
       if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
         window.location.reload();
@@ -32,7 +34,7 @@ export default function App(): React.JSX.Element {
     };
     window.addEventListener("keydown", handleRestartKey);
     return () => window.removeEventListener("keydown", handleRestartKey);
-  }, [gameOver]);
+  }, [gameOver, missionComplete]);
 
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];
@@ -108,6 +110,10 @@ export default function App(): React.JSX.Element {
             setGameOver(true);
             document.exitPointerLock();
           }}
+          onMissionComplete={(): void => {
+            setMissionComplete(true);
+            document.exitPointerLock();
+          }}
           mobileMoveRef={mobileMoveRef}
           mobileLookRef={mobileLookRef}
         />
@@ -172,6 +178,45 @@ export default function App(): React.JSX.Element {
             }}
           >
             Click anywhere to restart
+          </p>
+        </div>
+      )}
+      {missionComplete && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,40,0,0.8)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "monospace",
+            color: "#00ff00",
+            zIndex: 20,
+            cursor: "pointer",
+          }}
+          onClick={(): void => { window.location.reload(); }}
+        >
+          <h1
+            style={{
+              fontSize: "56px",
+              textShadow: "0 0 30px #0f0",
+            }}
+          >
+            MISSION ACCOMPLISHED
+          </h1>
+          <p
+            style={{
+              fontSize: "20px",
+              marginTop: "20px",
+              color: "#88ff88",
+            }}
+          >
+            Play again?
           </p>
         </div>
       )}
