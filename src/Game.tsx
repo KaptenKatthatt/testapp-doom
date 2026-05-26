@@ -102,6 +102,11 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
+  const enemiesRef = useRef<EnemyData[]>(INITIAL_ENEMIES);
+  // Keep enemies ref in sync for collision checks in game loop
+  useEffect(() => {
+    enemiesRef.current = enemies;
+  }, [enemies]);
   const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
@@ -194,6 +199,19 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return false;
   }, [walls]);
 
+  // Check if position collides with any alive enemy
+  const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius: number = 0.8): boolean => {
+    for (const e of currentEnemies) {
+      if (!e.alive) continue;
+      const dx = pos.x - e.position[0];
+      const dz = pos.z - e.position[2];
+      if (dx * dx + dz * dz < radius * radius) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
   // Main game loop
   useFrame((_state, delta) => {
     const player = playerRef.current;
@@ -240,11 +258,14 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       move.normalize().multiplyScalar(speed * dt);
     }
 
-    // Collision resolution with wall sliding
+    // Collision resolution with wall sliding + enemy collision
     const newPos = player.position.clone().add(move);
-    if (!checkCollision(newPos)) {
+    const hitWall = checkCollision(newPos);
+    const hitEnemy = checkEnemyCollision(newPos, enemiesRef.current);
+    if (!hitWall && !hitEnemy) {
       player.position.copy(newPos);
-    } else {
+    } else if (!hitEnemy) {
+      // Wall slide
       const slideX = player.position.clone();
       slideX.x += move.x;
       if (!checkCollision(slideX)) {
@@ -256,6 +277,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         player.position.z = slideZ.z;
       }
     }
+    // If hitEnemy, don't move at all (can't walk through monsters)
 
     // Camera follow with pitch
     camera.position.set(player.position.x, player.position.y, player.position.z);
@@ -368,7 +390,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           const ndx = len > 0.01 ? dx / len : 0;
           const ndz = len > 0.01 ? dz / len : 0;
 
-          if (dist > 2) {
+          if (dist > 1.2) {
             newX += ndx * eSpeed * dt;
             newZ += ndz * eSpeed * dt;
           }
