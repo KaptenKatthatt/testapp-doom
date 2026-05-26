@@ -268,10 +268,11 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     camera.lookAt(lookTarget);
     camera.updateMatrixWorld(true);
 
-    // Shooting - player projectiles
+    // Shooting - pump action: one shot per click
     if (player.shooting && now - player.lastShot > 0.25 && player.ammo > 0) {
       player.ammo--;
       player.lastShot = now;
+      player.shooting = false; // Reset: must click again for next shot
 
       // Spawn player bullet projectile
       const camDir = new THREE.Vector3();
