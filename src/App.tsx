@@ -24,17 +24,12 @@ export default function App(): React.JSX.Element {
     setMissionComplete(false);
     setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0 });
-    // Request pointer lock after a short delay so the canvas is ready
-    setTimeout(() => {
-      document.body.requestPointerLock();
-    }, 100);
   }, []);
 
   // Restart on click/Enter/Space when game over or mission complete
   useEffect(() => {
-    if (!gameOver && !missionComplete) return;
-
     const handleRestartKey = (e: KeyboardEvent): void => {
+      if (!gameOver && !missionComplete) return;
       if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
         document.exitPointerLock();
         handleStart();
@@ -42,18 +37,12 @@ export default function App(): React.JSX.Element {
     };
 
     // Global mousedown: exit pointer lock first, then restart on next click
-    let clickCount = 0;
     const handleMouseDown = (): void => {
+      if (!gameOver && !missionComplete) return; // Skip if game is running
       if (document.pointerLockElement) {
-        // First click: exit pointer lock
         document.exitPointerLock();
-        clickCount = 0;
       } else {
-        // Second click (pointer already free): restart
-        clickCount++;
-        if (clickCount >= 1) {
-          handleStart();
-        }
+        handleStart();
       }
     };
 
