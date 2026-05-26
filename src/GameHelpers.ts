@@ -137,10 +137,10 @@ export function updateEnemyAIHelper(
     // Check line of sight before moving or attacking
     const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
 
-    // Alert sound when enemy first sees the player
+    // Alert sound when enemy first sees the player (scaled down to 0.2 volume)
     if (canSeePlayer && !e.hasAlerted) {
       const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
-      audioManager.play(alertSounds[e.type] ?? 'zombie_alert');
+      audioManager.play(alertSounds[e.type] ?? 'zombie_alert', 0.2);
     }
 
     if (dist > 1.2) {
