@@ -20,6 +20,7 @@ import {
   autosave,
   loadAutosave,
 } from './StorageHelpers';
+import { MusicEngine } from './MusicEngine';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
@@ -75,6 +76,7 @@ export default function Editor() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveValidation, setSaveValidation] = useState<{ errors: string[]; warnings: string[] } | null>(null);
   const [musicTrack, setMusicTrack] = useState<TrackStyleType>('inferno');
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
@@ -394,6 +396,46 @@ export default function Editor() {
     }
   };
 
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const musicEngineRef = useRef<MusicEngine | null>(null);
+
+  const toggleMusicPreview = () => {
+    if (musicPlaying) {
+      // Stop
+      if (musicEngineRef.current) musicEngineRef.current.stop();
+      setMusicPlaying(false);
+    } else {
+      // Play
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.5;
+      gain.connect(ctx.destination);
+      const engine = new MusicEngine();
+      engine.start(ctx, gain, musicTrack);
+      musicEngineRef.current = engine;
+      setMusicPlaying(true);
+    }
+  };
+
+  // Restart preview when track changes
+  useEffect(() => {
+    if (musicPlaying && musicEngineRef.current && audioCtxRef.current) {
+      const ctx = audioCtxRef.current;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.5;
+      gain.connect(ctx.destination);
+      musicEngineRef.current.stop();
+      const engine = new MusicEngine();
+      engine.start(ctx, gain, musicTrack);
+      musicEngineRef.current = engine;
+    }
+    return () => {
+      if (musicEngineRef.current) musicEngineRef.current.stop();
+    };
+  }, [musicTrack]);
+
   const handlePlayMap = () => {
     // Save current map and level data so the game can load it
     const ld = gridToLevelData(grid, playerPos, musicTrack);
@@ -510,6 +552,18 @@ export default function Editor() {
             {opt.emoji} {opt.label}
           </button>
         ))}
+        <button
+          onClick={toggleMusicPreview}
+          style={{
+            ...btnStyle,
+            background: musicPlaying ? '#050' : '#333',
+            border: musicPlaying ? '2px solid #0f0' : '1px solid #c00',
+            fontSize: 13,
+            padding: '4px 10px',
+          }}
+        >
+          {musicPlaying ? '⏸' : '▶'}
+        </button>
       </div>
 
       <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>
