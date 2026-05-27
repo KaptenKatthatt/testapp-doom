@@ -1,7 +1,6 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { useFrame, useThree, createPortal } from "@react-three/fiber";
 import * as THREE from "three";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
 interface WeaponsProps {
   readonly shooting: boolean;
@@ -44,14 +43,10 @@ export default function Weapons({
   const recoilRef = useRef(0);
   const prevShootingRef = useRef(false);
 
-  // Loaded 3D Models
-  const [revolverGroup, setRevolverGroup] = useState<THREE.Group | null>(null);
-  const [dp28Group, setDp28Group] = useState<THREE.Group | null>(null);
-
   // Submesh Refs for animations
-  const cylinderRef = useRef<THREE.Object3D | null>(null);
-  const panMagRef = useRef<THREE.Object3D | null>(null);
-  const boltRef = useRef<THREE.Object3D | null>(null);
+  const cylinderRef = useRef<THREE.Group>(null);
+  const panMagRef = useRef<THREE.Group>(null);
+  const boltRef = useRef<THREE.Mesh>(null);
 
   // Cylinder/Pan Mag rotation trackers
   const targetCylinderRot = useRef(0);
@@ -64,165 +59,6 @@ export default function Weapons({
 
   // Bobbing weight for smoothing out motion
   const bobWeightRef = useRef(0);
-
-  // Load Models and apply textures
-  useEffect(() => {
-    const texLoader = new THREE.TextureLoader();
-
-    // 1. Load Revolver Textures
-    const revMetal1Color = texLoader.load("/models/textures/revolver_metal1_color.jpg");
-    const revMetal1Normal = texLoader.load("/models/textures/revolver_metal1_normal.jpg");
-    const revMetal1Rough = texLoader.load("/models/textures/revolver_metal1_roughness.jpg");
-
-    const revMetal2Color = texLoader.load("/models/textures/revolver_metal2_color.jpg");
-    const revMetal2Normal = texLoader.load("/models/textures/revolver_metal2_normal.jpg");
-    const revMetal2Rough = texLoader.load("/models/textures/revolver_metal2_roughness.jpg");
-
-    const revMetal3Color = texLoader.load("/models/textures/revolver_metal3_color.jpg");
-    const revMetal3Normal = texLoader.load("/models/textures/revolver_metal3_normal.jpg");
-    const revMetal3Rough = texLoader.load("/models/textures/revolver_metal3_roughness.jpg");
-
-    const revWoodColor = texLoader.load("/models/textures/revolver_wood_color.jpg");
-    const revWoodNormal = texLoader.load("/models/textures/revolver_wood_normal.jpg");
-    const revWoodRough = texLoader.load("/models/textures/revolver_wood_roughness.jpg");
-
-    // 2. Load DP-28 Textures
-    const dp28Albedo = texLoader.load("/models/textures/dp28_albedo.jpg");
-    const dp28Ao = texLoader.load("/models/textures/dp28_ao.jpg");
-    const dp28Metal = texLoader.load("/models/textures/dp28_metalness.jpg");
-    const dp28Normal = texLoader.load("/models/textures/dp28_normal.jpg");
-    const dp28Rough = texLoader.load("/models/textures/dp28_roughness.jpg");
-
-    // Fix texture orientations standard for FBX/GLTF
-    [
-      revMetal1Color, revMetal1Normal, revMetal1Rough,
-      revMetal2Color, revMetal2Normal, revMetal2Rough,
-      revMetal3Color, revMetal3Normal, revMetal3Rough,
-      revWoodColor, revWoodNormal, revWoodRough,
-      dp28Albedo, dp28Ao, dp28Metal, dp28Normal, dp28Rough,
-    ].forEach((t) => {
-      t.flipY = false;
-      t.colorSpace = THREE.SRGBColorSpace;
-    });
-
-    const fbxLoader = new FBXLoader();
-
-    // 3. Load Revolver Model
-    fbxLoader.load(
-      "/models/revolver.fbx",
-      (fbx) => {
-        fbx.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            const name = mesh.name.toLowerCase();
-
-            // Find rotating Cylinder
-            if (name.includes("cylinder") || name.includes("drum")) {
-              cylinderRef.current = mesh;
-            }
-
-            // Apply specific PBR materials to mesh parts
-            if (name.includes("wood") || name.includes("grip") || name.includes("handle")) {
-              mesh.material = new THREE.MeshStandardMaterial({
-                map: revWoodColor,
-                normalMap: revWoodNormal,
-                roughnessMap: revWoodRough,
-                emissive: 0xffffff,
-                emissiveMap: revWoodColor,
-                emissiveIntensity: 0.55, // brighten wood grip
-                roughness: 0.75,
-                metalness: 0.1,
-              });
-            } else if (name.includes("cylinder") || name.includes("drum") || name.includes("bullet")) {
-              // Shiny polished steel
-              mesh.material = new THREE.MeshStandardMaterial({
-                map: revMetal2Color,
-                normalMap: revMetal2Normal,
-                roughnessMap: revMetal2Rough,
-                emissive: 0xffffff,
-                emissiveMap: revMetal2Color,
-                emissiveIntensity: 0.45, // brighten cylinder
-                metalness: 0.95,
-                roughness: 0.12,
-              });
-            } else if (name.includes("barrel") || name.includes("trigger") || name.includes("hammer")) {
-              // Dark metal
-              mesh.material = new THREE.MeshStandardMaterial({
-                map: revMetal3Color,
-                normalMap: revMetal3Normal,
-                roughnessMap: revMetal3Rough,
-                emissive: 0xffffff,
-                emissiveMap: revMetal3Color,
-                emissiveIntensity: 0.45, // brighten barrel/parts
-                metalness: 0.85,
-                roughness: 0.28,
-              });
-            } else {
-              // Default frame metal
-              mesh.material = new THREE.MeshStandardMaterial({
-                map: revMetal1Color,
-                normalMap: revMetal1Normal,
-                roughnessMap: revMetal1Rough,
-                emissive: 0xffffff,
-                emissiveMap: revMetal1Color,
-                emissiveIntensity: 0.45, // brighten frame
-                metalness: 0.88,
-                roughness: 0.22,
-              });
-            }
-          }
-        });
-
-        // Set scaling and orient pointing forward (only modify Y rotation to keep loader's X/Z Z-up conversion)
-        fbx.scale.set(0.032, 0.032, 0.032);
-        fbx.rotation.y = Math.PI * 1.5; 
-        setRevolverGroup(fbx);
-      },
-      undefined,
-      (err) => console.error("Error loading revolver FBX:", err)
-    );
-
-    // 4. Load DP-28 Model
-    fbxLoader.load(
-      "/models/dp28.fbx",
-      (fbx) => {
-        fbx.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            const name = mesh.name.toLowerCase();
-
-            // Locate rotating magazine disc or bolt slider
-            if (name.includes("mag") || name.includes("drum")) {
-              panMagRef.current = mesh;
-            }
-            if (name.includes("bolt") || name.includes("slide") || name.includes("zatvor")) {
-              boltRef.current = mesh;
-            }
-
-            mesh.material = new THREE.MeshStandardMaterial({
-              map: dp28Albedo,
-              aoMap: dp28Ao,
-              metalnessMap: dp28Metal,
-              normalMap: dp28Normal,
-              roughnessMap: dp28Rough,
-              emissive: 0xffffff,
-              emissiveMap: dp28Albedo,
-              emissiveIntensity: 0.52, // brighten machinegun
-              metalness: 0.85,
-              roughness: 0.32,
-            });
-          }
-        });
-
-        // Scale up DP-28 and orient pointing forward (only modify Y rotation to keep loader's X/Z Z-up conversion)
-        fbx.scale.set(0.024, 0.024, 0.024);
-        fbx.rotation.y = Math.PI; 
-        setDp28Group(fbx);
-      },
-      undefined,
-      (err) => console.error("Error loading DP28 FBX:", err)
-    );
-  }, []);
 
   // Frame processing loop for FPS movement bobbing, sway, recoil, reload and custom rotations
   useFrame((_state, delta) => {
@@ -266,8 +102,8 @@ export default function Weapons({
         // Rapid spinning during reload
         currentCylinderRot.current += dt * 10;
         cylinderRef.current.rotation.y = currentCylinderRot.current;
-        // Swing cylinder out on reload (locally on X-axis, proportional to new scale)
-        cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, -0.35, dt * 10);
+        // Swing cylinder out on reload (locally on X-axis, proportional to new procedural scale)
+        cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, -0.015, dt * 10);
       } else {
         // Reset cylinder swing out
         cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, 0, dt * 10);
@@ -279,26 +115,26 @@ export default function Weapons({
 
     if (panMagRef.current) {
       if (machinegunReloading) {
-        // Magazine detach / attach animation (proportional to new scale)
+        // Magazine detach / attach animation (proportional to new procedural scale)
         reloadElapsed.current += dt;
         const progress = reloadElapsed.current; // Max reload time is 2.0s
 
         if (progress < 0.6) {
           // 0.0s - 0.6s: Pan mag lifted up and off the weapon
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 11.0, dt * 8);
-          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 5.0, dt * 8);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 0.18, dt * 8);
+          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 0.05, dt * 8);
         } else if (progress < 1.4) {
           // 0.6s - 1.4s: Magazine completely out of sight (beneath the player camera)
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -20.0, dt * 12);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -0.50, dt * 12);
         } else {
           // 1.4s - 2.0s: New magazine brought up, aligned, and snapped down on top
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 2.8, dt * 10);
-          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 0, dt * 10);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 0.038, dt * 10);
+          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, -0.06, dt * 10);
         }
       } else {
-        // Normal state: mag resting on top of the barrel, rotating when firing
+        // Normal state: mag resting on top of the receiver, rotating when firing
         reloadElapsed.current = 0;
-        panMagRef.current.position.set(0, 2.8, 0); // original local coordinate position
+        panMagRef.current.position.set(0, 0.038, -0.06); // original local coordinate position
         currentMagRot.current = THREE.MathUtils.lerp(currentMagRot.current, targetMagRot.current, dt * 10);
         panMagRef.current.rotation.y = currentMagRot.current;
       }
@@ -307,9 +143,9 @@ export default function Weapons({
     // Bolt pull back animation on machine gun firing
     if (boltRef.current) {
       if (shooting && currentWeapon === "machinegun" && !machinegunReloading) {
-        boltRef.current.position.z = -2.0; // recoil bolt position (proportional to new scale)
+        boltRef.current.position.z = -0.02; // recoil bolt position relative to its baseline
       } else {
-        boltRef.current.position.z = THREE.MathUtils.lerp(boltRef.current.position.z, 0, dt * 15); // snap back forward
+        boltRef.current.position.z = THREE.MathUtils.lerp(boltRef.current.position.z, 0.02, dt * 15); // snap back forward
       }
     }
 
@@ -387,141 +223,289 @@ export default function Weapons({
 
   return createPortal(
     <group ref={gunGroupRef}>
-        {/* --- FPS REVOLVER MODEL --- */}
-        {currentWeapon === "revolver" && revolverGroup && (
-          <group>
-            <primitive object={revolverGroup} />
+      {/* --- FPS PROCEDURAL REVOLVER (STYLIZED RETRO RENDER) --- */}
+      {currentWeapon === "revolver" && (
+        <group>
+          {/* Wooden Grip/Handle */}
+          <mesh position={[-0.01, -0.09, 0.05]} rotation={[0.4, 0, 0]}>
+            <boxGeometry args={[0.032, 0.09, 0.04]} />
+            <meshStandardMaterial color={0x8b5a2b} roughness={0.7} />
+          </mesh>
 
-            {/* Muzzle flash sphere in accurate world coordinates */}
-            <mesh ref={revolverMuzzleRef} position={[0.16, -0.4, -1.0]} visible={false}>
-              <sphereGeometry args={[0.05, 8, 8]} />
-              <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
-            </mesh>
+          {/* Main Metal Frame/Receiver */}
+          <mesh position={[0, -0.01, 0.0]}>
+            <boxGeometry args={[0.035, 0.05, 0.16]} />
+            <meshStandardMaterial color={0x444444} metalness={0.85} roughness={0.25} />
+          </mesh>
 
-            {/* Muzzle flash glow ring */}
-            <mesh
-              ref={revolverMuzzleRingRef}
-              position={[0.16, -0.4, -1.0]}
-              rotation={[0, 0, 0]}
-              visible={false}
-            >
-              <ringGeometry args={[0.025, 0.08, 8]} />
-              <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
+          {/* Trigger Guard */}
+          <mesh position={[0, -0.045, -0.02]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.03, 8, 1, true]} />
+            <meshStandardMaterial color={0x333333} metalness={0.8} />
+          </mesh>
+
+          {/* Trigger */}
+          <mesh position={[0, -0.04, -0.015]} rotation={[-0.2, 0, 0]}>
+            <boxGeometry args={[0.006, 0.02, 0.006]} />
+            <meshStandardMaterial color={0x222222} metalness={0.9} />
+          </mesh>
+
+          {/* Rotating Cylinder (Chamber) */}
+          <group ref={cylinderRef} position={[0, 0.005, -0.02]}>
+            {/* Central Cylinder Body */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.022, 0.022, 0.065, 12]} />
+              <meshStandardMaterial color={0x666666} metalness={0.9} roughness={0.2} />
             </mesh>
+            {/* Six Bullet Chambers (embedded dark cylinders representing loaded chambers) */}
+            {[0, 1, 2, 3, 4, 5].map((i) => {
+              const angle = (i * Math.PI) / 3;
+              const radius = 0.012;
+              const cx = Math.cos(angle) * radius;
+              const cy = Math.sin(angle) * radius;
+              return (
+                <mesh key={i} position={[cx, cy, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.005, 0.005, 0.066, 6]} />
+                  <meshStandardMaterial color={0x222222} metalness={0.9} roughness={0.8} />
+                </mesh>
+              );
+            })}
           </group>
-        )}
 
-        {/* --- FPS PROCEDURAL SHOTGUN (LEGACY RENDER) --- */}
-        {currentWeapon === "shotgun" && (
-          <>
-            {/* Main receiver/body */}
-            <mesh>
-              <boxGeometry args={[0.07, 0.06, 0.35]} />
-              <meshBasicMaterial color={0x555555} />
+          {/* Gun Hammer */}
+          <mesh position={[0, 0.035, 0.065]} rotation={[-0.4, 0, 0]}>
+            <boxGeometry args={[0.008, 0.025, 0.01]} />
+            <meshStandardMaterial color={0x222222} metalness={0.9} />
+          </mesh>
+
+          {/* Long Hexagonal Barrel */}
+          <mesh position={[0, 0.015, -0.16]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, 0.16, 6]} />
+            <meshStandardMaterial color={0x333333} metalness={0.85} roughness={0.3} />
+          </mesh>
+
+          {/* Front Sight Post */}
+          <mesh position={[0, 0.032, -0.225]}>
+            <boxGeometry args={[0.005, 0.01, 0.015]} />
+            <meshStandardMaterial color={0x222222} metalness={0.9} />
+          </mesh>
+
+          {/* Muzzle Flash relative to new barrel tip */}
+          <mesh ref={revolverMuzzleRef} position={[0, 0.015, -0.26]} visible={false}>
+            <sphereGeometry args={[0.05, 8, 8]} />
+            <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
+          </mesh>
+
+          {/* Muzzle flash glow ring */}
+          <mesh
+            ref={revolverMuzzleRingRef}
+            position={[0, 0.015, -0.26]}
+            rotation={[0, 0, 0]}
+            visible={false}
+          >
+            <ringGeometry args={[0.025, 0.08, 8]} />
+            <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      )}
+
+      {/* --- FPS PROCEDURAL SHOTGUN (LEGACY RENDER) --- */}
+      {currentWeapon === "shotgun" && (
+        <>
+          {/* Main receiver/body */}
+          <mesh>
+            <boxGeometry args={[0.07, 0.06, 0.35]} />
+            <meshBasicMaterial color={0x555555} />
+          </mesh>
+
+          {/* Barrel - lower */}
+          <mesh position={[0, 0.01, -0.28]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.018, 0.022, 0.28, 8]} />
+            <meshBasicMaterial color={0x333333} />
+          </mesh>
+
+          {/* Second barrel (over-under) */}
+          <mesh position={[0, 0.04, -0.25]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.015, 0.018, 0.24, 8]} />
+            <meshBasicMaterial color={0x2a2a2a} />
+          </mesh>
+
+          {/* Magazine tube below */}
+          <mesh position={[0, -0.025, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.016, 0.016, 0.2, 8]} />
+            <meshBasicMaterial color={0x444444} />
+          </mesh>
+
+          {/* Pump/forend */}
+          <mesh position={[0, -0.01, -0.12]}>
+            <boxGeometry args={[0.045, 0.045, 0.1]} />
+            <meshBasicMaterial color={0x8b5a2b} />
+          </mesh>
+
+          {/* Stock */}
+          <mesh position={[0, -0.01, 0.15]}>
+            <boxGeometry args={[0.05, 0.055, 0.18]} />
+            <meshBasicMaterial color={0x7a4b2a} />
+          </mesh>
+
+          {/* Stock butt */}
+          <mesh position={[0, -0.01, 0.27]}>
+            <boxGeometry args={[0.05, 0.07, 0.04]} />
+            <meshBasicMaterial color={0x6b3e20} />
+          </mesh>
+
+          {/* Grip */}
+          <mesh position={[0, -0.05, 0.06]} rotation={[0.2, 0, 0]}>
+            <boxGeometry args={[0.035, 0.06, 0.03]} />
+            <meshBasicMaterial color={0x7a4b2a} />
+          </mesh>
+
+          {/* Trigger guard */}
+          <mesh position={[0, -0.04, 0.02]}>
+            <boxGeometry args={[0.02, 0.025, 0.04]} />
+            <meshBasicMaterial color={0x444444} />
+          </mesh>
+
+          {/* Ejection port */}
+          <mesh position={[0.02, 0.035, 0.05]}>
+            <boxGeometry args={[0.015, 0.01, 0.05]} />
+            <meshBasicMaterial color={0x666666} />
+          </mesh>
+
+          {/* Muzzle brake */}
+          <mesh position={[0, 0.025, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.024, 0.024, 0.02, 8]} />
+            <meshBasicMaterial color={0x222222} />
+          </mesh>
+
+          {/* Muzzle flash sphere */}
+          <mesh ref={shotgunMuzzleRef} position={[0, 0.025, -0.45]} visible={false}>
+            <sphereGeometry args={[0.06, 8, 8]} />
+            <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
+          </mesh>
+
+          {/* Muzzle flash glow ring */}
+          <mesh
+            ref={shotgunMuzzleRingRef}
+            position={[0, 0.025, -0.45]}
+            rotation={[0, 0, 0]}
+            visible={false}
+          >
+            <ringGeometry args={[0.03, 0.08, 8]} />
+            <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
+
+      {/* --- FPS PROCEDURAL DP-28 MACHINE GUN (STYLIZED RETRO RENDER) --- */}
+      {currentWeapon === "machinegun" && (
+        <group>
+          {/* Long Receiver/Body */}
+          <mesh position={[0, 0, -0.05]}>
+            <boxGeometry args={[0.055, 0.055, 0.38]} />
+            <meshStandardMaterial color={0x333333} metalness={0.8} roughness={0.3} />
+          </mesh>
+
+          {/* Wooden Stock */}
+          <mesh position={[0, -0.025, 0.22]} rotation={[-0.1, 0, 0]}>
+            <boxGeometry args={[0.045, 0.05, 0.18]} />
+            <meshStandardMaterial color={0x7a4b2a} roughness={0.6} />
+          </mesh>
+
+          {/* Stock butt plate */}
+          <mesh position={[0, -0.025, 0.31]}>
+            <boxGeometry args={[0.046, 0.065, 0.02]} />
+            <meshStandardMaterial color={0x222222} metalness={0.9} />
+          </mesh>
+
+          {/* Pistol Grip */}
+          <mesh position={[0, -0.065, 0.12]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={[0.03, 0.06, 0.035]} />
+            <meshStandardMaterial color={0x7a4b2a} roughness={0.6} />
+          </mesh>
+
+          {/* Trigger Guard */}
+          <mesh position={[0, -0.045, 0.075]}>
+            <boxGeometry args={[0.015, 0.025, 0.045]} />
+            <meshStandardMaterial color={0x222222} metalness={0.8} />
+          </mesh>
+
+          {/* Rotating Pan Magazine (DP-28 disc magazine) */}
+          <group ref={panMagRef} position={[0, 0.038, -0.06]}>
+            {/* Disc Plate */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.13, 0.13, 0.018, 16]} />
+              <meshStandardMaterial color={0x4f4f4f} metalness={0.85} roughness={0.4} />
             </mesh>
-
-            {/* Barrel - lower */}
-            <mesh position={[0, 0.01, -0.28]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.018, 0.022, 0.28, 8]} />
-              <meshBasicMaterial color={0x333333} />
+            {/* Central Dome Bolt */}
+            <mesh position={[0, 0.012, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.02, 0.02, 0.01, 8]} />
+              <meshStandardMaterial color={0x222222} metalness={0.9} />
             </mesh>
-
-            {/* Second barrel (over-under) */}
-            <mesh position={[0, 0.04, -0.25]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.015, 0.018, 0.24, 8]} />
-              <meshBasicMaterial color={0x2a2a2a} />
-            </mesh>
-
-            {/* Magazine tube below */}
-            <mesh position={[0, -0.025, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.016, 0.016, 0.2, 8]} />
-              <meshBasicMaterial color={0x444444} />
-            </mesh>
-
-            {/* Pump/forend */}
-            <mesh position={[0, -0.01, -0.12]}>
-              <boxGeometry args={[0.045, 0.045, 0.1]} />
-              <meshBasicMaterial color={0x8b5a2b} />
-            </mesh>
-
-            {/* Stock */}
-            <mesh position={[0, -0.01, 0.15]}>
-              <boxGeometry args={[0.05, 0.055, 0.18]} />
-              <meshBasicMaterial color={0x7a4b2a} />
-            </mesh>
-
-            {/* Stock butt */}
-            <mesh position={[0, -0.01, 0.27]}>
-              <boxGeometry args={[0.05, 0.07, 0.04]} />
-              <meshBasicMaterial color={0x6b3e20} />
-            </mesh>
-
-            {/* Grip */}
-            <mesh position={[0, -0.05, 0.06]} rotation={[0.2, 0, 0]}>
-              <boxGeometry args={[0.035, 0.06, 0.03]} />
-              <meshBasicMaterial color={0x7a4b2a} />
-            </mesh>
-
-            {/* Trigger guard */}
-            <mesh position={[0, -0.04, 0.02]}>
-              <boxGeometry args={[0.02, 0.025, 0.04]} />
-              <meshBasicMaterial color={0x444444} />
-            </mesh>
-
-            {/* Ejection port */}
-            <mesh position={[0.02, 0.035, 0.05]}>
-              <boxGeometry args={[0.015, 0.01, 0.05]} />
-              <meshBasicMaterial color={0x666666} />
-            </mesh>
-
-            {/* Muzzle brake */}
-            <mesh position={[0, 0.025, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.024, 0.024, 0.02, 8]} />
-              <meshBasicMaterial color={0x222222} />
-            </mesh>
-
-            {/* Muzzle flash sphere */}
-            <mesh ref={shotgunMuzzleRef} position={[0, 0.025, -0.45]} visible={false}>
-              <sphereGeometry args={[0.06, 8, 8]} />
-              <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
-            </mesh>
-
-            {/* Muzzle flash glow ring */}
-            <mesh
-              ref={shotgunMuzzleRingRef}
-              position={[0, 0.025, -0.45]}
-              rotation={[0, 0, 0]}
-              visible={false}
-            >
-              <ringGeometry args={[0.03, 0.08, 8]} />
-              <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
-            </mesh>
-          </>
-        )}
-
-        {/* --- FPS MACHINE GUN (DP-28) MODEL --- */}
-        {currentWeapon === "machinegun" && dp28Group && (
-          <group>
-            <primitive object={dp28Group} />
-
-            {/* Muzzle flash sphere in accurate world coordinates */}
-            <mesh ref={machinegunMuzzleRef} position={[0.15, -0.35, -1.35]} visible={false}>
-              <sphereGeometry args={[0.08, 8, 8]} />
-              <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
-            </mesh>
-
-            {/* Muzzle flash glow ring */}
-            <mesh
-              ref={machinegunMuzzleRingRef}
-              position={[0.15, -0.35, -1.35]}
-              rotation={[0, 0, 0]}
-              visible={false}
-            >
-              <ringGeometry args={[0.04, 0.15, 8]} />
-              <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
-            </mesh>
+            {/* Visual Grooves for Rotation Feedback */}
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+              const angle = (i * Math.PI) / 4;
+              return (
+                <mesh
+                  key={i}
+                  position={[Math.cos(angle) * 0.065, 0.009, Math.sin(angle) * 0.065]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.09, 0.003, 0.012]} />
+                  <meshStandardMaterial color={0x2a2a2a} metalness={0.9} />
+                </mesh>
+              );
+            })}
           </group>
-        )}
+
+          {/* Recoiling Bolt Slider */}
+          <mesh ref={boltRef} position={[0.03, 0.005, 0.02]}>
+            <boxGeometry args={[0.01, 0.015, 0.035]} />
+            <meshStandardMaterial color={0xdddddd} metalness={0.95} roughness={0.1} />
+          </mesh>
+
+          {/* Long Steel Barrel */}
+          <mesh position={[0, 0.01, -0.34]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.014, 0.014, 0.28, 8]} />
+            <meshStandardMaterial color={0x1e1e1e} metalness={0.9} roughness={0.2} />
+          </mesh>
+
+          {/* Bipod Mount */}
+          <mesh position={[0, -0.018, -0.34]}>
+            <boxGeometry args={[0.022, 0.022, 0.04]} />
+            <meshStandardMaterial color={0x222222} metalness={0.9} />
+          </mesh>
+
+          {/* Bipod Left Leg */}
+          <mesh position={[-0.03, -0.09, -0.34]} rotation={[0, 0, 0.25]}>
+            <boxGeometry args={[0.006, 0.14, 0.008]} />
+            <meshStandardMaterial color={0x3a3a3a} metalness={0.8} />
+          </mesh>
+
+          {/* Bipod Right Leg */}
+          <mesh position={[0.03, -0.09, -0.34]} rotation={[0, 0, -0.25]}>
+            <boxGeometry args={[0.006, 0.14, 0.008]} />
+            <meshStandardMaterial color={0x3a3a3a} metalness={0.8} />
+          </mesh>
+
+          {/* Muzzle Flash relative to new barrel tip */}
+          <mesh ref={machinegunMuzzleRef} position={[0, 0.01, -0.52]} visible={false}>
+            <sphereGeometry args={[0.08, 8, 8]} />
+            <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
+          </mesh>
+
+          {/* Muzzle flash glow ring */}
+          <mesh
+            ref={machinegunMuzzleRingRef}
+            position={[0, 0.01, -0.52]}
+            rotation={[0, 0, 0]}
+            visible={false}
+          >
+            <ringGeometry args={[0.04, 0.15, 8]} />
+            <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      )}
     </group>,
     camera
   );
