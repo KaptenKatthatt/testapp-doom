@@ -366,14 +366,16 @@ interface SavedMap {
   grid: CellType[][];
   playerPos: [number, number] | null;
   timestamp: number;
+  validated?: boolean;
 }
 
-function saveMapToStorage(name: string, grid: CellData[][], playerPos: [number, number] | null) {
+function saveMapToStorage(name: string, grid: CellData[][], playerPos: [number, number] | null, validated: boolean) {
   const data: SavedMap = {
     name,
     grid: grid.map(row => row.map(c => c.type)),
     playerPos,
     timestamp: Date.now(),
+    validated,
   };
   localStorage.setItem(MAP_PREFIX + name, JSON.stringify(data));
 }
@@ -835,7 +837,8 @@ export default function Editor() {
   const handleSave = () => {
     const name = saveName.trim();
     if (!name) return;
-    saveMapToStorage(name, grid, playerPos);
+    const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
+    saveMapToStorage(name, grid, playerPos, isValid);
     setShowSaveDialog(false);
     setSaveName('');
   };
@@ -865,7 +868,7 @@ export default function Editor() {
     const ld = gridToLevelData(grid, playerPos);
     localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
     // Also save grid data for the editor to restore
-    saveMapToStorage('__playing__', grid, playerPos);
+    saveMapToStorage('__playing__', grid, playerPos, false);
     // Navigate to game — use hash without reload so React picks it up
     window.location.hash = '';
   };

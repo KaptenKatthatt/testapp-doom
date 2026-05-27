@@ -30,8 +30,8 @@ function calcScore(state: PlayerState): number {
   return Math.max(0, killPoints + timeBonus + accuracyBonus + healthBonus - hitPenalty);
 }
 
-function listSavedMaps(): Array<{ name: string; timestamp: number }> {
-  const maps: Array<{ name: string; timestamp: number }> = [];
+function listSavedMaps(): Array<{ name: string; timestamp: number; validated: boolean }> {
+  const maps: Array<{ name: string; timestamp: number; validated: boolean }> = [];
   const prefix = 'doom-map-';
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -40,7 +40,7 @@ function listSavedMaps(): Array<{ name: string; timestamp: number }> {
         const raw = localStorage.getItem(key);
         if (raw) {
           const data = JSON.parse(raw);
-          maps.push({ name: data.name, timestamp: data.timestamp });
+          maps.push({ name: data.name, timestamp: data.timestamp, validated: !!data.validated });
         }
       } catch { /* skip */ }
     }
@@ -75,7 +75,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
   const [gameKey, setGameKey] = useState(0);
-  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
+  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean }>>([]);
   const [showMapModal, setShowMapModal] = useState(false);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
@@ -299,12 +299,12 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               )}
 
               {/* Saved maps */}
-              {savedMaps.length === 0 && !levelData && (
+              {savedMaps.filter(m => m.validated).length === 0 && !levelData && (
                 <p style={{ color: "#555", fontSize: "13px", marginTop: "12px", fontFamily: 'monospace' }}>
-                  No saved maps yet.<br/>Create one in the Level Editor!
+                  No validated maps yet.<br/>Create one in the Level Editor!
                 </p>
               )}
-              {savedMaps.map(m => (
+              {savedMaps.filter(m => m.validated).map(m => (
                 <div
                   key={m.name}
                   onClick={() => { setSelectedLevel(`saved:${m.name}`); setShowMapModal(false); }}
@@ -332,6 +332,11 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                   </button>
                 </div>
               ))}
+              {savedMaps.filter(m => !m.validated).length > 0 && (
+                <div style={{ color: '#660', fontSize: '12px', marginTop: 8, fontFamily: 'monospace', borderTop: '1px solid #333', paddingTop: 8 }}>
+                  ⚠️ {savedMaps.filter(m => !m.validated).length} map(s) not validated (finish & validate in editor)
+                </div>
+              )}
 
               <button
                 onClick={() => setShowMapModal(false)}
