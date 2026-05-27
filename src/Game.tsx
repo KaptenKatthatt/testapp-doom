@@ -699,7 +699,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   return (
     <>
-      <Level customWalls={levelData ? levelData.walls : null} />
+      <Level customWalls={customWallData} />
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);
