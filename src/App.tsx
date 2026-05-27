@@ -99,6 +99,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000, endTime: 0, damageFlash: 0 });
     audioManager.init().then(() => {
       audioManager.resume();
+      audioManager.stopMenuMusic();
       audioManager.playMusic();
     });
     document.body.requestPointerLock();
@@ -134,6 +135,16 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
     };
   }, [gameOver, missionComplete, handleStart]);
+
+  // Restart menu music when returning to the main menu
+  useEffect(() => {
+    if (!started) {
+      if (audioManager.isLoaded()) {
+        audioManager.stopMusic();
+        audioManager.playMenuMusic();
+      }
+    }
+  }, [started]);
 
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];

@@ -27,3 +27,8 @@ canvas {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+@keyframes pulse {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.85; }
+  50% { transform: translate(-50%, 0) scale(1.04); opacity: 0.35; }
+}

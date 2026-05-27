@@ -1,5 +1,6 @@
 // AudioManager — handles all game audio (sound effects + music)
 // Uses Web Audio API for low-latency playback
+import { MenuSynth } from "./MenuSynth";
 
 class AudioManager {
   private audioContext: AudioContext | null = null;
@@ -11,6 +12,8 @@ class AudioManager {
   private musicVolume = 1.0;
   private sfxVolume = 0.5;
   private musicPlaying = false;
+  private menuSynth: MenuSynth | null = null;
+  private menuMusicPlaying = false;
   private loaded = false;
 
   async init(): Promise<void> {
@@ -156,6 +159,34 @@ class AudioManager {
       this.musicSource = null;
       this.musicPlaying = false;
     }
+  }
+
+  // Play menu synth music (looping)
+  playMenuMusic(): void {
+    if (!this.loaded || !this.audioContext || !this.musicGain || this.menuMusicPlaying) return;
+
+    // Stop standard level music if playing
+    this.stopMusic();
+
+    if (!this.menuSynth) {
+      this.menuSynth = new MenuSynth();
+    }
+
+    this.menuSynth.start(this.audioContext, this.musicGain);
+    this.menuMusicPlaying = true;
+  }
+
+  // Stop menu synth music
+  stopMenuMusic(): void {
+    if (this.menuSynth && this.menuMusicPlaying) {
+      this.menuSynth.stop();
+      this.menuMusicPlaying = false;
+    }
+  }
+
+  // Check if menu music is playing
+  isMenuMusicPlaying(): boolean {
+    return this.menuMusicPlaying;
   }
 
   // Set music volume (0-1)

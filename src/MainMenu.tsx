@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LevelData } from './main';
+import { audioManager } from './Audio';
 
 interface SavedMap {
   name: string;
@@ -30,6 +31,68 @@ export default function MainMenu({
   levelData,
   listSavedMaps
 }: MainMenuProps): React.JSX.Element {
+  const [musicActive, setMusicActive] = React.useState(false);
+
+  React.useEffect(() => {
+    if (audioManager.isLoaded() && audioManager.isMenuMusicPlaying()) {
+      setMusicActive(true);
+      return;
+    }
+
+    // Try auto-playing
+    const startAudio = () => {
+      audioManager.init().then(() => {
+        audioManager.resume();
+        audioManager.playMenuMusic();
+        setMusicActive(true);
+      }).catch((err) => {
+        console.log("Autoplay blocked, waiting for user interaction.", err);
+      });
+    };
+
+    startAudio();
+
+    // Fallback: start on any screen interaction
+    const handleInteraction = () => {
+      if (!audioManager.isMenuMusicPlaying()) {
+        startAudio();
+      }
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener('mousedown', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('pointerdown', handleInteraction);
+      window.removeEventListener('mousemove', handleInteraction);
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    window.addEventListener('mousedown', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('pointerdown', handleInteraction);
+    window.addEventListener('mousemove', handleInteraction);
+
+    return cleanup;
+  }, []);
+
+  const toggleMusic = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    audioManager.init().then(() => {
+      audioManager.resume();
+      if (audioManager.isMenuMusicPlaying()) {
+        audioManager.stopMenuMusic();
+        setMusicActive(false);
+      } else {
+        audioManager.playMenuMusic();
+        setMusicActive(true);
+      }
+    });
+  };
+
   return (
     <div
       style={{
@@ -48,6 +111,15 @@ export default function MainMenu({
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'OPTION') return;
+
+        // Auto-play menu music on click if not playing
+        if (!audioManager.isMenuMusicPlaying()) {
+          audioManager.init().then(() => {
+            audioManager.resume();
+            audioManager.playMenuMusic();
+            setMusicActive(true);
+          });
+        }
       }}
     >
       <h1 style={{ fontSize: "72px", margin: "0 0 8px", textShadow: "0 0 30px #f00, 0 0 60px #a00", fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "8px" }}>
@@ -212,6 +284,65 @@ export default function MainMenu({
               ► BACK
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Floating retro metal volume controller */}
+      <button
+        onClick={toggleMusic}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.boxShadow = musicActive ? '0 0 25px #ff0000' : '0 0 15px rgba(255,255,255,0.3)';
+          e.currentTarget.style.borderColor = musicActive ? '#ffffff' : '#aaaaaa';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = musicActive ? '0 0 15px rgba(255, 0, 0, 0.4)' : 'none';
+          e.currentTarget.style.borderColor = musicActive ? '#cc0000' : '#444444';
+        }}
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          background: 'rgba(15, 5, 5, 0.9)',
+          border: musicActive ? '2px solid #cc0000' : '2px solid #444444',
+          borderRadius: '50%',
+          width: '50px',
+          height: '50px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: musicActive ? '#ff3333' : '#666666',
+          fontSize: '20px',
+          cursor: 'pointer',
+          boxShadow: musicActive ? '0 0 15px rgba(255, 0, 0, 0.4)' : 'none',
+          transition: 'all 0.2s ease-in-out',
+          zIndex: 1001,
+          outline: 'none',
+        }}
+        title={musicActive ? "Mute Menu Music" : "Play Menu Music"}
+      >
+        {musicActive ? '🔊' : '🔇'}
+      </button>
+
+      {/* Pulsing prompt to activate music */}
+      {!musicActive && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "80px",
+            left: "50%",
+            color: "#ff3333",
+            fontSize: "11px",
+            fontFamily: "monospace",
+            letterSpacing: "3px",
+            textShadow: "0 0 10px #ff0000",
+            animation: "pulse 1.5s infinite",
+            pointerEvents: "none",
+            textAlign: "center",
+          }}
+        >
+          [ CLICK ANYWHERE TO ACTIVATE MENACING METAL MUSIC ]
         </div>
       )}
     </div>
