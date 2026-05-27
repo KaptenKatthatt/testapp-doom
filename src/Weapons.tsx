@@ -331,11 +331,11 @@ export default function Weapons({
         // DP-28 Machine Gun: placed on the right (like shotgun), pointing diagonally towards the center
         offset.set(
           0.22 + sway - pullback * 0.08,
-          -0.35 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
+          -0.58 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
           -0.55 + recoil * 0.10 + pullback * 0.3
         );
-        rotX = -0.04 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
-        rotY = 0.06 + sway * 0.3 - pullback * 0.2;
+        rotX = 0.02 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
+        rotY = 0.22 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       }
 
