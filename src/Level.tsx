@@ -9,6 +9,7 @@ import {
   createSlimeTexture,
   createBarrelTexture,
   createBloodTexture,
+  createLavaTexture,
 } from "./Textures";
 
 // Custom level data interface (matches editor format)
@@ -22,6 +23,7 @@ export interface CustomWallData {
 
 interface LevelProps {
   customWalls?: CustomWallData[] | null;
+  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }> | null;
 }
 
 // E1M1-inspired level geometry
@@ -140,7 +142,7 @@ export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: num
   }));
 }
 
-export default function Level({ customWalls }: LevelProps): React.JSX.Element {
+export default function Level({ customWalls, specialFloors }: LevelProps): React.JSX.Element {
   // Build wall data from custom or default
   const activeWallData = useMemo(() => {
     if (customWalls && customWalls.length > 0) {
@@ -179,6 +181,7 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
     door: createDoorTexture(),
     metal: createMetalTexture(),
     slime: createSlimeTexture(),
+    lava: createLavaTexture(),
     barrel: createBarrelTexture(),
     blood: createBloodTexture(),
   }), []);
@@ -214,6 +217,26 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
         <planeGeometry args={[levelSize, levelSize]} />
         <meshLambertMaterial map={textures.floor} color={0x776655} emissive={0x221100} emissiveIntensity={0.2} />
       </mesh>
+
+      {/* Special custom floor tiles (lava, slime) placed above the main floor */}
+      {specialFloors?.map((tile, i) => {
+        const isLava = tile.type === 'lava';
+        return (
+          <mesh
+            key={`special-floor-${i}`}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[tile.x + 0.5, 0.005, tile.z + 0.5]}
+          >
+            <planeGeometry args={[1, 1]} />
+            <meshLambertMaterial
+              map={isLava ? textures.lava : textures.slime}
+              color={isLava ? 0xff8844 : 0x44aa44}
+              emissive={isLava ? 0xcc4400 : 0x114411}
+              emissiveIntensity={isLava ? 0.9 : 0.5}
+            />
+          </mesh>
+        );
+      })}
 
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[levelSize / 2, 4, levelSize / 2]}>
@@ -271,15 +294,7 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
         <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
       </mesh>
 
-      {/* Barrels/crates */}
-      <mesh position={[22, 0.5, 10]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      <mesh position={[22, 0.5, 12]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
+
 
       {/* Torch flames - small emissive cubes on walls */}
       {[
@@ -295,10 +310,18 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
   );
 }
 export interface BarrelData {
+  id: number;
   position: [number, number, number];
   radius: number;
+  health: number;
+  maxHealth: number;
+  alive: boolean;
+  explosionTimer: number;
 }
 
 export function getBarrels(): BarrelData[] {
-  return [];
+  return [
+    { id: 100, position: [22, 0.5, 10], radius: 0.4, health: 20, maxHealth: 20, alive: true, explosionTimer: 0 },
+    { id: 101, position: [22, 0.5, 12], radius: 0.4, health: 20, maxHealth: 20, alive: true, explosionTimer: 0 },
+  ];
 }

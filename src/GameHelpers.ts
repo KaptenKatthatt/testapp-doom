@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EnemyData, ProjectileData, PickupData } from "./types";
 import { audioManager } from "./Audio";
+import type { BarrelData } from "./Level";
 
 const PROJECTILE_SPEED = 12;
 
@@ -127,21 +128,32 @@ export function updateEnemyAIHelper(
     let newAttack = e.lastAttack;
     const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
 
-    // Always chase the player
-    const dx = player.position.x - e.position[0];
-    const dz = player.position.z - e.position[2];
-    const len = Math.sqrt(dx * dx + dz * dz);
-    const ndx = len > 0.01 ? dx / len : 0;
-    const ndz = len > 0.01 ? dz / len : 0;
-
     // Check line of sight before moving or attacking
     const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
+
+    const alerted = e.hasAlerted || canSeePlayer;
 
     // Alert sound when enemy first sees the player (scaled down to 0.02 volume)
     if (canSeePlayer && !e.hasAlerted) {
       const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
       audioManager.play(alertSounds[e.type] ?? 'zombie_alert', 0.02);
     }
+
+    if (!alerted) {
+      // Not alerted yet, remain idle (no movement, no player tracking)
+      return {
+        ...e,
+        hitFlash: newHitFlash,
+        lastPosition: [e.position[0], 0, e.position[2]] as [number, number, number],
+      };
+    }
+
+    // Always chase the player if alerted
+    const dx = player.position.x - e.position[0];
+    const dz = player.position.z - e.position[2];
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const ndx = len > 0.01 ? dx / len : 0;
+    const ndz = len > 0.01 ? dz / len : 0;
 
     if (dist > 1.2) {
       // Direct movement toward player
@@ -240,8 +252,26 @@ export function checkSlimeDamageHelper(
   playerPos: THREE.Vector3,
   playerHealth: number,
   onGameOver: () => void,
-  setGameActive: (active: boolean) => void
+  setGameActive: (active: boolean) => void,
+  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }>
 ): number {
+  if (specialFloors && specialFloors.length > 0) {
+    const gx = Math.floor(playerPos.x);
+    const gz = Math.floor(playerPos.z);
+    const standingTile = specialFloors.find(tile => tile.x === gx && tile.z === gz);
+    if (standingTile) {
+      // Lava: 20 damage/sec, Slime: 3 damage/sec
+      const dmgRate = standingTile.type === 'lava' ? 20 : 3;
+      const nextHealth = Math.max(0, playerHealth - dt * dmgRate);
+      if (nextHealth <= 0) {
+        setGameActive(false);
+        onGameOver();
+        audioManager.play('player_death');
+      }
+      return nextHealth;
+    }
+  }
+
   const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
     { x: 12, z: 22, radius: 4 }, // Slime room center
     { x: 8, z: 18, radius: 3 },  // Slime room west
@@ -292,4 +322,75 @@ export function updatePickupCollectionHelper(
   });
 
   return { updatedPickups, healthBonus, ammoBonus, shotgunPickup };
+}
+
+/** Helper to apply radial blast damage from exploding barrels */
+export function explodeBarrelSplash(
+  barrel: BarrelData,
+  player: { health: number; timesHit: number; damageFlash: number; position: THREE.Vector3; kills: number; endTime: number },
+  enemies: EnemyData[],
+  onGameOver: () => void,
+  setGameActive: (active: boolean) => void,
+  barrels: BarrelData[],
+  hasLineOfSight: (x1: number, z1: number, x2: number, z2: number) => boolean
+): { updatedEnemies: EnemyData[]; updatedBarrels: BarrelData[] } {
+  const bx = barrel.position[0];
+  const bz = barrel.position[2];
+  const maxRadius = 6.0;
+
+  // 1. Damage Player
+  const playerDist = player.position.distanceTo(new THREE.Vector3(bx, player.position.y, bz));
+  if (playerDist <= maxRadius) {
+    if (hasLineOfSight(bx, bz, player.position.x, player.position.z)) {
+      const baseDmg = 30 + Math.random() * 20;
+      const dmg = baseDmg * (1 - playerDist / maxRadius);
+      player.health = Math.max(0, player.health - dmg);
+      player.timesHit++;
+      player.damageFlash = 1.0;
+      audioManager.play('player_hurt');
+      if (player.health <= 0) {
+        setGameActive(false);
+        onGameOver();
+        audioManager.play('player_death');
+      }
+    }
+  }
+
+  // 2. Damage Enemies
+  const updatedEnemies = enemies.map(e => {
+    if (!e.alive) return e;
+    const dist = Math.sqrt((e.position[0] - bx) ** 2 + (e.position[2] - bz) ** 2);
+    if (dist <= maxRadius) {
+      if (hasLineOfSight(bx, bz, e.position[0], e.position[2])) {
+        const baseDmg = 30 + Math.random() * 20;
+        const dmg = baseDmg * (1 - dist / maxRadius);
+        const nextHP = Math.max(0, e.health - dmg);
+        if (nextHP <= 0) {
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+          audioManager.play(deathSounds[e.type] ?? 'imp_death');
+          player.kills++;
+          return { ...e, health: 0, alive: false, hitFlash: 0 };
+        }
+        return { ...e, health: nextHP, hitFlash: 1.0 };
+      }
+    }
+    return e;
+  });
+
+  // 3. Damage other Barrels (chain reactions)
+  const updatedBarrels = barrels.map(other => {
+    if (other.id === barrel.id || !other.alive) return other;
+    const dist = Math.sqrt((other.position[0] - bx) ** 2 + (other.position[2] - bz) ** 2);
+    if (dist <= maxRadius) {
+      if (hasLineOfSight(bx, bz, other.position[0], other.position[2])) {
+        const baseDmg = 30 + Math.random() * 20;
+        const dmg = baseDmg * (1 - dist / maxRadius);
+        const nextHP = Math.max(0, other.health - dmg);
+        return { ...other, health: nextHP };
+      }
+    }
+    return other;
+  });
+
+  return { updatedEnemies, updatedBarrels };
 }
