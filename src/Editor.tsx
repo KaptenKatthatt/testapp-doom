@@ -999,7 +999,16 @@ export default function Editor() {
   const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect', hollowRect: '🔲 Hollow' };
 
   return (
-    <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
+    <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10, position: 'relative' }}>
+      {/* Close button */}
+      <a
+        href="#"
+        onClick={(e) => { e.preventDefault(); window.location.hash = ''; }}
+        style={{ position: 'absolute', top: 10, right: 14, color: '#c00', fontSize: 24, textDecoration: 'none', fontWeight: 'bold', lineHeight: 1, zIndex: 100 }}
+        title="Exit to game"
+      >
+        ✕
+      </a>
       <h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
 
       {/* Draw mode selector */}
@@ -1052,7 +1061,7 @@ export default function Editor() {
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button onClick={validate} style={btnStyle}>✅ Validate</button>
         <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
-        <button onClick={handleSave} style={btnStyle}>💾 Save</button>
+        <button onClick={() => { setSavedMaps(listSavedMaps()); setShowSaveDialog(true); }} style={btnStyle}>💾 Save</button>
         <button onClick={handleLoad} style={btnStyle}>📂 Load</button>
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
