@@ -546,7 +546,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
           const newHealth = e.health - closestDamage;
           if (newHealth <= 0) {
             player.kills++;
-            const totalEnemies = INITIAL_ENEMIES.length;
+            const totalEnemies = enemiesRef.current.length;
             if (player.kills >= totalEnemies && !missionCompleteRef.current) {
               missionCompleteRef.current = true;
               gameActiveRef.current = false;
@@ -617,7 +617,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
     );
 
-    // Exit Switch interaction
+    // Exit Switch interaction — only for default level (no custom levelData)
+    if (!levelData) {
     const switchX = 16;
     const switchZ = 36.35;
     const sdx = player.position.x - switchX;
@@ -641,6 +642,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         });
         onMissionComplete();
       }
+    }
     }
 
     // Reset use action after processing

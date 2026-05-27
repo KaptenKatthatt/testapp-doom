@@ -1006,17 +1006,10 @@ export default function Editor() {
   const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect', hollowRect: '🔲 Hollow' };
 
   return (
-    <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10, position: 'relative' }}>
-      {/* Close button */}
-      <a
-        href="#"
-        onClick={(e) => { e.preventDefault(); window.location.hash = ''; }}
-        style={{ position: 'absolute', top: 10, right: 14, color: '#c00', fontSize: 24, textDecoration: 'none', fontWeight: 'bold', lineHeight: 1, zIndex: 100 }}
-        title="Exit to game"
-      >
-        ✕
-      </a>
-      <h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
+    <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', justifyContent: 'center' }}><h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
+        <button onClick={() => { window.location.hash = String(); }} style={{ position: "absolute", top: 4, right: 0, color: "#c00", fontSize: 20, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }} title="Exit to menu">✕</button>
+      </div>
 
       {/* Draw mode selector */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
