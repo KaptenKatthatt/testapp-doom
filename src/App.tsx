@@ -456,6 +456,37 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         onMenuClose={() => { audioMenuOpenRef.current = false; }}
         onExit={() => { setStarted(false); document.exitPointerLock(); }}
       />
+      {/* Exit button — always visible in HUD */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setStarted(false); document.exitPointerLock(); }}
+        onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          bottom: 106,
+          right: 12,
+          width: 36,
+          height: 36,
+          background: 'rgba(100,0,0,0.8)',
+          border: '2px solid #c00',
+          borderRadius: 6,
+          color: '#ff4444',
+          fontSize: 11,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          zIndex: 1002,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          touchAction: 'none',
+          lineHeight: 1,
+          fontFamily: "'Courier New', monospace",
+        }}
+        title="Exit to menu"
+      >
+        ✕
+      </button>
     </div>
   );
 }
