@@ -64,6 +64,14 @@ export interface PlayerData {
   pitch: number;
   health: number;
   ammo: number;
+  bullets: number; // Revolver and Machine Gun ammo
+  shells: number; // Shotgun ammo
+  currentWeapon: "revolver" | "shotgun" | "machinegun";
+  revolverChamber: number;
+  revolverReloadTimer: number;
+  machinegunMag: number;
+  machinegunReloadTimer: number;
+  unlockedShotgun: boolean;
   kills: number;
   shotsFired: number;
   timesHit: number;
@@ -75,6 +83,7 @@ export interface PlayerData {
   lastEnvDmg: number;
   damageFlash: number;
   isMoving: boolean;
+  hasPlayedEmptyClick: boolean;
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
@@ -117,7 +126,15 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,
-    ammo: 50,
+    ammo: 60, // starts with 60 bullets
+    bullets: 60,
+    shells: 10,
+    currentWeapon: "revolver",
+    revolverChamber: 6,
+    revolverReloadTimer: 0,
+    machinegunMag: 70,
+    machinegunReloadTimer: 0,
+    unlockedShotgun: false, // starts locked, needs to be picked up
     kills: 0,
     shotsFired: 0,
     timesHit: 0,
@@ -129,6 +146,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     lastEnvDmg: 0,
     damageFlash: 0,
     isMoving: false,
+    hasPlayedEmptyClick: false,
   });
   const keysRef = useRef<Record<string, boolean>>({});
   const projectilesRef = useRef<ProjectileData[]>([]);
@@ -137,6 +155,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const pullbackRef = useRef(0);
+  const prevShootingRef = useRef(false);
   const doorTexture = useMemo(() => createDoorTexture(), []);
   // Use custom level data if provided, otherwise defaults
   // Build custom doors from level data
@@ -209,9 +228,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const handlePlayerState = useCallback((): void => {
     const p = playerRef.current;
     p.kills = enemiesRef.current.filter(e => !e.alive).length;
+    // Set legacy ammo count based on active weapon
+    p.ammo = p.currentWeapon === "shotgun" ? p.shells : p.bullets;
     onPlayerState({
       health: Math.round(p.health),
       ammo: p.ammo,
+      bullets: p.bullets,
+      shells: p.shells,
+      currentWeapon: p.currentWeapon,
+      revolverChamber: p.revolverChamber,
+      machinegunMag: p.machinegunMag,
+      revolverReloading: p.revolverReloadTimer > 0,
+      machinegunReloading: p.machinegunReloadTimer > 0,
       kills: p.kills,
       shotsFired: p.shotsFired,
       timesHit: p.timesHit,
@@ -223,6 +251,43 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   // Input handlers encapsulated in custom hook
   useGameInputs(keysRef, useActionRef, gameActiveRef, playerRef);
+
+  // Weapon switching keydown listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const player = playerRef.current;
+      if (player.health <= 0 || !gameActiveRef.current || paused) return;
+
+      if (e.code === "Digit1" || e.key === "1") {
+        player.currentWeapon = "revolver";
+        audioManager.play("weapon_pickup"); // Switch sound
+      } else if (e.code === "Digit2" || e.key === "2") {
+        if (player.unlockedShotgun) {
+          player.currentWeapon = "shotgun";
+          audioManager.play("weapon_pickup");
+        } else {
+          audioManager.play("noway"); // Denied sound
+        }
+      } else if (e.code === "Digit3" || e.key === "3") {
+        player.currentWeapon = "machinegun";
+        audioManager.play("weapon_pickup");
+      } else if (e.code === "KeyR" || e.key === "r" || e.key === "R") {
+        if (player.currentWeapon === "revolver") {
+          if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > player.revolverChamber) {
+            player.revolverReloadTimer = 1.0;
+            audioManager.play("shotgun_cock");
+          }
+        } else if (player.currentWeapon === "machinegun") {
+          if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > player.machinegunMag) {
+            player.machinegunReloadTimer = 2.0;
+            audioManager.play("shotgun_cock");
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [paused]);
 
   // Collision detection callbacks delegating to pure GameCollision helpers
   const checkCollision = useCallback((pos: THREE.Vector3, radius: number = COLLISION_MARGIN): boolean => {
@@ -263,6 +328,26 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
     const now = performance.now() / 1000;
+
+    // Reset out-of-ammo click flag when player clicks down
+    if (player.shooting && !prevShootingRef.current) {
+      player.hasPlayedEmptyClick = false;
+    }
+    prevShootingRef.current = player.shooting;
+
+    // Update weapon reload timers
+    if (player.revolverReloadTimer > 0) {
+      player.revolverReloadTimer = Math.max(0, player.revolverReloadTimer - dt);
+      if (player.revolverReloadTimer === 0) {
+        player.revolverChamber = Math.min(6, player.bullets);
+      }
+    }
+    if (player.machinegunReloadTimer > 0) {
+      player.machinegunReloadTimer = Math.max(0, player.machinegunReloadTimer - dt);
+      if (player.machinegunReloadTimer === 0) {
+        player.machinegunMag = Math.min(70, player.bullets);
+      }
+    }
 
     // Movement
     handlePlayerMovementHelper(
@@ -365,9 +450,20 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       player.health
     );
     setPickups(updatedPickups);
-    if (healthBonus > 0) { player.health = Math.min(100, player.health + healthBonus); audioManager.play('item_pickup'); }
-    if (ammoBonus > 0) { player.ammo += ammoBonus; audioManager.play('shotgun' in audioManager ? 'weapon_pickup' : 'item_pickup'); }
-    if (shotgunPickup) { audioManager.play('weapon_pickup'); }
+    if (healthBonus > 0) { 
+      player.health = Math.min(100, player.health + healthBonus); 
+      audioManager.play('item_pickup'); 
+    }
+    if (ammoBonus > 0 && !shotgunPickup) {
+      player.bullets += 24;
+      audioManager.play('item_pickup');
+    }
+    if (shotgunPickup) {
+      player.shells += 8;
+      player.unlockedShotgun = true;
+      player.currentWeapon = "shotgun"; // Auto switch to newly found weapon!
+      audioManager.play('weapon_pickup');
+    }
 
     // Update doors
     const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
@@ -389,16 +485,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         gameActiveRef.current = false;
         player.endTime = now;
         audioManager.play('switch');
-        onPlayerState({
-          health: Math.round(player.health),
-          ammo: player.ammo,
-          kills: player.kills,
-          shotsFired: player.shotsFired,
-          timesHit: player.timesHit,
-          startTime: player.startTime,
-          endTime: now,
-          damageFlash: 0,
-        });
+        handlePlayerState();
         onMissionComplete();
       }
     }
@@ -496,16 +583,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       missionCompleteRef.current = true;
       gameActiveRef.current = false;
       player.endTime = now;
-      onPlayerState({
-        health: Math.round(player.health),
-        ammo: player.ammo,
-        kills: player.kills,
-        shotsFired: player.shotsFired,
-        timesHit: player.timesHit,
-        startTime: player.startTime,
-        endTime: now,
-        damageFlash: 0,
-      });
+      handlePlayerState();
       onMissionComplete();
     }
 
@@ -577,6 +655,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         lastShot={playerRef.current.lastShot}
         isMoving={playerRef.current.isMoving}
         pullbackRef={pullbackRef}
+        currentWeapon={playerRef.current.currentWeapon}
+        revolverReloading={playerRef.current.revolverReloadTimer > 0}
+        machinegunReloading={playerRef.current.machinegunReloadTimer > 0}
       />
     </>
   );

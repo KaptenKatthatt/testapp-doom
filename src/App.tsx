@@ -46,7 +46,14 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   }, [levelData]);
   const [playerState, setPlayerState] = useState<PlayerState>({
     health: 100,
-    ammo: 50,
+    ammo: 60,
+    bullets: 60,
+    shells: 10,
+    currentWeapon: "revolver",
+    revolverChamber: 6,
+    machinegunMag: 70,
+    revolverReloading: false,
+    machinegunReloading: false,
     kills: 0,
     shotsFired: 0,
     timesHit: 0,
@@ -96,7 +103,23 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setGameOver(false);
     setMissionComplete(false);
     setGameKey((k) => k + 1);
-    setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000, endTime: 0, damageFlash: 0 });
+    setPlayerState({ 
+      health: 100, 
+      ammo: 60, 
+      bullets: 60,
+      shells: 10,
+      currentWeapon: "revolver",
+      revolverChamber: 6,
+      machinegunMag: 70,
+      revolverReloading: false,
+      machinegunReloading: false,
+      kills: 0, 
+      shotsFired: 0, 
+      timesHit: 0, 
+      startTime: performance.now() / 1000, 
+      endTime: 0, 
+      damageFlash: 0 
+    });
     audioManager.init().then(() => {
       audioManager.resume();
       audioManager.stopMenuMusic();
@@ -205,7 +228,18 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           paused={menuOpen}
         />
       </Canvas>
-      <HUD health={playerState.health} ammo={playerState.ammo} kills={playerState.kills} />
+      <HUD 
+        health={playerState.health} 
+        ammo={playerState.ammo} 
+        bullets={playerState.bullets}
+        shells={playerState.shells}
+        currentWeapon={playerState.currentWeapon}
+        revolverChamber={playerState.revolverChamber}
+        machinegunMag={playerState.machinegunMag}
+        revolverReloading={playerState.revolverReloading}
+        machinegunReloading={playerState.machinegunReloading}
+        kills={playerState.kills} 
+      />
 
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
