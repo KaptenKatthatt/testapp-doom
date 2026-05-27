@@ -1095,41 +1095,33 @@ export default function Editor() {
         <div style={overlayStyle}>
           <div style={dialogStyle}>
             {saveValidation && saveValidation.errors.length === 0 ? (
-              <>
-                <h3 style={{ color: '#0f0', marginTop: 0 }}>✅ Map Validated!</h3>
-                {saveValidation.warnings.length > 0 && (
-                  <div style={{ marginBottom: 8, maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#ff0' }}>
-                    {saveValidation.warnings.map((w, i) => <div key={i}>{w}</div>)}
-                  </div>
-                )}
-                <input
-                  type="text"
-                  value={saveName}
-                  onChange={e => setSaveName(e.target.value)}
-                  placeholder="Map name..."
-                  style={{ background: '#111', color: '#fff', border: '1px solid #555', padding: '8px', fontFamily: 'monospace', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-                  autoFocus
-                />
-                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                  <button onClick={handleSave} style={btnStyle}>💾 Save</button>
-                  <button onClick={() => { setShowSaveDialog(false); setSaveName(''); setSaveValidation(null); }} style={btnStyle}>❌ Cancel</button>
-                </div>
-              </>
+              <h3 style={{ color: '#0f0', marginTop: 0 }}>✅ Map Validated!</h3>
             ) : (
-              <>
-                <h3 style={{ color: '#f00', marginTop: 0 }}>❌ Not Validated</h3>
-                <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 12, color: '#f88', marginBottom: 8 }}>
-                  {saveValidation?.errors.map((e, i) => <div key={i}>{e}</div>)}
-                </div>
-                {saveValidation && saveValidation.warnings.length > 0 && (
-                  <div style={{ maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#ff0', marginBottom: 8 }}>
-                    {saveValidation.warnings.map((w, i) => <div key={i}>{w}</div>)}
-                  </div>
-                )}
-                <button onClick={() => { setShowSaveDialog(false); setSaveValidation(null); }} style={btnStyle}>❌ Close</button>
-              </>
+              <h3 style={{ color: '#f00', marginTop: 0 }}>⚠️ Validation Issues</h3>
             )}
+            {saveValidation && saveValidation.errors.length > 0 && (
+              <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 12, color: '#f88', marginBottom: 8 }}>
+                {saveValidation.errors.map((e, i) => <div key={i}>{e}</div>)}
+              </div>
+            )}
+            {saveValidation && saveValidation.warnings.length > 0 && (
+              <div style={{ maxHeight: 80, overflowY: 'auto', fontSize: 12, color: '#ff0', marginBottom: 8 }}>
+                {saveValidation.warnings.map((w, i) => <div key={i}>{w}</div>)}
+              </div>
+            )}
+            <input
+              type="text"
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              placeholder="Map name..."
+              style={{ background: '#111', color: '#fff', border: '1px solid #555', padding: '8px', fontFamily: 'monospace', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+              onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+              autoFocus
+            />
+            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+              <button onClick={handleSave} style={btnStyle}>💾 Save</button>
+              <button onClick={() => { setShowSaveDialog(false); setSaveName(''); setSaveValidation(null); }} style={btnStyle}>❌ Cancel</button>
+            </div>
           </div>
         </div>
       )}
