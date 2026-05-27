@@ -241,8 +241,8 @@ export default function Weapons({
     const recoil = recoilRef.current;
 
     // 2. Walking bobbing & sway (only when moving)
-    const time = performance.now() / 1000;
-    const bobFreq = 6.0;
+    const time = _state.clock.getElapsedTime();
+    const bobFreq = 3.5;
     const sway = isMoving ? Math.sin(time * bobFreq) * 0.004 : 0;
     const bob = isMoving ? Math.abs(Math.sin(time * bobFreq)) * 0.008 : 0;
     const pullback = pullbackRef?.current ?? 0;
