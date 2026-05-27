@@ -37,8 +37,8 @@ export class MusicEngine {
   private totalSteps = 512;
   private bpm = 125;
   private timerId: ReturnType<typeof setTimeout> | null = null;
-  private lookahead = 25.0;
-  private scheduleAheadTime = 0.1;
+  private lookahead = 50.0; // ms between scheduler polls (was 25, raised for perf)
+  private scheduleAheadTime = 0.2; // schedule 200ms ahead (was 100ms, raised for perf)
   private fadeGain: GainNode | null = null;
 
   private distortionCurve: Float32Array;
@@ -539,67 +539,59 @@ export class MusicEngine {
     if (!this.audioContext || !this.destination) return;
 
     const freq = this.midiToFreq(midiNote);
-    const osc1 = this.audioContext.createOscillator();
-    const osc2 = this.audioContext.createOscillator();
-    const distNode = this.audioContext.createWaveShaper();
+    const osc = this.audioContext.createOscillator();
     const filter = this.audioContext.createBiquadFilter();
     const envelope = this.audioContext.createGain();
 
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(freq, time);
-    osc1.detune.setValueAtTime(6, time);
-
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(freq, time);
-    osc2.detune.setValueAtTime(-6, time);
+    // Single oscillator with detune for stereo width (lighter than dual)
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+    osc.detune.setValueAtTime(8, time); // Slight detune for richness
 
     if (type === 'clean') {
-      // Clean tone: no distortion, chorus-like
+      // Clean tone: no distortion, gentle filter
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(3000, time);
+      filter.frequency.setValueAtTime(2500, time);
       filter.Q.setValueAtTime(0.5, time);
       envelope.gain.setValueAtTime(0, time);
       envelope.gain.linearRampToValueAtTime(0.15, time + 0.01);
-      envelope.gain.exponentialRampToValueAtTime(0.08, time + duration * 0.5);
-      envelope.gain.setValueAtTime(0.08, time + duration - 0.02);
+      envelope.gain.exponentialRampToValueAtTime(0.06, time + duration * 0.5);
+      envelope.gain.setValueAtTime(0.06, time + duration - 0.02);
       envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
 
-      osc1.connect(filter);
-      osc2.connect(filter);
+      osc.connect(filter);
       filter.connect(envelope);
     } else {
-      // Distorted tone
+      // Distorted tone: use WaveShaper for crunch
+      const distNode = this.audioContext.createWaveShaper();
       distNode.curve = this.distortionCurve as any;
-      distNode.oversample = '4x';
+      distNode.oversample = '2x'; // 2x instead of 4x for better performance
 
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(1400, time);
-      filter.Q.setValueAtTime(2.0, time);
+      filter.Q.setValueAtTime(1.5, time);
 
       envelope.gain.setValueAtTime(0, time);
-      envelope.gain.linearRampToValueAtTime(0.24, time + 0.003);
+      envelope.gain.linearRampToValueAtTime(0.2, time + 0.003);
 
       if (type === 'mute') {
-        envelope.gain.exponentialRampToValueAtTime(0.015, time + 0.1);
-        envelope.gain.setValueAtTime(0.015, time + duration - 0.01);
+        envelope.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
+        envelope.gain.setValueAtTime(0.01, time + duration - 0.01);
         envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
       } else {
-        envelope.gain.exponentialRampToValueAtTime(0.18, time + 0.25);
-        envelope.gain.setValueAtTime(0.18, time + duration - 0.02);
+        envelope.gain.exponentialRampToValueAtTime(0.15, time + 0.25);
+        envelope.gain.setValueAtTime(0.15, time + duration - 0.02);
         envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
       }
 
-      osc1.connect(distNode);
-      osc2.connect(distNode);
+      osc.connect(distNode);
       distNode.connect(filter);
       filter.connect(envelope);
     }
 
     envelope.connect(this.destination);
-    osc1.start(time);
-    osc2.start(time);
-    osc1.stop(time + duration);
-    osc2.stop(time + duration);
+    osc.start(time);
+    osc.stop(time + duration + 0.05);
   }
 
   private playBassNote(midiNote: number, time: number, duration: number): void {
@@ -623,7 +615,7 @@ export class MusicEngine {
     filter.Q.setValueAtTime(2, time);
 
     envelope.gain.setValueAtTime(0, time);
-    envelope.gain.linearRampToValueAtTime(0.35, time + 0.005);
+    envelope.gain.linearRampToValueAtTime(0.25, time + 0.005);
     envelope.gain.exponentialRampToValueAtTime(0.2, time + 0.1);
     envelope.gain.setValueAtTime(0.2, time + duration - 0.05);
     envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
