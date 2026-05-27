@@ -223,7 +223,7 @@ export default function MobileControls({
         )}
       </div>
 
-      {/* Use button (E key) */}
+      {/* Use button (E key) — CoD style: above shoot button */}
       <button
         data-testid="use-button"
         onTouchStart={(e: React.TouchEvent<HTMLButtonElement>): void => {
@@ -239,13 +239,13 @@ export default function MobileControls({
         onClick={(): void => onUse()}
         style={{
           position: "absolute",
-          right: 110,
-          bottom: 25,
-          width: 70,
-          height: 70,
+          right: 24,
+          bottom: 140,
+          width: 56,
+          height: 56,
           borderRadius: "50%",
-          background: "rgba(60, 180, 255, 0.5)",
-          border: "3px solid rgba(100, 200, 255, 0.8)",
+          background: "rgba(60, 180, 255, 0.45)",
+          border: "2px solid rgba(100, 200, 255, 0.7)",
           color: "#fff",
           cursor: "pointer",
           zIndex: 20,
@@ -256,7 +256,7 @@ export default function MobileControls({
           alignItems: "center",
           justifyContent: "center",
           padding: 0,
-          fontSize: 18,
+          fontSize: 14,
           fontWeight: "bold",
           fontFamily: "monospace",
         }}
@@ -264,7 +264,7 @@ export default function MobileControls({
         USE
       </button>
 
-      {/* Shoot button */}
+      {/* Shoot button — CoD style: right side, above HUD */}
       <button
         data-testid="shoot-button"
         onTouchStart={(e: React.TouchEvent<HTMLButtonElement>): void => {
@@ -281,8 +281,8 @@ export default function MobileControls({
         }}
         style={{
           position: "absolute",
-          right: 20,
-          bottom: 20,
+          right: 16,
+          bottom: 72,
           width: 80,
           height: 80,
           borderRadius: "50%",
