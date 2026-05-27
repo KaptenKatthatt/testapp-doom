@@ -153,9 +153,9 @@ export default function Weapons({
           }
         });
 
-        // Set scaling and default orientation
-        fbx.scale.set(0.0052, 0.0052, 0.0052);
-        fbx.rotation.set(0, Math.PI, 0); // Face forward (away from camera)
+        // Set scaling and orient pointing forward (Y = Math.PI * 1.5)
+        fbx.scale.set(0.038, 0.038, 0.038);
+        fbx.rotation.set(0, Math.PI * 1.5, 0); 
         setRevolverGroup(fbx);
       },
       undefined,
@@ -191,9 +191,9 @@ export default function Weapons({
           }
         });
 
-        // Scale and orient DP-28
-        fbx.scale.set(0.0016, 0.0016, 0.0016);
-        fbx.rotation.set(0, Math.PI, 0); // Face forward
+        // Scale up DP-28 to look heavy and massive, and orient pointing forward (Y = Math.PI)
+        fbx.scale.set(0.024, 0.024, 0.024);
+        fbx.rotation.set(0, Math.PI, 0); 
         setDp28Group(fbx);
       },
       undefined,
@@ -238,8 +238,8 @@ export default function Weapons({
         // Rapid spinning during reload
         currentCylinderRot.current += dt * 10;
         cylinderRef.current.rotation.y = currentCylinderRot.current;
-        // Swing cylinder out on reload (X shift)
-        cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, -2.5, dt * 10);
+        // Swing cylinder out on reload (locally on X-axis, proportional to new scale)
+        cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, -0.35, dt * 10);
       } else {
         // Reset cylinder swing out
         cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, 0, dt * 10);
@@ -251,27 +251,26 @@ export default function Weapons({
 
     if (panMagRef.current) {
       if (machinegunReloading) {
-        // Magazine detach / attach animation!
+        // Magazine detach / attach animation (proportional to new scale)
         reloadElapsed.current += dt;
         const progress = reloadElapsed.current; // Max reload time is 2.0s
 
-        // Animating the local position of the pan magazine disc
         if (progress < 0.6) {
           // 0.0s - 0.6s: Pan mag lifted up and off the weapon
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 160.0, dt * 8);
-          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 80.0, dt * 8);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 11.0, dt * 8);
+          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 5.0, dt * 8);
         } else if (progress < 1.4) {
           // 0.6s - 1.4s: Magazine completely out of sight (beneath the player camera)
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -300.0, dt * 12);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -20.0, dt * 12);
         } else {
           // 1.4s - 2.0s: New magazine brought up, aligned, and snapped down on top
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 42.0, dt * 10);
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 2.8, dt * 10);
           panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 0, dt * 10);
         }
       } else {
         // Normal state: mag resting on top of the barrel, rotating when firing
         reloadElapsed.current = 0;
-        panMagRef.current.position.set(0, 42.0, 0); // original local coordinate position
+        panMagRef.current.position.set(0, 2.8, 0); // original local coordinate position
         currentMagRot.current = THREE.MathUtils.lerp(currentMagRot.current, targetMagRot.current, dt * 10);
         panMagRef.current.rotation.y = currentMagRot.current;
       }
@@ -280,7 +279,7 @@ export default function Weapons({
     // Bolt pull back animation on machine gun firing
     if (boltRef.current) {
       if (shooting && currentWeapon === "machinegun" && !machinegunReloading) {
-        boltRef.current.position.z = -30.0; // recoil bolt position
+        boltRef.current.position.z = -2.0; // recoil bolt position (proportional to new scale)
       } else {
         boltRef.current.position.z = THREE.MathUtils.lerp(boltRef.current.position.z, 0, dt * 15); // snap back forward
       }
@@ -297,7 +296,7 @@ export default function Weapons({
         // Revolver: placed neatly on the right, tilted slightly up, closer in view
         offset.set(
           0.16 + sway - pullback * 0.05,
-          -0.16 + bob - recoil * 0.08 - (revolverReloading ? 0.2 : 0) - pullback * 0.2,
+          -0.18 + bob - recoil * 0.08 - (revolverReloading ? 0.2 : 0) - pullback * 0.2,
           -0.34 + recoil * 0.12 + pullback * 0.25
         );
         rotX = -0.02 + recoil * 0.15 - (revolverReloading ? 0.7 : 0) - pullback * 0.5;
@@ -314,11 +313,11 @@ export default function Weapons({
         rotY = 0.015 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       } else if (currentWeapon === "machinegun") {
-        // DP-28 Machine Gun: heavy bipod-mounted massive automatic weapon centered more
+        // DP-28 Machine Gun: heavy massive automatic weapon centered more
         offset.set(
-          0.14 + sway - pullback * 0.08,
+          0.12 + sway - pullback * 0.08,
           -0.24 + bob - recoil * 0.04 - (machinegunReloading ? 0.35 : 0) - pullback * 0.22,
-          -0.42 + recoil * 0.08 + pullback * 0.3
+          -0.45 + recoil * 0.08 + pullback * 0.3
         );
         rotX = -0.05 + recoil * 0.08 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
         rotY = 0.01 + sway * 0.25 - pullback * 0.15;
@@ -368,20 +367,20 @@ export default function Weapons({
           <group>
             <primitive object={revolverGroup} />
 
-            {/* Local muzzle flash sphere at revolver barrel tip */}
-            <mesh ref={revolverMuzzleRef} position={[0, 16.0, -82.0]} visible={false}>
-              <sphereGeometry args={[8.0, 8, 8]} />
+            {/* Muzzle flash sphere in accurate world coordinates */}
+            <mesh ref={revolverMuzzleRef} position={[0.18, -0.16, -0.55]} visible={false}>
+              <sphereGeometry args={[0.05, 8, 8]} />
               <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
             </mesh>
 
-            {/* Local muzzle flash ring */}
+            {/* Muzzle flash glow ring */}
             <mesh
               ref={revolverMuzzleRingRef}
-              position={[0, 16.0, -82.0]}
+              position={[0.18, -0.16, -0.55]}
               rotation={[0, 0, 0]}
               visible={false}
             >
-              <ringGeometry args={[4.0, 12.0, 8]} />
+              <ringGeometry args={[0.025, 0.08, 8]} />
               <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
             </mesh>
           </group>
@@ -480,20 +479,20 @@ export default function Weapons({
           <group>
             <primitive object={dp28Group} />
 
-            {/* Local muzzle flash sphere at barrel tip */}
-            <mesh ref={machinegunMuzzleRef} position={[0, 48.0, -320.0]} visible={false}>
-              <sphereGeometry args={[18.0, 8, 8]} />
+            {/* Muzzle flash sphere in accurate world coordinates */}
+            <mesh ref={machinegunMuzzleRef} position={[0.15, -0.26, -0.85]} visible={false}>
+              <sphereGeometry args={[0.08, 8, 8]} />
               <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
             </mesh>
 
             {/* Muzzle flash glow ring */}
             <mesh
               ref={machinegunMuzzleRingRef}
-              position={[0, 48.0, -320.0]}
+              position={[0.15, -0.26, -0.85]}
               rotation={[0, 0, 0]}
               visible={false}
             >
-              <ringGeometry args={[8.0, 26.0, 8]} />
+              <ringGeometry args={[0.04, 0.15, 8]} />
               <meshBasicMaterial color={0xff6600} transparent opacity={0.6} side={THREE.DoubleSide} />
             </mesh>
           </group>
