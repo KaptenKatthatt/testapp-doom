@@ -32,7 +32,7 @@ export default function HUD({
   // Load Doom face image once and listen to font loading
   useEffect(() => {
     const img = new Image();
-    img.src = "/doom-face.jpg";
+    img.src = "/doom-face.png";
     img.onload = () => {
       setFaceImg(img);
     };
@@ -167,9 +167,7 @@ export default function HUD({
     const faceX = faceCenterX - faceSize / 2;
     const faceY = (h - faceSize) / 2;
 
-    // Dark background behind face
-    ctx.fillStyle = "#2a2a2a";
-    ctx.fillRect(faceX - 4 * s, faceY - 4 * s, faceSize + 8 * s, faceSize + 8 * s);
+    // No background behind face (PNG has transparency)
 
     // Draw the actual Doom face image
     if (faceImg) {
