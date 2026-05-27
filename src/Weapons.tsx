@@ -22,7 +22,12 @@ export default function Weapons({
   revolverReloading,
   machinegunReloading,
 }: WeaponsProps): React.JSX.Element {
-  const { camera } = useThree();
+  const { camera, scene } = useThree();
+
+  // Ensure the camera is added to the scene graph so that portal-rendered weapon models are rendered
+  useEffect(() => {
+    scene.add(camera);
+  }, [scene, camera]);
 
   // Weapon Group Refs (FPS container positioning)
   const gunGroupRef = useRef<THREE.Group>(null);
