@@ -123,11 +123,27 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const pullbackRef = useRef(0);
   const doorTexture = useMemo(() => createDoorTexture(), []);
   // Use custom level data if provided, otherwise defaults
+  // Build custom doors from level data
+  const customDoors: DoorData[] = useMemo(() => {
+    if (!levelData || levelData.walls.length === 0) return INITIAL_DOORS;
+    const doorWalls = levelData.walls.filter(w => w.isDoor);
+    return doorWalls.map((w, i) => ({
+      id: 1000 + i, // offset to avoid clash with hardcoded doors
+      position: [w.x + w.w / 2, 2, w.z + w.d / 2] as [number, number, number],
+      size: [w.w, 4, w.d] as [number, number, number],
+      state: 'closed' as const,
+      timer: 0,
+      autoClose: 4.0,
+      isSecret: false,
+      triggerDistance: 2.5,
+    }));
+  }, [levelData]);
+
   const [enemies, setEnemies] = useState<EnemyData[]>(customEnemies);
   const enemiesRef = useRef<EnemyData[]>(customEnemies);
   const [pickups, setPickups] = useState<PickupData[]>(customPickups);
-  const [doors, setDoors] = useState<DoorData[]>(INITIAL_DOORS);
-  const doorsRef = useRef<DoorData[]>(INITIAL_DOORS);
+  const [doors, setDoors] = useState<DoorData[]>(customDoors);
+  const doorsRef = useRef<DoorData[]>(customDoors);
   // Keep doors ref in sync for collision checks
   useEffect(() => {
     doorsRef.current = doors;
@@ -135,9 +151,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
   // Build wall data for Level component and collision
+  // Doors are rendered separately by the door system, so exclude them from walls
   const customWallData = useMemo(() => {
     if (levelData && levelData.walls.length > 0) {
-      return levelData.walls.map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: w.isDoor ? 0xcc0000 : 0x8b7355, isDoor: w.isDoor }));
+      return levelData.walls
+        .filter(w => !w.isDoor)
+        .map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: w.isDoor ? 0xcc0000 : 0x8b7355, isDoor: w.isDoor }));
     }
     return null;
   }, [levelData]);
