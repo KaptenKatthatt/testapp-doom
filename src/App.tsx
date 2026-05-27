@@ -342,7 +342,6 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
 
   return (
     <div style={{ width: "100vw", height: "100dvh", background: "#000", position: "relative", overflow: "hidden" }}>
-      <a href="#editor" style={{ position: 'fixed', top: 4, left: 4, color: '#666', fontSize: 10, fontFamily: 'monospace', textDecoration: 'none', zIndex: 999, opacity: 0.5 }}>📐 Editor</a>
       <Canvas camera={{ fov: 75, near: 0.1, far: 200 }} gl={{ alpha: false, antialias: true }}>
         <color attach="background" args={["#3d2e1e"]} />
         <fog attach="fog" args={["#3d2e1e", 20, 120]} />
@@ -452,9 +451,10 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           </button>
         </div>
       )}
-      <AudioMenu 
+      <AudioMenu
         onMenuOpen={() => { audioMenuOpenRef.current = true; handleShootEnd(); }}
         onMenuClose={() => { audioMenuOpenRef.current = false; }}
+        onExit={() => { setStarted(false); document.exitPointerLock(); }}
       />
     </div>
   );

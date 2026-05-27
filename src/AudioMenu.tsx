@@ -4,9 +4,10 @@ import { audioManager } from './Audio';
 interface AudioMenuProps {
   onMenuOpen?: () => void;
   onMenuClose?: () => void;
+  onExit?: () => void;
 }
 
-export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
+export default function AudioMenu({ onMenuOpen, onMenuClose, onExit }: AudioMenuProps) {
   const [open, setOpen] = useState(false);
   const [musicVol, setMusicVol] = useState(audioManager.getMusicVolume());
   const [sfxVol, setSfxVol] = useState(audioManager.getSfxVolume());
@@ -150,6 +151,30 @@ export default function AudioMenu({ onMenuOpen, onMenuClose }: AudioMenuProps) {
               onPointerDown={(e) => e.stopPropagation()}
               style={{ width: '100%', accentColor: '#c00' }}
             />
+          </div>
+          {/* Exit button */}
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #555' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); closeMenu(); onExit?.(); }}
+              onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                padding: '8px 0',
+                background: '#660000',
+                border: '2px solid #c00',
+                borderRadius: 4,
+                color: '#ff4444',
+                fontSize: 13,
+                fontFamily: "'Courier New', monospace",
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                letterSpacing: 2,
+              }}
+            >
+              ✕ EXIT GAME
+            </button>
           </div>
         </div>
       )}
