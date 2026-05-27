@@ -19,6 +19,12 @@ import type {
   ProjectileData,
 } from "./types";
 import {
+  checkCollision as checkCollisionPure,
+  checkWallHit as checkWallHitPure,
+  checkEnemyCollision as checkEnemyCollisionPure,
+  hasLineOfSight as hasLineOfSightPure,
+} from "./GameCollision";
+import {
   updateProjectilesHelper,
   updateEnemyAIHelper,
   checkSlimeDamageHelper,
@@ -240,104 +246,22 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     };
   }, []);
 
-  // Collision detection
+  // Collision detection callbacks delegating to pure GameCollision helpers
   const checkCollision = useCallback((pos: THREE.Vector3, radius: number = COLLISION_MARGIN): boolean => {
-    for (const wall of walls) {
-      const closestX = Math.max(wall.min[0], Math.min(pos.x, wall.max[0]));
-      const closestZ = Math.max(wall.min[2], Math.min(pos.z, wall.max[2]));
-      const dx = pos.x - closestX;
-      const dz = pos.z - closestZ;
-      if (dx * dx + dz * dz < radius * radius) {
-        return true;
-      }
-    }
-    // Also check closed doors
-    for (const door of doorsRef.current) {
-      const doorBox = getDoorCollisionBox(door);
-      if (!doorBox) continue;
-      const closestX = Math.max(doorBox.min[0], Math.min(pos.x, doorBox.max[0]));
-      const closestZ = Math.max(doorBox.min[2], Math.min(pos.z, doorBox.max[2]));
-      const dx = pos.x - closestX;
-      const dz = pos.z - closestZ;
-      if (dx * dx + dz * dz < radius * radius) {
-        return true;
-      }
-    }
-    // Also check barrels
-    for (const barrel of barrels) {
-      const dx = pos.x - barrel.position[0];
-      const dz = pos.z - barrel.position[2];
-      const distSq = dx * dx + dz * dz;
-      const minDist = radius + barrel.radius;
-      if (distSq < minDist * minDist) {
-        return true;
-      }
-    }
-    return false;
+    return checkCollisionPure(pos, walls, doorsRef.current, barrels, radius);
   }, [walls, barrels]);
 
-  // Check if a point hits a door (only when closed)
-  const checkDoorHit = useCallback((x: number, z: number): boolean => {
-    for (const door of doorsRef.current) {
-      const doorBox = getDoorCollisionBox(door);
-      if (!doorBox) continue;
-      if (x >= doorBox.min[0] && x <= doorBox.max[0] && z >= doorBox.min[2] && z <= doorBox.max[2]) {
-        return true;
-      }
-    }
-    return false;
-  }, []);
-
-  // Check if a point hits a wall or barrel (for projectiles)
   const checkWallHit = useCallback((x: number, z: number): boolean => {
-    for (const wall of walls) {
-      if (x >= wall.min[0] && x <= wall.max[0] && z >= wall.min[2] && z <= wall.max[2]) {
-        return true;
-      }
-    }
-    if (checkDoorHit(x, z)) return true;
-    // Check barrels
-    for (const barrel of barrels) {
-      const dx = x - barrel.position[0];
-      const dz = z - barrel.position[2];
-      if (dx * dx + dz * dz < barrel.radius * barrel.radius) {
-        return true;
-      }
-    }
-    return false;
-  }, [walls, checkDoorHit, barrels]);
+    return checkWallHitPure(x, z, walls, doorsRef.current, barrels);
+  }, [walls, barrels]);
 
-  // Check if position collides with any alive enemy
   const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {
-    for (const e of currentEnemies) {
-      if (!e.alive) continue;
-      const dx = pos.x - e.position[0];
-      const dz = pos.z - e.position[2];
-      if (dx * dx + dz * dz < radius * radius) {
-        return true;
-      }
-    }
-    return false;
+    return checkEnemyCollisionPure(pos, currentEnemies, radius);
   }, []);
 
-  // Check line of sight between two points (no wall or door in between)
   const hasLineOfSight = useCallback((x1: number, z1: number, x2: number, z2: number): boolean => {
-    const steps = Math.ceil(Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2) * 2);
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const cx = x1 + (x2 - x1) * t;
-      const cz = z1 + (z2 - z1) * t;
-      for (const wall of walls) {
-        if (cx >= wall.min[0] && cx <= wall.max[0] && cz >= wall.min[2] && cz <= wall.max[2]) {
-          return false;
-        }
-      }
-      if (checkDoorHit(cx, cz)) {
-        return false;
-      }
-    }
-    return true;
-  }, [walls, checkDoorHit]);
+    return hasLineOfSightPure(x1, z1, x2, z2, walls, doorsRef.current);
+  }, [walls]);
 
   // Main game loop
   useFrame((_state, delta) => {
