@@ -1177,7 +1177,7 @@ export default function Editor() {
 
 const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 };
 const dialogStyle: React.CSSProperties = { background: '#1a1a1a', border: '2px solid #c00', borderRadius: 6, padding: 16, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', minWidth: 300 };
-const btnStyle: React.CSSProperties = { background: '#333', border: '1px solid #c00', color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: 13, borderRadius: 4, fontFamily: 'monospace' };
+const btnStyle: React.CSSProperties = { background: '#444', border: '1px solid #c00', color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: 13, borderRadius: 4, fontFamily: 'monospace' };
 
 // Export grid-to-level-data converter for use by the game
 export function gridToLevelData(grid: CellData[][], playerPos: [number, number] | null) {
