@@ -137,12 +137,6 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       }
     };
 
-    const handleMouseDown = (): void => {
-      if (!gameOver) return;
-      document.exitPointerLock();
-      handleStart();
-    };
-
     const handlePointerLockChange = (): void => {
       if ((gameOver || missionComplete) && document.pointerLockElement) {
         document.exitPointerLock();
@@ -150,11 +144,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     };
 
     window.addEventListener("keydown", handleRestartKey);
-    window.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     return () => {
       window.removeEventListener("keydown", handleRestartKey);
-      window.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
     };
   }, [gameOver, missionComplete, handleStart]);
@@ -265,13 +257,40 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           style={{
             position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
             background: "rgba(180,0,0,0.7)", display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#fff", zIndex: 100, cursor: "pointer",
+            alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#fff", zIndex: 100,
           }}
-          onClick={(): void => { document.exitPointerLock(); handleStart(); }}
           onMouseDown={(): void => { document.exitPointerLock(); }}
         >
-          <h1 style={{ fontSize: "72px", textShadow: "0 0 30px #f00" }}>YOU DIED</h1>
-          <p style={{ fontSize: "18px" }}>Click anywhere to restart</p>
+          <h1 style={{ fontSize: "72px", textShadow: "0 0 30px #f00", fontFamily: '"DooM", monospace', color: "#ff1111", marginBottom: "20px" }}>YOU DIED</h1>
+          <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
+            <button
+              onClick={(): void => { document.exitPointerLock(); handleStart(); }}
+              style={{
+                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
+              onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
+            >
+              RESTART GAME
+            </button>
+            <button
+              onClick={(): void => {
+                document.exitPointerLock();
+                setStarted(false);
+              }}
+              style={{
+                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e): void => { e.currentTarget.style.background = "#882222"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff4444"; }}
+              onMouseLeave={(e): void => { e.currentTarget.style.background = "#551111"; e.currentTarget.style.color = "#ff4444"; e.currentTarget.style.borderColor = "#bb2222"; }}
+            >
+              EXIT TO MAIN MENU
+            </button>
+          </div>
         </div>
       )}
       {missionComplete && (
@@ -312,18 +331,35 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               <span style={{ color: "#ffee00", fontWeight: "bold" }}>{calcScore(playerState)}</span>
             </div>
           </div>
-          <button
-            onClick={(): void => { document.exitPointerLock(); handleStart(); }}
-            style={{
-              fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
-              background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
-              letterSpacing: "2px", marginTop: "8px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
-            }}
-            onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
-            onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
-          >
-            RESTART GAME
-          </button>
+          <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
+            <button
+              onClick={(): void => { document.exitPointerLock(); handleStart(); }}
+              style={{
+                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
+              onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
+            >
+              RESTART GAME
+            </button>
+            <button
+              onClick={(): void => {
+                document.exitPointerLock();
+                setStarted(false);
+              }}
+              style={{
+                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e): void => { e.currentTarget.style.background = "#882222"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff4444"; }}
+              onMouseLeave={(e): void => { e.currentTarget.style.background = "#551111"; e.currentTarget.style.color = "#ff4444"; e.currentTarget.style.borderColor = "#bb2222"; }}
+            >
+              EXIT TO MAIN MENU
+            </button>
+          </div>
         </div>
       )}
       {/* Sleek, state-of-the-art Menu Button — bottom right corner, above HUD */}
