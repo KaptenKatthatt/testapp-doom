@@ -109,6 +109,8 @@ export default function AudioMenu({ onMenuOpen, onMenuClose, onExit }: AudioMenu
             fontFamily: "'Courier New', monospace",
             color: '#fff',
             minWidth: 200,
+            maxHeight: 'calc(100vh - 140px)',
+            overflowY: 'auto',
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 10, color: '#c00', textAlign: 'center' }}>
