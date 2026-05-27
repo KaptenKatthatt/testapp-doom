@@ -41,9 +41,12 @@ const ENTITY_TYPES = ['imp', 'demon', 'zombieman'] as const;
 const PICKUP_TYPES = ['health', 'ammo', 'shotgun'] as const;
 
 function makeGrid(): CellData[][] {
-  return Array.from({ length: GRID_H }, () =>
-    Array.from({ length: GRID_W }, (): CellData => ({ type: 'empty' }))
+  const grid = Array.from({ length: GRID_H }, (_, z) =>
+    Array.from({ length: GRID_W }, (_, x): CellData => 
+      (z === 0 || z === GRID_H - 1 || x === 0 || x === GRID_W - 1) ? { type: 'wall' } : { type: 'empty' }
+    )
   );
+  return grid;
 }
 
 function getCell(grid: CellData[][], x: number, z: number): CellData {
@@ -614,8 +617,10 @@ export default function Editor() {
     const scaleY = canvas.height / rect.height;
     const gx = Math.floor((clientX - rect.left) * scaleX / CELL_SIZE);
     const gz = Math.floor((clientY - rect.top) * scaleY / CELL_SIZE);
-    if (gx < 0 || gx >= GRID_W || gz < 0 || gz >= GRID_H) return null;
-    return [gx, gz];
+    // Clamp to grid edges so dragging outside canvas still works
+    const cx = Math.max(0, Math.min(GRID_W - 1, gx));
+    const cz = Math.max(0, Math.min(GRID_H - 1, gz));
+    return [cx, cz];
   };
 
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
@@ -682,7 +687,9 @@ export default function Editor() {
       return;
     }
 
-    const pos = e.type === 'mouseleave' ? null : getGridPos(e as React.MouseEvent | React.TouchEvent);
+    // Don't finalize on mouseLeave — just keep the preview so user can come back
+    if (e.type === 'mouseleave') return;
+    const pos = getGridPos(e as React.MouseEvent | React.TouchEvent);
 
     if (drawMode === 'line' && lineStart) {
       const end = pos || lineStart;
