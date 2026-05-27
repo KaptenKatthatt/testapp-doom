@@ -39,6 +39,7 @@ export default function Enemies({ enemies }: { readonly enemies: EnemyData[] }):
 function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const meshRef = useRef<Group>(null);
   const glowRef = useRef<Mesh>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
   const { position, type, hitFlash, rotation } = enemy;
   const config = ENEMY_CONFIG[type];
   const isDemon = type === "demon";
@@ -86,6 +87,19 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       if (material && "emissiveIntensity" in material) {
         const pulse = 0.5 + Math.sin(state.clock.getElapsedTime() * 5 + enemy.id * 2) * 0.3;
         (material as { emissiveIntensity: number }).emissiveIntensity = pulse;
+      }
+    }
+    if (lightRef.current) {
+      // Calculate squared distance to camera
+      const dx = position[0] - state.camera.position.x;
+      const dz = position[2] - state.camera.position.z;
+      const distSq = dx * dx + dz * dz;
+      // Only enable light if within 15 units to reduce rendering overhead from many active lights
+      if (distSq < 225) { // 15 * 15
+        lightRef.current.visible = true;
+        lightRef.current.intensity = 2.0;
+      } else {
+        lightRef.current.visible = false;
       }
     }
   });
@@ -170,6 +184,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
 
       {/* Enemy glow light */}
       <pointLight
+        ref={lightRef}
         position={[0, config.bodyH + 0.5, 0]}
         color={type === "demon" ? "#ff0044" : type === "zombieman" ? "#88ff88" : "#ff6600"}
         intensity={2.0}
