@@ -334,8 +334,8 @@ export default function Weapons({
           -0.65 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
           -0.55 + recoil * 0.10 + pullback * 0.3
         );
-        rotX = 0.02 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
-        rotY = 0.22 + sway * 0.3 - pullback * 0.2;
+        rotX = 0.065 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
+        rotY = 0.035 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       }
 
