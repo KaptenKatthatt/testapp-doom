@@ -166,7 +166,7 @@ export default function Weapons({
         });
 
         // Set scaling and orient pointing forward (only modify Y rotation to keep loader's X/Z Z-up conversion)
-        fbx.scale.set(0.038, 0.038, 0.038);
+        fbx.scale.set(0.032, 0.032, 0.032);
         fbx.rotation.y = Math.PI * 1.5; 
         setRevolverGroup(fbx);
       },
@@ -331,7 +331,7 @@ export default function Weapons({
         // DP-28 Machine Gun: placed on the right (like shotgun), pointing diagonally towards the center
         offset.set(
           0.22 + sway - pullback * 0.08,
-          -0.58 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
+          -0.65 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
           -0.55 + recoil * 0.10 + pullback * 0.3
         );
         rotX = 0.02 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
