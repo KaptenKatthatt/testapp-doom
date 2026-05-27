@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame, useThree, createPortal } from "@react-three/fiber";
 import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
@@ -56,6 +56,9 @@ export default function Weapons({
 
   // Reload progress animation variables
   const reloadElapsed = useRef(0);
+
+  // Bobbing weight for smoothing out motion
+  const bobWeightRef = useRef(0);
 
   // Load Models and apply textures
   useEffect(() => {
@@ -240,11 +243,16 @@ export default function Weapons({
 
     const recoil = recoilRef.current;
 
-    // 2. Walking bobbing & sway (only when moving)
+    // 2. Walking bobbing & sway (smoothly lerped to filter any rapid key/physics stuttering)
+    bobWeightRef.current = THREE.MathUtils.lerp(
+      bobWeightRef.current,
+      isMoving ? 1.0 : 0.0,
+      dt * 10.0
+    );
     const time = _state.clock.getElapsedTime();
-    const bobFreq = 3.5;
-    const sway = isMoving ? Math.sin(time * bobFreq) * 0.004 : 0;
-    const bob = isMoving ? Math.abs(Math.sin(time * bobFreq)) * 0.008 : 0;
+    const bobFreq = 2.4; // smooth, heavy, and natural walking pace
+    const sway = Math.sin(time * bobFreq) * 0.004 * bobWeightRef.current;
+    const bob = Math.abs(Math.sin(time * bobFreq)) * 0.008 * bobWeightRef.current;
     const pullback = pullbackRef?.current ?? 0;
 
     // 3. Cylinder / Mag continuous spin animations
@@ -339,12 +347,10 @@ export default function Weapons({
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       }
 
-      offset.applyQuaternion(camera.quaternion);
-      gunGroup.position.copy(camera.position).add(offset);
-      gunGroup.quaternion.copy(camera.quaternion);
-      gunGroup.rotateX(rotX);
-      gunGroup.rotateY(rotY);
-      gunGroup.rotateZ(rotZ);
+      // Since gunGroup is portal-rendered inside the camera, its coordinate space is relative to camera.
+      // Thus, we copy the local offsets and rotations directly to gunGroup local properties.
+      gunGroup.position.copy(offset);
+      gunGroup.rotation.set(rotX, rotY, rotZ);
     }
 
     // 5. Muzzle Flash trigger timing (only visible for 70ms post-shot)
@@ -374,9 +380,8 @@ export default function Weapons({
     }
   });
 
-  return (
-    <>
-      <group ref={gunGroupRef}>
+  return createPortal(
+    <group ref={gunGroupRef}>
         {/* --- FPS REVOLVER MODEL --- */}
         {currentWeapon === "revolver" && revolverGroup && (
           <group>
@@ -512,7 +517,7 @@ export default function Weapons({
             </mesh>
           </group>
         )}
-      </group>
-    </>
+    </group>,
+    camera
   );
 }
