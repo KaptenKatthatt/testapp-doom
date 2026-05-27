@@ -112,35 +112,49 @@ const PRESETS: PresetMap[] = [
     description: 'Narrow corridors and small rooms',
     grid: (() => {
       const g = borderGrid();
-      // Outer walls done by borderGrid
-      // Room dividers
-      hWall(g, 10, 1, 15); hWall(g, 10, 18, 24); hWall(g, 10, 27, 48);
-      hWall(g, 20, 1, 8); hWall(g, 20, 11, 22); hWall(g, 20, 25, 35); hWall(g, 20, 38, 48);
-      hWall(g, 30, 1, 12); hWall(g, 30, 15, 28); hWall(g, 30, 31, 42); hWall(g, 30, 45, 48);
-      hWall(g, 40, 1, 18); hWall(g, 40, 21, 35); hWall(g, 40, 38, 48);
-      vWall(g, 15, 1, 10); vWall(g, 25, 10, 20); vWall(g, 35, 1, 10); vWall(g, 35, 20, 30);
-      vWall(g, 12, 20, 30); vWall(g, 22, 30, 40); vWall(g, 38, 10, 20); vWall(g, 42, 30, 40);
-      // Doors (openings)
-      g[10]![16]!.type = 'door'; g[10]![17]!.type = 'door';
-      g[20]![9]!.type = 'door'; g[20]![10]!.type = 'door';
-      g[20]![23]!.type = 'door'; g[20]![24]!.type = 'door';
-      g[20]![36]!.type = 'door'; g[20]![37]!.type = 'door';
-      g[30]![13]!.type = 'door'; g[30]![14]!.type = 'door';
-      g[30]![29]!.type = 'door'; g[30]![30]!.type = 'empty';
-      g[30]![43]!.type = 'door'; g[30]![44]!.type = 'door';
-      g[40]![19]!.type = 'door'; g[40]![20]!.type = 'door';
-      g[40]![36]!.type = 'door'; g[40]![37]!.type = 'door';
+      // Use only horizontal walls to divide rows — doors go in the wall line
+      // Each horizontal wall spans most of the width with a 2-wide door gap
+      hWall(g, 8, 1, 5); hWall(g, 8, 8, 22); hWall(g, 8, 25, 48);
+      g[8]![6]!.type = 'door'; g[8]![7]!.type = 'door';
+      g[8]![23]!.type = 'door'; g[8]![24]!.type = 'door';
+
+      hWall(g, 16, 1, 18); hWall(g, 16, 21, 35); hWall(g, 16, 38, 48);
+      g[16]![19]!.type = 'door'; g[16]![20]!.type = 'door';
+      g[16]![36]!.type = 'door'; g[16]![37]!.type = 'door';
+
+      hWall(g, 24, 1, 10); hWall(g, 24, 13, 28); hWall(g, 24, 31, 48);
+      g[24]![11]!.type = 'door'; g[24]![12]!.type = 'door';
+      g[24]![29]!.type = 'door'; g[24]![30]!.type = 'door';
+
+      hWall(g, 32, 1, 22); hWall(g, 32, 25, 40); hWall(g, 32, 43, 48);
+      g[32]![23]!.type = 'door'; g[32]![24]!.type = 'door';
+      g[32]![41]!.type = 'door'; g[32]![42]!.type = 'door';
+
+      hWall(g, 40, 1, 8); hWall(g, 40, 11, 30); hWall(g, 40, 33, 48);
+      g[40]![9]!.type = 'door'; g[40]![10]!.type = 'door';
+      g[40]![31]!.type = 'door'; g[40]![32]!.type = 'door';
+
+      // No vertical walls — horizontal walls alone create tight corridor feel
+
       // Player
-      g[3]![3]!.type = 'player';
-      // Enemies
-      g[5]![20]!.type = 'imp'; g[15]![30]!.type = 'demon'; g[25]![8]!.type = 'imp';
-      g[35]![40]!.type = 'imp'; g[15]![42]!.type = 'zombieman'; g[45]![20]!.type = 'imp';
+      g[4]![4]!.type = 'player';
+      // Enemies in open areas
+      g[4]![25]!.type = 'imp';
+      g[12]![7]!.type = 'demon';
+      g[12]![42]!.type = 'imp';
+      g[20]![20]!.type = 'zombieman';
+      g[28]![40]!.type = 'imp';
+      g[36]![15]!.type = 'imp';
+      g[44]![25]!.type = 'imp';
       // Pickups
-      g[5]![10]!.type = 'health'; g[15]![5]!.type = 'ammo'; g[25]![40]!.type = 'health';
-      g[35]![20]!.type = 'shotgun'; g[45]![45]!.type = 'ammo';
+      g[4]![40]!.type = 'health';
+      g[12]![25]!.type = 'ammo';
+      g[20]![45]!.type = 'health';
+      g[36]![45]!.type = 'shotgun';
+      g[44]![10]!.type = 'ammo';
       return g;
     })(),
-    playerPos: [3, 3],
+    playerPos: [4, 4],
   },
   // 2. OPEN — large arena with pillars
   {
@@ -182,90 +196,60 @@ const PRESETS: PresetMap[] = [
     description: 'Classic maze with winding corridors',
     grid: (() => {
       const g = borderGrid();
-      // Generate maze-like walls using a simple pattern
-      // Vertical walls with gaps
-      for (let col = 5; col < GRID_W - 2; col += 5) {
-        const topOrBottom = (col / 5) % 2 === 0;
-        if (topOrBottom) {
-          vWall(g, col, 1, GRID_H - 5);
-          // Gap at bottom
-          g[GRID_H - 3]![col]!.type = 'empty';
-          g[GRID_H - 2]![col]!.type = 'empty';
-          g[GRID_H - 4]![col]!.type = 'empty';
-        } else {
-          vWall(g, col, 4, GRID_H - 2);
-          // Gap at top
-          g[1]![col]!.type = 'empty';
-          g[2]![col]!.type = g[2]![col]!.type === 'wall' ? 'wall' : 'empty';
-          g[3]![col]!.type = 'empty';
-        }
-      }
-      // Horizontal walls with gaps
-      for (let row = 5; row < GRID_H - 2; row += 5) {
-        const leftOrRight = (row / 5) % 2 === 0;
-        if (leftOrRight) {
-          hWall(g, row, 1, GRID_W - 5);
-          // Gap on right
-          g[row]![GRID_W - 3]!.type = 'empty';
-          g[row]![GRID_W - 2]!.type = 'empty';
-          g[row]![GRID_W - 4]!.type = 'empty';
-        } else {
-          hWall(g, row, 4, GRID_W - 2);
-          // Gap on left
-          g[row]![1]!.type = 'empty';
-          g[row]![2]!.type = 'empty';
-          g[row]![3]!.type = 'empty';
-        }
-      }
-      // Make sure corridors are 2-wide (erase every other wall for 2-wide corridors)
-      // Re-approach: clear a proper maze with 2-wide paths
-      // Reset and do it properly
-      // Actually let's just use a simpler approach: border + internal walls with 2-wide gaps
-      // Clear and start over with a proper maze
-      // Reset grid
-      for (let z = 0; z < GRID_H; z++) for (let x = 0; x < GRID_W; x++) g[z]![x]!.type = 'empty';
-      // Outer walls (2 thick)
-      for (let x = 0; x < GRID_W; x++) { g[0]![x]!.type = 'wall'; g[1]![x]!.type = 'wall'; g[GRID_H-1]![x]!.type = 'wall'; g[GRID_H-2]![x]!.type = 'wall'; }
-      for (let z = 0; z < GRID_H; z++) { g[z]![0]!.type = 'wall'; g[z]![1]!.type = 'wall'; g[z]![GRID_W-1]!.type = 'wall'; g[z]![GRID_W-2]!.type = 'wall'; }
-      // Internal maze walls (horizontal and vertical barriers with 2-wide passages)
-      hWall(g, 10, 2, 14); hWall(g, 11, 2, 14);
-      hWall(g, 10, 20, 35); hWall(g, 11, 20, 35);
-      hWall(g, 20, 8, 22); hWall(g, 21, 8, 22);
-      hWall(g, 20, 30, 47); hWall(g, 21, 30, 47);
-      hWall(g, 30, 2, 15); hWall(g, 31, 2, 15);
-      hWall(g, 30, 25, 40); hWall(g, 31, 25, 40);
-      hWall(g, 40, 10, 28); hWall(g, 41, 10, 28);
-      hWall(g, 40, 35, 47); hWall(g, 41, 35, 47);
+      // Only vertical walls (no horizontal walls) to avoid intersection issues
+      // Each vWall has gaps for 2-wide doors, alternating left/right to create maze paths
+      // Walls are spaced to leave 4-wide corridors between them
 
-      vWall(g, 15, 2, 10); vWall(g, 16, 2, 10);
-      vWall(g, 25, 11, 20); vWall(g, 26, 11, 20);
-      vWall(g, 38, 2, 10); vWall(g, 39, 2, 10);
-      vWall(g, 8, 21, 30); vWall(g, 9, 21, 30);
-      vWall(g, 35, 21, 31); vWall(g, 36, 21, 31);
-      vWall(g, 15, 31, 40); vWall(g, 16, 31, 40);
-      vWall(g, 42, 11, 20); vWall(g, 43, 11, 20);
-      vWall(g, 30, 31, 41); vWall(g, 31, 31, 41);
-      // Doors as openings
-      g[10]![15]!.type = 'door'; g[11]![15]!.type = 'empty';
-      g[10]![18]!.type = 'door'; g[11]![18]!.type = 'empty';
-      g[20]![23]!.type = 'door'; g[21]![23]!.type = 'empty';
-      g[20]![28]!.type = 'door'; g[21]![28]!.type = 'empty';
-      g[30]![16]!.type = 'door'; g[31]![16]!.type = 'empty';
-      g[30]![23]!.type = 'door'; g[31]![23]!.type = 'empty';
-      g[40]![29]!.type = 'door'; g[41]![29]!.type = 'empty';
-      g[40]![33]!.type = 'door'; g[41]![33]!.type = 'empty';
-      // Player
-      g[4]![4]!.type = 'player';
-      // Enemies
-      g[6]![20]!.type = 'imp'; g[16]![30]!.type = 'demon';
-      g[26]![12]!.type = 'imp'; g[36]![42]!.type = 'zombieman';
-      g[15]![8]!.type = 'imp'; g[25]![44]!.type = 'imp';
-      // Pickups
-      g[4]![30]!.type = 'health'; g[16]![20]!.type = 'ammo';
-      g[36]![10]!.type = 'shotgun'; g[45]![45]!.type = 'health';
+      // Column 10 — gap on LEFT side (rows 1-3)
+      vWall(g, 10, 4, 48);
+      g[1]![10]!.type = 'door'; g[2]![10]!.type = 'door'; g[3]![10]!.type = 'empty';
+
+      // Column 20 — gap on RIGHT side (rows 46-48)
+      vWall(g, 20, 1, 45);
+      g[46]![20]!.type = 'door'; g[47]![20]!.type = 'door'; g[48]![20]!.type = 'empty';
+
+      // Column 30 — gap on LEFT side (rows 1-3)
+      vWall(g, 30, 4, 48);
+      g[1]![30]!.type = 'door'; g[2]![30]!.type = 'door'; g[3]![30]!.type = 'empty';
+
+      // Column 40 — gap on RIGHT side (rows 46-48)
+      vWall(g, 40, 1, 45);
+      g[46]![40]!.type = 'door'; g[47]![40]!.type = 'door'; g[48]![40]!.type = 'empty';
+
+      // Horizontal stub walls for dead-end feel (NOT crossing vertical walls)
+      // In section between col 1-9
+      hWall(g, 15, 2, 8);
+      hWall(g, 35, 2, 8);
+      // In section between col 11-19
+      hWall(g, 25, 12, 18);
+      hWall(g, 45, 12, 18);
+      // In section between col 21-29
+      hWall(g, 15, 22, 28);
+      hWall(g, 35, 22, 28);
+      // In section between col 31-39
+      hWall(g, 25, 32, 38);
+      hWall(g, 45, 32, 38);
+      // In section between col 41-48
+      hWall(g, 15, 42, 47);
+      hWall(g, 35, 42, 47);
+
+      // Player in top-left
+      g[5]![5]!.type = 'player';
+      // Enemies in open corridors
+      g[10]![15]!.type = 'imp';
+      g[20]![25]!.type = 'demon';
+      g[30]![35]!.type = 'zombieman';
+      g[40]![15]!.type = 'imp';
+      g[45]![45]!.type = 'imp';
+      g[10]![45]!.type = 'imp';
+      // Pickups in corridors
+      g[20]![5]!.type = 'health';
+      g[30]![15]!.type = 'ammo';
+      g[40]![25]!.type = 'shotgun';
+      g[20]![45]!.type = 'health';
       return g;
     })(),
-    playerPos: [4, 4],
+    playerPos: [5, 5],
   },
   // 4. ARENA — central arena with surrounding corridors
   {
@@ -273,45 +257,41 @@ const PRESETS: PresetMap[] = [
     description: 'Central arena with surrounding corridors',
     grid: (() => {
       const g = borderGrid();
-      // Central arena walls (leaving 4-wide openings on each side)
-      hWall(g, 12, 12, 21); hWall(g, 12, 28, 37);
-      hWall(g, 37, 12, 21); hWall(g, 37, 28, 37);
-      vWall(g, 12, 12, 20); vWall(g, 12, 30, 37);
-      vWall(g, 37, 12, 21); vWall(g, 37, 29, 37);
-      // Corner pillars
-      fillRect(g, 12, 12, 14, 14, 'wall');
-      fillRect(g, 35, 12, 37, 14, 'wall');
-      fillRect(g, 12, 35, 14, 37, 'wall');
-      fillRect(g, 35, 35, 37, 37, 'wall');
-      // Alcoves in corners
-      fillRect(g, 4, 4, 6, 6, 'wall');
-      fillRect(g, 43, 4, 45, 6, 'wall');
-      fillRect(g, 4, 43, 6, 45, 'wall');
-      fillRect(g, 43, 43, 45, 45, 'wall');
-      // Doors on arena entrances
-      g[12]![22]!.type = 'door'; g[12]![23]!.type = 'door'; g[12]![24]!.type = 'door'; g[12]![25]!.type = 'door'; g[12]![26]!.type = 'door'; g[12]![27]!.type = 'door';
-      g[37]![22]!.type = 'door'; g[37]![23]!.type = 'door'; g[37]![24]!.type = 'door'; g[37]![25]!.type = 'door'; g[37]![26]!.type = 'door'; g[37]![27]!.type = 'door';
-      // Actually doors should be 2-wide max. Let me redo: just open the gaps
-      for (let x = 22; x <= 27; x++) { g[12]![x]!.type = 'empty'; g[37]![x]!.type = 'empty'; }
-      for (let z = 22; z <= 27; z++) { g[z]![12]!.type = 'empty'; g[z]![37]!.type = 'empty'; }
-      // Add doors (2-wide each)
-      g[12]![23]!.type = 'door'; g[12]![24]!.type = 'door';
-      g[37]![23]!.type = 'door'; g[37]![24]!.type = 'door';
-      g[23]![12]!.type = 'door'; g[24]![12]!.type = 'door';
-      g[23]![37]!.type = 'door'; g[24]![37]!.type = 'door';
+      // Central arena — single-thick wall rectangle with 4 door openings
+      hWall(g, 15, 15, 22); hWall(g, 15, 28, 35);
+      hWall(g, 35, 15, 22); hWall(g, 35, 28, 35);
+      vWall(g, 15, 15, 34); vWall(g, 35, 15, 34);
+      // Doors on each side (2-wide each, opposite open sides)
+      g[15]![23]!.type = 'door'; g[15]![24]!.type = 'door'; // N entrance
+      g[15]![25]!.type = 'door'; g[15]![26]!.type = 'door'; // N entrance wide
+      g[35]![23]!.type = 'door'; g[35]![24]!.type = 'door'; // S entrance
+      g[35]![25]!.type = 'door'; g[35]![26]!.type = 'door'; // S entrance wide
+      g[23]![15]!.type = 'door'; g[24]![15]!.type = 'door'; // W entrance
+      g[25]![15]!.type = 'door'; g[26]![15]!.type = 'door'; // W entrance wide
+      g[23]![35]!.type = 'door'; g[24]![35]!.type = 'door'; // E entrance
+      g[25]![35]!.type = 'door'; g[26]![35]!.type = 'door'; // E entrance wide
+      // Pillars inside arena (not blocking doors)
+      fillRect(g, 20, 20, 21, 21, 'wall');
+      fillRect(g, 29, 20, 30, 21, 'wall');
+      fillRect(g, 20, 29, 21, 30, 'wall');
+      fillRect(g, 29, 29, 30, 30, 'wall');
       // Player in south corridor
-      g[44]![25]!.type = 'player';
-      // Enemies in arena center and corridors
-      g[24]![24]!.type = 'demon'; g[20]![20]!.type = 'imp';
-      g[28]![28]!.type = 'imp'; g[20]![30]!.type = 'imp';
-      g[30]![20]!.type = 'zombieman'; g[5]![25]!.type = 'imp';
-      g[44]![10]!.type = 'imp'; g[10]![40]!.type = 'zombieman';
+      g[42]![25]!.type = 'player';
+      // Enemies — inside arena and in corridors
+      g[25]![25]!.type = 'demon'; // arena center
+      g[18]![20]!.type = 'imp'; // arena NW
+      g[32]![30]!.type = 'imp'; // arena SE
+      g[10]![25]!.type = 'zombieman'; // N corridor
+      g[42]![10]!.type = 'imp'; // SW corridor
+      g[8]![40]!.type = 'imp'; // NE corner area
       // Pickups
-      g[24]![25]!.type = 'shotgun'; g[44]![40]!.type = 'health';
-      g[5]![40]!.type = 'ammo'; g[44]![5]!.type = 'health';
+      g[25]![24]!.type = 'shotgun'; // arena
+      g[42]![40]!.type = 'health'; // SE corridor
+      g[5]![40]!.type = 'ammo'; // NE area
+      g[42]![8]!.type = 'health'; // SW area
       return g;
     })(),
-    playerPos: [25, 44],
+    playerPos: [25, 42],
   },
   // 5. FORTRESS — room-based with connected chambers
   {
@@ -319,69 +299,61 @@ const PRESETS: PresetMap[] = [
     description: 'Connected chambers with a central keep',
     grid: (() => {
       const g = borderGrid();
-      // Central keep
-      fillRect(g, 20, 20, 30, 30, 'wall');
-      // Hollow out interior
-      fillRect(g, 21, 21, 29, 29, 'empty');
-      // Keep doors
-      g[20]![24]!.type = 'door'; g[20]![25]!.type = 'door'; g[20]![26]!.type = 'empty';
-      g[30]![24]!.type = 'door'; g[30]![25]!.type = 'door'; g[30]![26]!.type = 'empty';
-      g[24]![20]!.type = 'door'; g[25]![20]!.type = 'door'; g[26]![20]!.type = 'empty';
-      g[24]![30]!.type = 'door'; g[25]![30]!.type = 'door'; g[26]![30]!.type = 'empty';
+      // Central keep — hollow rectangle
+      hWall(g, 20, 20, 30); hWall(g, 30, 20, 30);
+      vWall(g, 20, 20, 30); vWall(g, 30, 20, 30);
+      // Keep doors (2-wide each, opposite open sides)
+      g[20]![24]!.type = 'door'; g[20]![25]!.type = 'door'; // N door
+      g[30]![24]!.type = 'door'; g[30]![25]!.type = 'door'; // S door
+      g[24]![20]!.type = 'door'; g[25]![20]!.type = 'door'; // W door
+      g[24]![30]!.type = 'door'; g[25]![30]!.type = 'door'; // E door
 
-      // NW room
-      fillRect(g, 2, 2, 16, 16, 'empty');
-      fillRect(g, 2, 2, 2, 2, 'wall'); fillRect(g, 2, 2, 16, 2, 'wall'); // already border
+      // NW room walls (x2-16, z2-16)
       hWall(g, 16, 2, 16); vWall(g, 16, 2, 16);
-      g[16]![10]!.type = 'door'; g[16]![11]!.type = 'door';
+      // NE room walls (x33-47, z2-16)
+      hWall(g, 16, 33, 47); vWall(g, 33, 2, 16);
+      // SW room walls (x2-16, z33-47)
+      hWall(g, 33, 2, 16); vWall(g, 16, 33, 47);
+      // SE room walls (x33-47, z33-47)
+      hWall(g, 33, 33, 47); vWall(g, 33, 33, 47);
 
-      // NE room
-      fillRect(g, 34, 2, 47, 16, 'empty');
-      hWall(g, 16, 34, 47); vWall(g, 34, 2, 16);
-      g[16]![38]!.type = 'door'; g[16]![39]!.type = 'door';
-
-      // SW room
-      fillRect(g, 2, 34, 16, 47, 'empty');
-      hWall(g, 34, 2, 16); vWall(g, 16, 34, 47);
-      g[34]![10]!.type = 'door'; g[34]![11]!.type = 'door';
-
-      // SE room
-      fillRect(g, 34, 34, 47, 47, 'empty');
-      hWall(g, 34, 34, 47); vWall(g, 34, 34, 47);
-      g[34]![38]!.type = 'door'; g[34]![39]!.type = 'door';
-
-      // Corridors connecting rooms to center
-      // N corridor
-      hWall(g, 18, 2, 19); hWall(g, 18, 31, 47);
-      // S corridor
-      hWall(g, 31, 2, 19); hWall(g, 31, 31, 47);
-      // W corridor
-      vWall(g, 18, 2, 19); vWall(g, 18, 31, 47);
-      // E corridor
-      vWall(g, 31, 2, 19); vWall(g, 31, 31, 47);
-      // Clear corridor interiors (3-wide passages)
-      fillRect(g, 21, 17, 29, 19, 'empty');
-      fillRect(g, 21, 31, 29, 33, 'empty');
-      fillRect(g, 17, 21, 19, 29, 'empty');
-      fillRect(g, 31, 21, 33, 29, 'empty');
+      // Room doors to corridors (2-wide each)
+      // NW room S door
+      g[16]![9]!.type = 'door'; g[16]![10]!.type = 'door';
+      // NW room E door
+      g[8]![16]!.type = 'door'; g[9]![16]!.type = 'door';
+      // NE room S door
+      g[16]![40]!.type = 'door'; g[16]![41]!.type = 'door';
+      // NE room W door
+      g[8]![33]!.type = 'door'; g[9]![33]!.type = 'door';
+      // SW room N door
+      g[33]![9]!.type = 'door'; g[33]![10]!.type = 'door';
+      // SW room E door
+      g[40]![16]!.type = 'door'; g[41]![16]!.type = 'door';
+      // SE room N door
+      g[33]![40]!.type = 'door'; g[33]![41]!.type = 'door';
+      // SE room W door
+      g[40]![33]!.type = 'door'; g[41]![33]!.type = 'door';
 
       // Player in SW room
-      g[42]![8]!.type = 'player';
-
-      // Enemies
-      g[10]![25]!.type = 'imp'; g[10]![40]!.type = 'demon';
-      g[40]![40]!.type = 'imp'; g[25]![10]!.type = 'zombieman';
-      g[25]![25]!.type = 'demon'; g[42]![40]!.type = 'imp';
-      g[10]![8]!.type = 'imp'; g[40]![8]!.type = 'zombieman';
-
-      // Pickups
-      g[25]![25]!.type = 'shotgun'; g[42]![40]!.type = 'ammo';
-      g[8]![40]!.type = 'health'; g[42]![8]!.type = 'health';
-      g[8]![10]!.type = 'ammo';
-
+      g[40]![8]!.type = 'player';
+      // Enemies in open rooms (not in corridors, not near walls)
+      g[8]![8]!.type = 'imp';     // NW room
+      g[8]![40]!.type = 'demon';  // NE room
+      g[40]![40]!.type = 'imp';   // SE room
+      g[25]![25]!.type = 'demon'; // Keep center
+      g[8]![25]!.type = 'zombieman'; // N corridor
+      g[25]![8]!.type = 'imp';   // W corridor
+      g[40]![25]!.type = 'imp';  // S corridor area
+      // Pickups in open rooms
+      g[25]![24]!.type = 'shotgun'; // Keep
+      g[40]![40]!.type = 'ammo';  // SE room (moved from entity overlap)
+      g[8]![40]!.type = 'health'; // NE room (moved from entity overlap)
+      g[40]![8]!.type = 'ammo';   // SW room (moved from player overlap — put nearby)
+      g[8]![9]!.type = 'health';  // NW room
       return g;
     })(),
-    playerPos: [8, 42],
+    playerPos: [8, 40],
   },
 ];
 
