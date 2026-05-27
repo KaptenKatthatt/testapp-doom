@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
@@ -7,6 +7,9 @@ import AudioMenu from "./AudioMenu";
 import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
 import type { LevelData } from "./main";
+import { gridToLevelData } from "./Editor";
+
+type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun';
 
 function formatTime(startTime: number, endTime: number): string {
   if (!startTime) return "0:00";
@@ -68,6 +71,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const [missionComplete, setMissionComplete] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
+  const [showMapModal, setShowMapModal] = useState(false);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
   const mobilePitchRef = useRef(0);
@@ -79,8 +83,23 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setSavedMaps(listSavedMaps());
   }, []);
 
-  // If we have levelData from the editor, use it
-  const activeLevelData = selectedLevel === '__custom__' && levelData ? levelData : null;
+  // If we have levelData from the editor, use it; otherwise load saved map
+  const activeLevelData = useMemo(() => {
+    if (selectedLevel === '__custom__' && levelData) return levelData;
+    if (selectedLevel?.startsWith('saved:')) {
+      const mapName = selectedLevel.slice(6);
+      const raw = localStorage.getItem('doom-map-' + mapName);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          const grid = data.grid.map((row: CellType[]) => row.map((t: CellType) => ({ type: t })));
+          const playerPos: [number, number] = data.playerPos || [2, 2];
+          return gridToLevelData(grid, playerPos);
+        } catch { /* fall through */ }
+      }
+    }
+    return null;
+  }, [selectedLevel, levelData]);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -199,19 +218,119 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           {selectedLevel === '__custom__' ? '▶ Custom Level' : selectedLevel?.startsWith('saved:') ? `▶ ${selectedLevel.slice(6)}` : '▶ E1M1 - Entryway'}
         </p>
 
-        <p style={{ fontSize: "14px", color: "#666", marginTop: "30px", animation: "blink 1s infinite" }}>
+        {/* Custom Map button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setSavedMaps(listSavedMaps()); setShowMapModal(true); }}
+          style={{
+            marginTop: "16px", padding: "10px 24px", background: "#222", color: "#c00", border: "2px solid #c00",
+            fontFamily: '"DooM", monospace', fontSize: "16px", cursor: "pointer", letterSpacing: "2px",
+            transition: "background 0.15s, color 0.15s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#c00"; e.currentTarget.style.color = "#fff"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#c00"; }}
+        >
+          🗺️ CUSTOM MAP
+        </button>
+
+        <p style={{ fontSize: "14px", color: "#666", marginTop: "20px", animation: "blink 1s infinite" }}>
           Tap to start
         </p>
         <a
           href="#editor"
           onClick={(e) => e.stopPropagation()}
-          style={{ fontSize: "12px", color: "#c00", marginTop: "16px", textDecoration: "none", opacity: 0.7 }}
+          style={{ fontSize: "12px", color: "#c00", marginTop: "12px", textDecoration: "none", opacity: 0.7 }}
         >
           📐 Level Editor
         </a>
         <p style={{ fontSize: "12px", color: "#444", marginTop: "10px" }}>
           WASD / Joystick · Mouse / Touch · Click to shoot
         </p>
+
+        {/* Custom Map Modal */}
+        {showMapModal && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+              background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 10000, fontFamily: '"DooM", monospace',
+            }}
+          >
+            <div style={{
+              background: "#1a0a00", border: "2px solid #c00", borderRadius: 6, padding: "20px 24px",
+              minWidth: "320px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
+            }}>
+              <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px" }}>🗺️ CUSTOM MAPS</h2>
+
+              {/* Default level option */}
+              <div
+                onClick={() => { setSelectedLevel('__default__'); setShowMapModal(false); }}
+                style={{
+                  padding: "10px 12px", margin: "4px 0", background: selectedLevel === '__default__' ? '#331100' : '#222',
+                  border: selectedLevel === '__default__' ? '1px solid #c00' : '1px solid #444',
+                  cursor: "pointer", color: "#ffcc00", fontSize: "14px",
+                }}
+              >
+                🏚️ E1M1 - Entryway (Default)
+              </div>
+
+              {/* Editor level if available */}
+              {levelData && (
+                <div
+                  onClick={() => { setSelectedLevel('__custom__'); setShowMapModal(false); }}
+                  style={{
+                    padding: "10px 12px", margin: "4px 0", background: selectedLevel === '__custom__' ? '#331100' : '#222',
+                    border: selectedLevel === '__custom__' ? '1px solid #c00' : '1px solid #444',
+                    cursor: "pointer", color: "#0f0", fontSize: "14px",
+                  }}
+                >
+                  ✏️ Custom Level (from Editor)
+                </div>
+              )}
+
+              {/* Saved maps */}
+              {savedMaps.length === 0 && !levelData && (
+                <p style={{ color: "#666", fontSize: "13px", marginTop: "8px" }}>
+                  No saved maps yet. Create one in the Level Editor!
+                </p>
+              )}
+              {savedMaps.map(m => (
+                <div
+                  key={m.name}
+                  onClick={() => { setSelectedLevel(`saved:${m.name}`); setShowMapModal(false); }}
+                  style={{
+                    padding: "10px 12px", margin: "4px 0", background: selectedLevel === `saved:${m.name}` ? '#331100' : '#222',
+                    border: selectedLevel === `saved:${m.name}` ? '1px solid #c00' : '1px solid #444',
+                    cursor: "pointer", color: "#ffcc00", fontSize: "14px",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}
+                >
+                  <span>🗺️ {m.name}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      localStorage.removeItem(`doom-map-${m.name}`);
+                      setSavedMaps(listSavedMaps());
+                    }}
+                    style={{ background: "#660000", color: "#ff4444", border: "1px solid #ff4444", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+
+              <button
+                onClick={() => setShowMapModal(false)}
+                style={{
+                  marginTop: "16px", padding: "8px 20px", background: "#333", color: "#aaa",
+                  border: "1px solid #555", cursor: "pointer", fontFamily: '"DooM", monospace', fontSize: "14px",
+                }}
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
