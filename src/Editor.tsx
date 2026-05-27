@@ -87,16 +87,14 @@ export default function Editor() {
     }, 1000);
   }, []);
 
-  // Check for autosave on mount
+  // Check for autosave on mount — restore silently if available
   useEffect(() => {
     const autoData = loadAutosave();
     if (autoData) {
       const hasContent = autoData.grid.some(row => row.some(c => c.type !== 'empty'));
       if (hasContent) {
-        if (confirm('Restore autosaved work?')) {
-          setGrid(autoData.grid);
-          setPlayerPos(autoData.playerPos);
-        }
+        setGrid(autoData.grid);
+        setPlayerPos(autoData.playerPos);
       }
     }
   }, []);
