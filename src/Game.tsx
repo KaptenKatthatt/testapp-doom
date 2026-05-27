@@ -206,6 +206,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   const handlePlayerState = useCallback((): void => {
     const p = playerRef.current;
+    p.kills = enemiesRef.current.filter(e => !e.alive).length;
     onPlayerState({
       health: Math.round(p.health),
       ammo: p.ammo,
@@ -326,10 +327,6 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       walls,
       enemiesRef,
       setEnemies,
-      missionCompleteRef,
-      gameActiveRef,
-      onPlayerState,
-      onMissionComplete,
       barrelsRef,
       setBarrels
     );
@@ -467,6 +464,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
             prevBarrels,
             hasLineOfSight
           );
+          enemiesRef.current = updatedEnemies;
           setEnemies(updatedEnemies);
           return { ...b, alive: false, explosionTimer: 1.0 };
         }
@@ -477,7 +475,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       if (exploded) {
         const originalExploded = prevBarrels.find(b => b.id === exploded.id);
         if (originalExploded && originalExploded.alive) {
-          const { updatedBarrels } = explodeBarrelSplash(
+          const { updatedEnemies, updatedBarrels } = explodeBarrelSplash(
             originalExploded,
             playerRef.current,
             enemiesRef.current,
@@ -486,6 +484,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
             prevBarrels,
             hasLineOfSight
           );
+          enemiesRef.current = updatedEnemies;
+          setEnemies(updatedEnemies);
           return nextBarrels.map(b => {
             if (b.id === exploded.id) return b;
             const updated = updatedBarrels.find(u => u.id === b.id);
@@ -498,6 +498,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     });
 
     // Centralized mission completion check: if all enemies are dead, player wins!
+    player.kills = enemiesRef.current.filter(e => !e.alive).length;
     const totalEnemies = enemiesRef.current.length;
     const aliveEnemies = enemiesRef.current.filter(e => e.alive).length;
     if (totalEnemies > 0 && aliveEnemies === 0 && !missionCompleteRef.current) {

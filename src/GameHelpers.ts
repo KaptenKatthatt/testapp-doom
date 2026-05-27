@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { EnemyData, ProjectileData, PickupData, PlayerState, WallBox } from "./types";
+import type { EnemyData, ProjectileData, PickupData, WallBox } from "./types";
 import { audioManager } from "./Audio";
 import type { PlayerData } from "./Game";
 import type { BarrelData } from "./Level";
@@ -396,14 +396,10 @@ export function handlePlayerShootingHelper(
   projectileIdRef: { current: number },
   walls: WallBox[],
   enemiesRef: { current: EnemyData[] },
-  setEnemies: (value: EnemyData[] | ((prev: EnemyData[]) => EnemyData[])) => void,
-  missionCompleteRef: { current: boolean },
-  gameActiveRef: { current: boolean },
-  onPlayerState: (state: PlayerState) => void,
-  onMissionComplete: () => void,
+  setEnemies: (value: EnemyData[]) => void,
   barrelsRef?: React.MutableRefObject<BarrelData[]>,
   setBarrels?: React.Dispatch<React.SetStateAction<BarrelData[]>>
-) {
+): void {
   if (player.shooting && now - player.lastShot > 0.6 && player.ammo > 0) {
     player.ammo--;
     player.lastShot = now;
@@ -534,39 +530,19 @@ export function handlePlayerShootingHelper(
     if (closestTarget) {
       if (closestTarget.type === 'enemy') {
         const targetEnemy = closestTarget.e;
-        setEnemies((prev: EnemyData[]): EnemyData[] => {
-          const updated = prev.map((e: EnemyData): EnemyData => {
-            if (!e.alive) return e;
-            if (e.id !== targetEnemy.id) return e;
-            const newHealth = e.health - closestDamage;
-            if (newHealth <= 0) {
-              player.kills++;
-              const totalEnemies = enemiesRef.current.length;
-              if (player.kills >= totalEnemies && !missionCompleteRef.current) {
-                missionCompleteRef.current = true;
-                gameActiveRef.current = false;
-                player.endTime = now;
-                onPlayerState({
-                  health: Math.round(player.health),
-                  ammo: player.ammo,
-                  kills: player.kills,
-                  shotsFired: player.shotsFired,
-                  timesHit: player.timesHit,
-                  startTime: player.startTime,
-                  endTime: now,
-                  damageFlash: 0,
-                });
-                onMissionComplete();
-              }
-              const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
-              audioManager.play(deathSounds[e.type] ?? 'imp_death');
-              return { ...e, health: 0, alive: false, hitFlash: 0 };
-            }
-            return { ...e, health: newHealth, hitFlash: 1 };
-          });
-          enemiesRef.current = updated;
-          return updated;
+        const updated = enemiesRef.current.map((e: EnemyData): EnemyData => {
+          if (!e.alive) return e;
+          if (e.id !== targetEnemy.id) return e;
+          const newHealth = e.health - closestDamage;
+          if (newHealth <= 0) {
+            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+            audioManager.play(deathSounds[e.type] ?? 'imp_death');
+            return { ...e, health: 0, alive: false, hitFlash: 0 };
+          }
+          return { ...e, health: newHealth, hitFlash: 1 };
         });
+        enemiesRef.current = updated;
+        setEnemies(updated);
       } else if (closestTarget.type === 'barrel' && setBarrels && barrelsRef) {
         const targetBarrel = closestTarget.b;
         setBarrels((prev: BarrelData[]): BarrelData[] => {
@@ -627,7 +603,6 @@ export function explodeBarrelSplash(
         if (nextHP <= 0) {
           const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
           audioManager.play(deathSounds[e.type] ?? 'imp_death');
-          player.kills++;
           return { ...e, health: 0, alive: false, hitFlash: 0 };
         }
         return { ...e, health: nextHP, hitFlash: 1.0 };
