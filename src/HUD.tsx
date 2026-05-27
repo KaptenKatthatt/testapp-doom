@@ -3,10 +3,28 @@ import { useEffect, useRef, useState } from "react";
 interface HUDProps {
   readonly health: number;
   readonly ammo: number;
+  readonly bullets?: number;
+  readonly shells?: number;
+  readonly currentWeapon?: "revolver" | "shotgun" | "machinegun";
+  readonly revolverChamber?: number;
+  readonly machinegunMag?: number;
+  readonly revolverReloading?: boolean;
+  readonly machinegunReloading?: boolean;
   readonly kills: number;
 }
 
-export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Element {
+export default function HUD({
+  health,
+  ammo,
+  bullets = 0,
+  shells = 0,
+  currentWeapon = "revolver",
+  revolverChamber = 0,
+  machinegunMag = 0,
+  revolverReloading = false,
+  machinegunReloading = false,
+  kills,
+}: HUDProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [faceImg, setFaceImg] = useState<HTMLImageElement | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -69,15 +87,63 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     const labelSize = Math.round(12 * s);
     const valueSize = Math.round(40 * s);
 
+    // Determine ammo digits and reloading/low states based on selected weapon
+    let ammoText = "000";
+    let isLow = false;
+    let isReloading = false;
+    let reserveText = "";
+
+    const activeW = currentWeapon ?? "revolver";
+
+    if (activeW === "shotgun") {
+      ammoText = String(shells).padStart(3, "0");
+      isLow = shells <= 2;
+    } else if (activeW === "revolver") {
+      isReloading = revolverReloading;
+      if (isReloading) {
+        ammoText = "RLD";
+        isLow = true;
+      } else {
+        ammoText = String(revolverChamber).padStart(3, "0");
+        isLow = revolverChamber <= 1;
+      }
+      reserveText = `RES:${String(bullets).padStart(3, "0")}`;
+    } else if (activeW === "machinegun") {
+      isReloading = machinegunReloading;
+      if (isReloading) {
+        ammoText = "RLD";
+        isLow = true;
+      } else {
+        ammoText = String(machinegunMag).padStart(3, "0");
+        isLow = machinegunMag <= 10;
+      }
+      reserveText = `RES:${String(bullets).padStart(3, "0")}`;
+    }
+
     // === AMMO section (left quarter) ===
     const ammoX = 16 * s;
     ctx.textAlign = "left";
     ctx.fillStyle = "#aaaaaa";
     ctx.font = doomFont(labelSize);
     ctx.fillText("AMMO", ammoX, 20 * s);
-    ctx.fillStyle = ammo > 20 ? "#ffcc00" : "#ff3300";
+
+    // Flash large reload text dynamically
+    if (isReloading) {
+      const flash = Math.floor(performance.now() / 150) % 2 === 0;
+      ctx.fillStyle = flash ? "#ff3300" : "#771100";
+    } else {
+      ctx.fillStyle = isLow ? "#ff3300" : "#ffcc00";
+    }
+
     ctx.font = doomFont(valueSize);
-    ctx.fillText(String(ammo).padStart(3, "0"), ammoX, 62 * s);
+    ctx.fillText(ammoText, ammoX, 62 * s);
+
+    // Draw small ammo reserve indicator (e.g. bullets reserve)
+    if (reserveText) {
+      ctx.fillStyle = "#888888";
+      ctx.font = doomFont(Math.round(8.5 * s));
+      ctx.fillText(reserveText, ammoX + 80 * s, 62 * s);
+    }
 
     // === HEALTH section (second quarter) ===
     const healthX = sectionW + 16 * s;
@@ -97,7 +163,6 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
 
     // === DOOM FACE (center section) ===
     const faceCenterX = sectionW * 2 + sectionW / 2;
-    // Draw face background (dark border like in Doom)
     const faceSize = 70 * s; // Big! Like in Doom
     const faceX = faceCenterX - faceSize / 2;
     const faceY = (h - faceSize) / 2;
@@ -110,7 +175,6 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     if (faceImg) {
       ctx.drawImage(faceImg, faceX, faceY, faceSize, faceSize);
     } else {
-      // Fallback: simple colored square while image loads
       ctx.fillStyle = "#cc9966";
       ctx.fillRect(faceX, faceY, faceSize, faceSize);
     }
@@ -125,17 +189,34 @@ export default function HUD({ health, ammo, kills }: HUDProps): React.JSX.Elemen
     ctx.font = doomFont(valueSize);
     ctx.fillText(String(kills), killsX, 62 * s);
 
-    // Weapon name
+    // Weapon name display
     ctx.fillStyle = "#666666";
     ctx.font = doomFont(Math.round(10 * s));
-    ctx.fillText("SHOTGUN", ammoX, 80 * s);
+    
+    let weaponDisplayName = "REVOLVER";
+    if (activeW === "shotgun") weaponDisplayName = "SHOTGUN";
+    else if (activeW === "machinegun") weaponDisplayName = "DP-28 MACHINE GUN";
+
+    ctx.fillText(weaponDisplayName, ammoX, 80 * s);
 
     // Arms indicator (like Doom) - small
     ctx.fillStyle = "#888888";
     ctx.font = doomFont(Math.round(9 * s));
     ctx.fillText("ARMS", killsX, 80 * s);
 
-  }, [health, ammo, kills, faceImg, fontLoaded]);
+  }, [
+    health,
+    ammo,
+    bullets,
+    shells,
+    currentWeapon,
+    revolverChamber,
+    machinegunMag,
+    revolverReloading,
+    machinegunReloading,
+    faceImg,
+    fontLoaded,
+  ]);
 
   return (
     <canvas

@@ -1,6 +1,13 @@
 export interface PlayerState {
   health: number;
-  ammo: number;
+  ammo: number; // for backward compatibility/legacy reference
+  bullets: number; // shared revolver & machinegun ammo
+  shells: number; // shotgun ammo
+  currentWeapon: "revolver" | "shotgun" | "machinegun";
+  revolverChamber: number; // 0-6
+  machinegunMag: number; // 0-70
+  revolverReloading: boolean;
+  machinegunReloading: boolean;
   kills: number;
   shotsFired: number;
   timesHit: number;

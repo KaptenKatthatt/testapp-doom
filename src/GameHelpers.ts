@@ -409,16 +409,113 @@ export function handlePlayerShootingHelper(
   barrelsRef?: React.MutableRefObject<BarrelData[]>,
   setBarrels?: React.Dispatch<React.SetStateAction<BarrelData[]>>
 ): void {
-  if (player.shooting && now - player.lastShot > 0.6 && player.ammo > 0) {
-    player.ammo--;
-    player.lastShot = now;
-    player.shotsFired++;
-    audioManager.play('shotgun');
-    // Pump sound plays after a short delay (matches Doom pump timing)
-    setTimeout(() => audioManager.play('shotgun_cock'), 300);
-    player.shooting = false; // Reset: must click again for next shot
+  if (!player.shooting) return;
 
-    // Spawn player bullet projectile
+  const currentWeapon = player.currentWeapon ?? "revolver";
+
+  // --- REVOLVER ---
+  if (currentWeapon === "revolver") {
+    // Check reload / chamber state
+    if (player.revolverReloadTimer > 0) return;
+    
+    if (player.revolverChamber <= 0) {
+      if (player.bullets > 0) {
+        player.revolverReloadTimer = 1.0;
+        audioManager.play('shotgun_cock');
+      } else {
+        audioManager.play('noway');
+        player.shooting = false;
+      }
+      return;
+    }
+
+    if (player.bullets <= 0) {
+      audioManager.play('noway');
+      player.shooting = false;
+      return;
+    }
+
+    if (now - player.lastShot > 0.3) {
+      player.revolverChamber--;
+      player.bullets--;
+      player.lastShot = now;
+      player.shotsFired++;
+      audioManager.play('pistol');
+      player.shooting = false; // Semi-automatic: must click again
+
+      // Trigger auto-reload if chamber is now empty
+      if (player.revolverChamber === 0 && player.bullets > 0) {
+        player.revolverReloadTimer = 1.0;
+        setTimeout(() => audioManager.play('shotgun_cock'), 200);
+      }
+
+      spawnBullet(45, "#ffff44");
+      applyDamage(22 + Math.random() * 8); // High power revolver hit!
+    }
+  }
+
+  // --- SHOTGUN ---
+  else if (currentWeapon === "shotgun") {
+    if (player.shells <= 0) {
+      audioManager.play('noway');
+      player.shooting = false;
+      return;
+    }
+
+    if (now - player.lastShot > 0.6) {
+      player.shells--;
+      player.lastShot = now;
+      player.shotsFired++;
+      audioManager.play('shotgun');
+      setTimeout(() => audioManager.play('shotgun_cock'), 300);
+      player.shooting = false; // Semi-automatic: must click again
+
+      spawnBullet(40, "#ffff22");
+      applyDamage(15 + Math.random() * 10);
+    }
+  }
+
+  // --- MACHINE GUN (DP-28) ---
+  else if (currentWeapon === "machinegun") {
+    // Check reload / mag state
+    if (player.machinegunReloadTimer > 0) return;
+
+    if (player.machinegunMag <= 0) {
+      if (player.bullets > 0) {
+        player.machinegunReloadTimer = 2.0;
+        audioManager.play('shotgun_cock');
+      } else {
+        audioManager.play('noway');
+      }
+      return;
+    }
+
+    if (player.bullets <= 0) {
+      audioManager.play('noway');
+      return;
+    }
+
+    if (now - player.lastShot > 0.1) {
+      player.machinegunMag--;
+      player.bullets--;
+      player.lastShot = now;
+      player.shotsFired++;
+      audioManager.play('pistol');
+      // DO NOT reset player.shooting to false! (Fully automatic)
+
+      // Trigger auto-reload if mag is now empty
+      if (player.machinegunMag === 0 && player.bullets > 0) {
+        player.machinegunReloadTimer = 2.0;
+        setTimeout(() => audioManager.play('shotgun_cock'), 300);
+      }
+
+      spawnBullet(40, "#ffdd44");
+      applyDamage(10 + Math.random() * 6); // Faster, slightly lower damage per bullet
+    }
+  }
+
+  // Helper to spawn a projectile bullet
+  function spawnBullet(speed: number, color: string) {
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
     const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
@@ -431,17 +528,16 @@ export function handlePlayerShootingHelper(
       id: projectileIdRef.current++,
       position: bulletPos,
       direction: bulletDir,
-      speed: 40,
+      speed,
       fromEnemy: false,
-      color: "#ffff44",
+      color,
       life: 1.5,
     };
     projectilesRef.current = [...projectilesRef.current, bullet];
+  }
 
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    raycaster.far = 50;
-
+  // Helper to apply raycasted bullet hitscan damage
+  function applyDamage(baseDamage: number) {
     let closestTarget: { type: 'enemy'; e: EnemyData } | { type: 'barrel'; b: BarrelData } | null = null;
     let closestDist = Infinity;
     let closestDamage = 0;
@@ -461,8 +557,7 @@ export function handlePlayerShootingHelper(
 
         const hitRange = Math.max(0.12, 0.45 / (dist / 5));
         if (angle < hitRange && dist < closestDist) {
-          // Can't shoot through walls — check at the actual hit height
-          // Use 3D raycast to see if line from camera to hit point is clear
+          // Check line of sight
           const rayDir = ePos.clone().sub(camera.position).normalize();
           const rayLen = camera.position.distanceTo(ePos);
           let blocked = false;
@@ -472,7 +567,6 @@ export function handlePlayerShootingHelper(
             const px = camera.position.x + rayDir.x * rayLen * t;
             const py = camera.position.y + rayDir.y * rayLen * t;
             const pz = camera.position.z + rayDir.z * rayLen * t;
-            // Check if this point is inside any wall
             for (const wall of walls) {
               if (px >= wall.min[0] && px <= wall.max[0] &&
                   py >= wall.min[1] && py <= wall.max[1] &&
@@ -486,13 +580,13 @@ export function handlePlayerShootingHelper(
           if (blocked) continue;
           closestDist = dist;
           closestTarget = { type: 'enemy', e };
-          closestDamage = 15 + Math.random() * 10;
-          break; // Hit this enemy, no need to check other heights
+          closestDamage = baseDamage;
+          break;
         }
       }
     }
 
-    // 2. Check barrels if barrelsRef is provided
+    // 2. Check barrels
     if (barrelsRef && barrelsRef.current) {
       for (const b of barrelsRef.current) {
         if (!b.alive) continue;
@@ -530,7 +624,7 @@ export function handlePlayerShootingHelper(
           if (blocked) continue;
           closestDist = dist;
           closestTarget = { type: 'barrel', b };
-          closestDamage = 15 + Math.random() * 10;
+          closestDamage = baseDamage;
         }
       }
     }
