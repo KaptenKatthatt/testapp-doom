@@ -469,6 +469,7 @@ function loadAutosave(): { grid: CellData[][], playerPos: [number, number] | nul
 
 export default function Editor() {
   const [grid, setGrid] = useState<CellData[][]>(makeGrid);
+  const [undoStack, setUndoStack] = useState<CellData[][][]>([]);
   const [tool, setTool] = useState<CellType>('wall');
   const [drawMode, setDrawMode] = useState<DrawMode>('paint');
   const [isDragging, setIsDragging] = useState(false);
@@ -510,6 +511,7 @@ export default function Editor() {
 
   // Update grid + autosave helper
   const updateGrid = useCallback((newGrid: CellData[][], newPlayerPos?: [number, number] | null) => {
+    pushUndo();
     setGrid(newGrid);
     if (newPlayerPos !== undefined) {
       setPlayerPos(newPlayerPos);
@@ -571,6 +573,32 @@ export default function Editor() {
 
   useEffect(() => { draw(); }, [draw]);
 
+  const pushUndo = useCallback(() => {
+    setGrid(current => {
+      setUndoStack(stack => [...stack.slice(-49), cloneGrid(current)]);
+      return current;
+    });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setUndoStack(stack => {
+      if (stack.length === 0) return stack;
+      const prev = stack[stack.length - 1]!;
+      setGrid(prev);
+      return stack.slice(0, -1);
+    });
+  }, []);
+
+  // Undo keyboard shortcut (Ctrl+Z)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); handleUndo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleUndo]);
+
+
   const paintCells = useCallback((cells: [number, number][], cellType: CellType) => {
     setGrid(prev => {
       const next = cloneGrid(prev);
@@ -630,12 +658,15 @@ export default function Editor() {
     if (!pos) return;
 
     if (drawMode === 'paint') {
+      pushUndo();
       setIsDragging(true);
       paintCell(pos[0], pos[1]);
     } else if (drawMode === 'line') {
+      pushUndo();
       setLineStart(pos);
       setPreviewCells([[pos[0], pos[1]]]);
     } else if (drawMode === 'rect' || drawMode === 'hollowRect') {
+      pushUndo();
       setRectStart(pos);
       setPreviewCells([[pos[0], pos[1]]]);
     }
@@ -1059,6 +1090,7 @@ export default function Editor() {
       />
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
         <button onClick={validate} style={btnStyle}>✅ Validate</button>
         <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
         <button onClick={() => { setSavedMaps(listSavedMaps()); setShowSaveDialog(true); }} style={btnStyle}>💾 Save</button>
