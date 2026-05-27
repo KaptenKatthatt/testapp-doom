@@ -10,6 +10,8 @@ import {
   createBarrelTexture,
   createBloodTexture,
 } from "./Textures";
+import { LevelLights } from "./LevelLights";
+import { LevelDecorations } from "./LevelDecorations";
 
 // Custom level data interface (matches editor format)
 export interface CustomWallData {
@@ -185,29 +187,7 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
 
   return (
     <group>
-      {/* Strong ambient so everything is visible */}
-      <ambientLight intensity={1.5} color="#eeccaa" />
-      <hemisphereLight args={["#ffeedd", "#665544", 0.8]} />
-
-      {/* Key point lights for atmosphere - much stronger */}
-      <pointLight position={[3, 3.5, 4]} intensity={6.0} color="#ffaa66" distance={30} />
-      <pointLight position={[8, 3.5, 8]} intensity={5.0} color="#ff9944" distance={25} />
-      <pointLight position={[20, 3.5, 14]} intensity={4.0} color="#ffcc88" distance={30} />
-      <pointLight position={[36, 3.5, 8]} intensity={3.0} color="#ff8844" distance={25} />
-      <pointLight position={[14, 3.5, 26]} intensity={3.0} color="#ffaa66" distance={25} />
-      <pointLight position={[38, 3.5, 28]} intensity={3.0} color="#88ff88" distance={25} />
-      <pointLight position={[4, 3.5, 34]} intensity={2.0} color="#ff6666" distance={20} />
-
-      {/* Ceiling lights - uniform overhead lighting */}
-      <pointLight position={[10, 3.8, 16]} intensity={4.0} color="#ffffff" distance={20} />
-      <pointLight position={[28, 3.8, 16]} intensity={3.0} color="#ffffff" distance={20} />
-      <pointLight position={[40, 3.8, 30]} intensity={3.0} color="#ffffff" distance={20} />
-
-      {/* Torch lights on walls - brighter */}
-      <pointLight position={[6, 3, 4]} intensity={3.0} color="#ff8833" distance={15} />
-      <pointLight position={[16, 3, 18]} intensity={3.0} color="#ff8833" distance={15} />
-      <pointLight position={[30, 3, 12]} intensity={2.5} color="#ff8833" distance={15} />
-      <pointLight position={[40, 3, 20]} intensity={2.5} color="#88cc88" distance={15} />
+      <LevelLights />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[levelSize / 2, 0, levelSize / 2]}>
@@ -249,48 +229,7 @@ export default function Level({ customWalls }: LevelProps): React.JSX.Element {
         );
       })}
 
-      {/* Blood pool */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[12, 0.01, 18]}>
-        <circleGeometry args={[1.5, 16]} />
-        <meshLambertMaterial map={textures.blood} transparent opacity={0.8} />
-      </mesh>
-
-      {/* Slime pool */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[38, 0.01, 38]}>
-        <circleGeometry args={[2, 16]} />
-        <meshLambertMaterial map={textures.slime} transparent opacity={0.8} />
-      </mesh>
-
-      {/* Cross in starting room */}
-      <mesh position={[3, 2.5, 4]}>
-        <boxGeometry args={[0.2, 1.2, 0.05]} />
-        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
-      </mesh>
-      <mesh position={[3, 3, 4]}>
-        <boxGeometry args={[0.6, 0.2, 0.05]} />
-        <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
-      </mesh>
-
-      {/* Barrels/crates */}
-      <mesh position={[22, 0.5, 10]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      <mesh position={[22, 0.5, 12]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-
-      {/* Torch flames - small emissive cubes on walls */}
-      {[
-        [6, 3, 4], [16, 3, 18], [30, 3, 12], [40, 3, 20],
-        [3, 3.5, 4], [8, 3.5, 8],
-      ].map((pos, i) => (
-        <mesh key={`torch-${i}`} position={pos as [number, number, number]}>
-          <boxGeometry args={[0.15, 0.15, 0.15]} />
-          <meshBasicMaterial color="#ff6600" />
-        </mesh>
-      ))}
+      <LevelDecorations textures={textures} />
     </group>
   );
 }
