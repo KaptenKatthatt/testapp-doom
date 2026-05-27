@@ -452,6 +452,7 @@ export default function Editor() {
   const [reachableCells, setReachableCells] = useState<Set<string> | null>(null);
   const [exportCode, setExportCode] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveValidation, setSaveValidation] = useState<{ errors: string[]; warnings: string[] } | null>(null);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
@@ -869,7 +870,7 @@ export default function Editor() {
     window.location.hash = '';
   };
 
-  const validate = () => {
+  const runValidation = (): { errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -992,17 +993,21 @@ export default function Editor() {
       }
     }
 
-    const all = [...errors, ...warnings];
+    if (playerPos && visited) {
+      setReachableCells(visited);
+    }
+    return { errors, warnings };
+  };
+
+  const validate = () => {
+    const result = runValidation();
+    const all = [...result.errors, ...result.warnings];
     if (all.length === 0) {
       alert('✅ Level looks good! All checks passed:\n• Player start exists\n• All enemies/pickups reachable\n• No stuck enemies\n• No 1-wide passages with entities\n• All doors have open access');
     } else {
-      alert(errors.length > 0
-        ? `Found ${errors.length} error(s) and ${warnings.length} warning(s):\n\n${all.join('\n')}`
-        : `${warnings.length} warning(s):\n\n${warnings.join('\n')}`);
-    }
-
-    if (playerPos && visited) {
-      setReachableCells(visited);
+      alert(result.errors.length > 0
+        ? `Found ${result.errors.length} error(s) and ${result.warnings.length} warning(s):\n\n${all.join('\n')}`
+        : `${result.warnings.length} warning(s):\n\n${all.join('\n')}`);
     }
   };
 
@@ -1065,7 +1070,16 @@ export default function Editor() {
         <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
         <button onClick={validate} style={btnStyle}>✅ Validate</button>
         <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
-        <button onClick={() => { setSavedMaps(listSavedMaps()); setShowSaveDialog(true); }} style={btnStyle}>💾 Save</button>
+        <button onClick={() => {
+          const result = runValidation();
+          setSaveValidation(result);
+          if (result.errors.length === 0) {
+            setSavedMaps(listSavedMaps());
+            setShowSaveDialog(true);
+          } else {
+            setShowSaveDialog(true); // show dialog with errors
+          }
+        }} style={btnStyle}>💾 Save</button>
         <button onClick={handleLoad} style={btnStyle}>📂 Load</button>
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
@@ -1080,20 +1094,42 @@ export default function Editor() {
       {showSaveDialog && (
         <div style={overlayStyle}>
           <div style={dialogStyle}>
-            <h3 style={{ color: '#c00', marginTop: 0 }}>💾 Save Map</h3>
-            <input
-              type="text"
-              value={saveName}
-              onChange={e => setSaveName(e.target.value)}
-              placeholder="Map name..."
-              style={{ background: '#111', color: '#fff', border: '1px solid #555', padding: '8px', fontFamily: 'monospace', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
-              onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-              autoFocus
-            />
-            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-              <button onClick={handleSave} style={btnStyle}>💾 Save</button>
-              <button onClick={() => { setShowSaveDialog(false); setSaveName(''); }} style={btnStyle}>❌ Cancel</button>
-            </div>
+            {saveValidation && saveValidation.errors.length === 0 ? (
+              <>
+                <h3 style={{ color: '#0f0', marginTop: 0 }}>✅ Map Validated!</h3>
+                {saveValidation.warnings.length > 0 && (
+                  <div style={{ marginBottom: 8, maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#ff0' }}>
+                    {saveValidation.warnings.map((w, i) => <div key={i}>{w}</div>)}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  placeholder="Map name..."
+                  style={{ background: '#111', color: '#fff', border: '1px solid #555', padding: '8px', fontFamily: 'monospace', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+                  autoFocus
+                />
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <button onClick={handleSave} style={btnStyle}>💾 Save</button>
+                  <button onClick={() => { setShowSaveDialog(false); setSaveName(''); setSaveValidation(null); }} style={btnStyle}>❌ Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ color: '#f00', marginTop: 0 }}>❌ Not Validated</h3>
+                <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 12, color: '#f88', marginBottom: 8 }}>
+                  {saveValidation?.errors.map((e, i) => <div key={i}>{e}</div>)}
+                </div>
+                {saveValidation && saveValidation.warnings.length > 0 && (
+                  <div style={{ maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#ff0', marginBottom: 8 }}>
+                    {saveValidation.warnings.map((w, i) => <div key={i}>{w}</div>)}
+                  </div>
+                )}
+                <button onClick={() => { setShowSaveDialog(false); setSaveValidation(null); }} style={btnStyle}>❌ Close</button>
+              </>
+            )}
           </div>
         </div>
       )}
