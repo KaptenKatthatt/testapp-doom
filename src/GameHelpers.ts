@@ -423,14 +423,20 @@ export function handlePlayerShootingHelper(
         player.revolverReloadTimer = 1.0;
         audioManager.play('shotgun_cock');
       } else {
-        audioManager.play('noway');
+        if (!player.hasPlayedEmptyClick) {
+          audioManager.play('noway');
+          player.hasPlayedEmptyClick = true;
+        }
         player.shooting = false;
       }
       return;
     }
 
     if (player.bullets <= 0) {
-      audioManager.play('noway');
+      if (!player.hasPlayedEmptyClick) {
+        audioManager.play('noway');
+        player.hasPlayedEmptyClick = true;
+      }
       player.shooting = false;
       return;
     }
@@ -457,7 +463,10 @@ export function handlePlayerShootingHelper(
   // --- SHOTGUN ---
   else if (currentWeapon === "shotgun") {
     if (player.shells <= 0) {
-      audioManager.play('noway');
+      if (!player.hasPlayedEmptyClick) {
+        audioManager.play('noway');
+        player.hasPlayedEmptyClick = true;
+      }
       player.shooting = false;
       return;
     }
@@ -485,13 +494,19 @@ export function handlePlayerShootingHelper(
         player.machinegunReloadTimer = 2.0;
         audioManager.play('shotgun_cock');
       } else {
-        audioManager.play('noway');
+        if (!player.hasPlayedEmptyClick) {
+          audioManager.play('noway');
+          player.hasPlayedEmptyClick = true;
+        }
       }
       return;
     }
 
     if (player.bullets <= 0) {
-      audioManager.play('noway');
+      if (!player.hasPlayedEmptyClick) {
+        audioManager.play('noway');
+        player.hasPlayedEmptyClick = true;
+      }
       return;
     }
 

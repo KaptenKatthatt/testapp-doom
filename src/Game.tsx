@@ -83,6 +83,7 @@ export interface PlayerData {
   lastEnvDmg: number;
   damageFlash: number;
   isMoving: boolean;
+  hasPlayedEmptyClick: boolean;
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
@@ -145,6 +146,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     lastEnvDmg: 0,
     damageFlash: 0,
     isMoving: false,
+    hasPlayedEmptyClick: false,
   });
   const keysRef = useRef<Record<string, boolean>>({});
   const projectilesRef = useRef<ProjectileData[]>([]);
@@ -153,6 +155,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const pullbackRef = useRef(0);
+  const prevShootingRef = useRef(false);
   const doorTexture = useMemo(() => createDoorTexture(), []);
   // Use custom level data if provided, otherwise defaults
   // Build custom doors from level data
@@ -268,6 +271,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       } else if (e.code === "Digit3" || e.key === "3") {
         player.currentWeapon = "machinegun";
         audioManager.play("weapon_pickup");
+      } else if (e.code === "KeyR" || e.key === "r" || e.key === "R") {
+        if (player.currentWeapon === "revolver") {
+          if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > player.revolverChamber) {
+            player.revolverReloadTimer = 1.0;
+            audioManager.play("shotgun_cock");
+          }
+        } else if (player.currentWeapon === "machinegun") {
+          if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > player.machinegunMag) {
+            player.machinegunReloadTimer = 2.0;
+            audioManager.play("shotgun_cock");
+          }
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -313,6 +328,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
     const now = performance.now() / 1000;
+
+    // Reset out-of-ammo click flag when player clicks down
+    if (player.shooting && !prevShootingRef.current) {
+      player.hasPlayedEmptyClick = false;
+    }
+    prevShootingRef.current = player.shooting;
 
     // Update weapon reload timers
     if (player.revolverReloadTimer > 0) {
