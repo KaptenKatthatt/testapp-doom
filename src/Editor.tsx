@@ -21,6 +21,7 @@ import {
   loadAutosave,
 } from './StorageHelpers';
 import { MusicEngine } from './MusicEngine';
+import { MenuSynth } from './MenuSynth';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
@@ -398,11 +399,17 @@ export default function Editor() {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
+  const menuSynthRef = useRef<MenuSynth | null>(null);
+
+  const stopMusicPreview = () => {
+    if (musicEngineRef.current) musicEngineRef.current.stop();
+    if (menuSynthRef.current) menuSynthRef.current.stop();
+  };
 
   const toggleMusicPreview = () => {
     if (musicPlaying) {
       // Stop
-      if (musicEngineRef.current) musicEngineRef.current.stop();
+      stopMusicPreview();
       setMusicPlaying(false);
     } else {
       // Play
@@ -412,27 +419,44 @@ export default function Editor() {
       const gain = ctx.createGain();
       gain.gain.value = 0.5;
       gain.connect(ctx.destination);
-      const engine = new MusicEngine();
-      engine.start(ctx, gain, musicTrack);
-      musicEngineRef.current = engine;
+      stopMusicPreview();
+      if (musicTrack === 'classic') {
+        const synth = new MenuSynth();
+        synth.start(ctx, gain);
+        menuSynthRef.current = synth;
+        musicEngineRef.current = null;
+      } else {
+        const engine = new MusicEngine();
+        engine.start(ctx, gain, musicTrack);
+        musicEngineRef.current = engine;
+        menuSynthRef.current = null;
+      }
       setMusicPlaying(true);
     }
   };
 
   // Restart preview when track changes
   useEffect(() => {
-    if (musicPlaying && musicEngineRef.current && audioCtxRef.current) {
+    if (musicPlaying && audioCtxRef.current) {
       const ctx = audioCtxRef.current;
       const gain = ctx.createGain();
       gain.gain.value = 0.5;
       gain.connect(ctx.destination);
-      musicEngineRef.current.stop();
-      const engine = new MusicEngine();
-      engine.start(ctx, gain, musicTrack);
-      musicEngineRef.current = engine;
+      stopMusicPreview();
+      if (musicTrack === 'classic') {
+        const synth = new MenuSynth();
+        synth.start(ctx, gain);
+        menuSynthRef.current = synth;
+        musicEngineRef.current = null;
+      } else {
+        const engine = new MusicEngine();
+        engine.start(ctx, gain, musicTrack);
+        musicEngineRef.current = engine;
+        menuSynthRef.current = null;
+      }
     }
     return () => {
-      if (musicEngineRef.current) musicEngineRef.current.stop();
+      stopMusicPreview();
     };
   }, [musicTrack]);
 

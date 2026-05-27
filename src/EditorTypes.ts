@@ -1,4 +1,4 @@
-export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom';
+export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom' | 'classic';
 
 export const TRACK_OPTIONS: { value: TrackStyle; label: string; emoji: string }[] = [
   { value: 'inferno', label: 'Inferno', emoji: '🔥' },
@@ -6,6 +6,7 @@ export const TRACK_OPTIONS: { value: TrackStyle; label: string; emoji: string }[
   { value: 'rampage', label: 'Rampage', emoji: '⚡' },
   { value: 'eerie', label: 'Eerie', emoji: '🏚️' },
   { value: 'doom', label: 'Doom', emoji: '💀' },
+  { value: 'classic', label: 'Classic', emoji: '🎸' },
 ];
 
 export type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';

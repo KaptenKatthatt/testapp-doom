@@ -1,7 +1,7 @@
 // MusicEngine.ts — Procedural music engine generating 5 Doom-style tracks via Web Audio API
 // Each track is synthesized in real-time: no external audio files needed.
 
-export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom';
+export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom' | 'classic';
 
 const TRACK_CONFIG: Record<TrackStyle, { bpm: number; name: string }> = {
   inferno:  { bpm: 125, name: 'Inferno' },     // Aggressive metal riff
@@ -9,6 +9,7 @@ const TRACK_CONFIG: Record<TrackStyle, { bpm: number; name: string }> = {
   rampage:  { bpm: 155, name: 'Rampage' },       // Fast intense combat
   eerie:    { bpm: 88,  name: 'Eerie' },          // Creepy exploration
   doom:     { bpm: 108, name: 'Doom' },           // Heavy epic march
+  classic:  { bpm: 125, name: 'Classic' },         // Original menu track
 };
 
 interface SynthNote {
@@ -426,6 +427,7 @@ export class MusicEngine {
       case 'rampage': this.generateRampage(); break;
       case 'eerie': this.generateEerie(); break;
       case 'doom': this.generateDoom(); break;
+      case 'classic': this.generateInferno(); break;  // Classic = Inferno pattern (same as original menu)
     }
   }
 

@@ -195,19 +195,33 @@ class AudioManager {
   // Play game music (track style from level data)
   playGameMusic(track: TrackStyle): void {
     if (!this.loaded || !this.audioContext || !this.musicGain) return;
+    this.stopGameMusic();
     this.stopMenuMusic();
     this.stopMusic();
 
-    if (!this.musicEngine) {
-      this.musicEngine = new MusicEngine();
+    if (track === 'classic') {
+      // Use the original MenuSynth for the classic track
+      if (!this.menuSynth) {
+        this.menuSynth = new MenuSynth();
+      }
+      this.menuSynth.start(this.audioContext, this.musicGain);
+      this.menuMusicPlaying = true;
+    } else {
+      if (!this.musicEngine) {
+        this.musicEngine = new MusicEngine();
+      }
+      this.musicEngine.start(this.audioContext, this.musicGain, track);
     }
-    this.musicEngine.start(this.audioContext, this.musicGain, track);
   }
 
   // Stop game music
   stopGameMusic(): void {
     if (this.musicEngine) {
       this.musicEngine.stop();
+    }
+    if (this.menuSynth && this.menuMusicPlaying) {
+      this.menuSynth.stop();
+      this.menuMusicPlaying = false;
     }
   }
 
