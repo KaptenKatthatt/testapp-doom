@@ -23,6 +23,8 @@ import {
   updateEnemyAIHelper,
   checkSlimeDamageHelper,
   updatePickupCollectionHelper,
+  handlePlayerMovementHelper,
+  handlePlayerShootingHelper,
 } from "./GameHelpers";
 
 const COLLISION_MARGIN = 0.4;
@@ -45,7 +47,7 @@ interface GameProps {
   readonly levelData?: CustomLevelData | null;
 }
 
-interface PlayerData {
+export interface PlayerData {
   position: THREE.Vector3;
   rotation: number;
   pitch: number;
@@ -344,73 +346,20 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
-    const speed = 8;
     const now = performance.now() / 1000;
 
     // Movement
-    const forward = new THREE.Vector3(
-      -Math.sin(player.rotation),
-      0,
-      -Math.cos(player.rotation),
+    handlePlayerMovementHelper(
+      dt,
+      player,
+      keys,
+      mobileMoveRef.current,
+      mobileLookRef.current,
+      mobilePitchRef.current,
+      checkCollision,
+      checkEnemyCollision,
+      enemiesRef.current
     );
-    const right = new THREE.Vector3(
-      Math.cos(player.rotation),
-      0,
-      -Math.sin(player.rotation),
-    );
-    const move = new THREE.Vector3();
-
-    if (keys["KeyW"] ?? false) move.add(forward);
-    if (keys["KeyS"] ?? false) move.sub(forward);
-    if (keys["KeyA"] ?? false) move.sub(right);
-    if (keys["KeyD"] ?? false) move.add(right);
-
-    // Mobile joystick input
-    const [moveX, moveY] = mobileMoveRef.current;
-    if (Math.abs(moveX) > 0.05 || Math.abs(moveY) > 0.05) {
-      const mobileForward = forward.clone().multiplyScalar(-moveY);
-      const mobileRight = right.clone().multiplyScalar(moveX);
-      move.add(mobileForward).add(mobileRight);
-    }
-
-    // Mobile look input (joystick position × speed × dt)
-    const MOBILE_TURN_SPEED = 2.5;
-    const MOBILE_PITCH_SPEED = 1.5;
-    const lookX = mobileLookRef.current;
-    const lookY = mobilePitchRef.current;
-    if (Math.abs(lookX) > 0.05) {
-      player.rotation -= lookX * MOBILE_TURN_SPEED * dt;
-    }
-    if (Math.abs(lookY) > 0.05) {
-      player.pitch -= lookY * MOBILE_PITCH_SPEED * dt;
-      player.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, player.pitch));
-    }
-
-    player.isMoving = move.length() > 0;
-    if (move.length() > 0) {
-      move.normalize().multiplyScalar(speed * dt);
-    }
-
-    // Collision resolution with wall sliding + enemy collision
-    const newPos = player.position.clone().add(move);
-    const hitWall = checkCollision(newPos);
-    const hitEnemy = checkEnemyCollision(newPos, enemiesRef.current);
-    if (!hitWall && !hitEnemy) {
-      player.position.copy(newPos);
-    } else if (!hitEnemy) {
-      // Wall slide
-      const slideX = player.position.clone();
-      slideX.x += move.x;
-      if (!checkCollision(slideX)) {
-        player.position.x = slideX.x;
-      }
-      const slideZ = player.position.clone();
-      slideZ.z += move.z;
-      if (!checkCollision(slideZ)) {
-        player.position.z = slideZ.z;
-      }
-    }
-    // If hitEnemy, don't move at all (can't walk through monsters)
 
     // Contact damage: if player is very close to any alive enemy, take damage
     const contactRadius = 1.0;
@@ -454,125 +403,22 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     camera.lookAt(lookTarget);
     camera.updateMatrixWorld(true);
 
-    // Shooting - pump action: one shot per click
-    if (player.shooting && now - player.lastShot > 0.6 && player.ammo > 0) {
-      player.ammo--;
-      player.lastShot = now;
-      player.shotsFired++;
-      audioManager.play('shotgun');
-      // Pump sound plays after a short delay (matches Doom pump timing)
-      setTimeout(() => audioManager.play('shotgun_cock'), 300);
-      player.shooting = false; // Reset: must click again for next shot
-
-      // Spawn player bullet projectile
-      const camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
-      const bulletPos: [number, number, number] = [
-        camera.position.x + camDir.x * 1.5,
-        camera.position.y + camDir.y * 0.5 - 0.1,
-        camera.position.z + camDir.z * 1.5,
-      ];
-      const bullet: ProjectileData = {
-        id: projectileIdRef.current++,
-        position: bulletPos,
-        direction: bulletDir,
-        speed: 40,
-        fromEnemy: false,
-        color: "#ffff44",
-        life: 1.5,
-      };
-      projectilesRef.current = [...projectilesRef.current, bullet];
-
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-      raycaster.far = 50;
-
-      setEnemies((prev: EnemyData[]): EnemyData[] => {
-        // Find the closest enemy in the hit cone — only damage that one
-        let closestEnemy: EnemyData | null = null;
-        let closestDist = Infinity;
-        let closestDamage = 0;
-
-        for (const e of prev) {
-          if (!e.alive) continue;
-          // Check hit at multiple body heights: torso (y=1), head (y=2.5)
-          for (const hitY of [1, 2.5]) {
-            const ePos = new THREE.Vector3(e.position[0], hitY, e.position[2]);
-            const dist = ePos.distanceTo(camera.position);
-            if (dist > 50) continue;
-
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const toEnemy = ePos.clone().sub(camera.position).normalize();
-            const angle = dir.angleTo(toEnemy);
-
-            const hitRange = Math.max(0.12, 0.45 / (dist / 5));
-            if (angle < hitRange && dist < closestDist) {
-              // Can't shoot through walls — check at the actual hit height
-              // Use 3D raycast to see if line from camera to hit point is clear
-              const rayDir = ePos.clone().sub(camera.position).normalize();
-              const rayLen = camera.position.distanceTo(ePos);
-              let blocked = false;
-              const raySteps = Math.ceil(rayLen * 2);
-              for (let s = 1; s < raySteps; s++) {
-                const t = s / raySteps;
-                const px = camera.position.x + rayDir.x * rayLen * t;
-                const py = camera.position.y + rayDir.y * rayLen * t;
-                const pz = camera.position.z + rayDir.z * rayLen * t;
-                // Check if this point is inside any wall
-                for (const wall of walls) {
-                  if (px >= wall.min[0] && px <= wall.max[0] &&
-                      py >= wall.min[1] && py <= wall.max[1] &&
-                      pz >= wall.min[2] && pz <= wall.max[2]) {
-                    blocked = true;
-                    break;
-                  }
-                }
-                if (blocked) break;
-              }
-              if (blocked) continue;
-              closestDist = dist;
-              closestEnemy = e;
-              closestDamage = 15 + Math.random() * 10;
-              break; // Hit this enemy, no need to check other heights
-            }
-          }
-        }
-
-        const updated = prev.map((e: EnemyData): EnemyData => {
-          if (!e.alive) return e;
-          if (e !== closestEnemy) return e;
-          const newHealth = e.health - closestDamage;
-          if (newHealth <= 0) {
-            player.kills++;
-            const totalEnemies = enemiesRef.current.length;
-            if (player.kills >= totalEnemies && !missionCompleteRef.current) {
-              missionCompleteRef.current = true;
-              gameActiveRef.current = false;
-              player.endTime = now;
-              onPlayerState({
-                health: Math.round(player.health),
-                ammo: player.ammo,
-                kills: player.kills,
-                shotsFired: player.shotsFired,
-                timesHit: player.timesHit,
-                startTime: player.startTime,
-                endTime: now,
-                damageFlash: 0,
-              });
-              onMissionComplete();
-            }
-            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
-            audioManager.play(deathSounds[e.type] ?? 'imp_death');
-            return { ...e, health: 0, alive: false, hitFlash: 0 };
-          }
-          return { ...e, health: newHealth, hitFlash: 1 };
-        });
-        enemiesRef.current = updated;
-        return updated;
-      });
-    }    // Enemy AI + projectile spawning
+    // Shooting
+    handlePlayerShootingHelper(
+      player,
+      now,
+      camera,
+      projectilesRef,
+      projectileIdRef,
+      walls,
+      enemiesRef,
+      setEnemies,
+      missionCompleteRef,
+      gameActiveRef,
+      onPlayerState,
+      onMissionComplete
+    );
+    // Enemy AI + projectile spawning
     const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
       dt,
       now,

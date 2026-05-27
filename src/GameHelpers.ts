@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import type { EnemyData, ProjectileData, PickupData } from "./types";
+import type { EnemyData, ProjectileData, PickupData, PlayerState, WallBox } from "./types";
 import { audioManager } from "./Audio";
+import type { PlayerData } from "./Game";
 
 const PROJECTILE_SPEED = 12;
 
@@ -265,6 +266,7 @@ export function checkSlimeDamageHelper(
   return playerHealth;
 }
 
+
 /** Helper to check for pickup items */
 export function updatePickupCollectionHelper(
   playerPos: THREE.Vector3,
@@ -292,4 +294,200 @@ export function updatePickupCollectionHelper(
   });
 
   return { updatedPickups, healthBonus, ammoBonus, shotgunPickup };
+}
+
+export function handlePlayerMovementHelper(
+  dt: number,
+  player: PlayerData,
+  keys: Record<string, boolean>,
+  mobileMove: [number, number],
+  mobileLook: number,
+  mobilePitch: number,
+  checkCollision: (pos: THREE.Vector3, radius?: number) => boolean,
+  checkEnemyCollision: (pos: THREE.Vector3, enemies: EnemyData[]) => boolean,
+  enemies: EnemyData[]
+) {
+  const speed = 8;
+  const forward = new THREE.Vector3(-Math.sin(player.rotation), 0, -Math.cos(player.rotation));
+  const right = new THREE.Vector3(Math.cos(player.rotation), 0, -Math.sin(player.rotation));
+  const move = new THREE.Vector3();
+
+  if (keys["KeyW"] ?? false) move.add(forward);
+  if (keys["KeyS"] ?? false) move.sub(forward);
+  if (keys["KeyA"] ?? false) move.sub(right);
+  if (keys["KeyD"] ?? false) move.add(right);
+
+  const [moveX, moveY] = mobileMove;
+  if (Math.abs(moveX) > 0.05 || Math.abs(moveY) > 0.05) {
+    const mobileForward = forward.clone().multiplyScalar(-moveY);
+    const mobileRight = right.clone().multiplyScalar(moveX);
+    move.add(mobileForward).add(mobileRight);
+  }
+
+  const MOBILE_TURN_SPEED = 2.5;
+  const MOBILE_PITCH_SPEED = 1.5;
+  if (Math.abs(mobileLook) > 0.05) {
+    player.rotation -= mobileLook * MOBILE_TURN_SPEED * dt;
+  }
+  if (Math.abs(mobilePitch) > 0.05) {
+    player.pitch -= mobilePitch * MOBILE_PITCH_SPEED * dt;
+    player.pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, player.pitch));
+  }
+
+  player.isMoving = move.length() > 0;
+  if (move.length() > 0) {
+    move.normalize().multiplyScalar(speed * dt);
+  }
+
+  const newPos = player.position.clone().add(move);
+  const hitWall = checkCollision(newPos);
+  const hitEnemy = checkEnemyCollision(newPos, enemies);
+  if (!hitWall && !hitEnemy) {
+    player.position.copy(newPos);
+  } else if (!hitEnemy) {
+    const slideX = player.position.clone();
+    slideX.x += move.x;
+    if (!checkCollision(slideX)) {
+      player.position.x = slideX.x;
+    }
+    const slideZ = player.position.clone();
+    slideZ.z += move.z;
+    if (!checkCollision(slideZ)) {
+      player.position.z = slideZ.z;
+    }
+  }
+}
+
+export function handlePlayerShootingHelper(
+  player: PlayerData,
+  now: number,
+  camera: THREE.Camera,
+  projectilesRef: { current: ProjectileData[] },
+  projectileIdRef: { current: number },
+  walls: WallBox[],
+  enemiesRef: { current: EnemyData[] },
+  setEnemies: (value: EnemyData[] | ((prev: EnemyData[]) => EnemyData[])) => void,
+  missionCompleteRef: { current: boolean },
+  gameActiveRef: { current: boolean },
+  onPlayerState: (state: PlayerState) => void,
+  onMissionComplete: () => void
+) {
+  if (player.shooting && now - player.lastShot > 0.6 && player.ammo > 0) {
+    player.ammo--;
+    player.lastShot = now;
+    player.shotsFired++;
+    audioManager.play('shotgun');
+    // Pump sound plays after a short delay (matches Doom pump timing)
+    setTimeout(() => audioManager.play('shotgun_cock'), 300);
+    player.shooting = false; // Reset: must click again for next shot
+
+    // Spawn player bullet projectile
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
+    const bulletPos: [number, number, number] = [
+      camera.position.x + camDir.x * 1.5,
+      camera.position.y + camDir.y * 0.5 - 0.1,
+      camera.position.z + camDir.z * 1.5,
+    ];
+    const bullet: ProjectileData = {
+      id: projectileIdRef.current++,
+      position: bulletPos,
+      direction: bulletDir,
+      speed: 40,
+      fromEnemy: false,
+      color: "#ffff44",
+      life: 1.5,
+    };
+    projectilesRef.current = [...projectilesRef.current, bullet];
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    raycaster.far = 50;
+
+    setEnemies((prev: EnemyData[]): EnemyData[] => {
+      // Find the closest enemy in the hit cone — only damage that one
+      let closestEnemy: EnemyData | null = null;
+      let closestDist = Infinity;
+      let closestDamage = 0;
+
+      for (const e of prev) {
+        if (!e.alive) continue;
+        // Check hit at multiple body heights: torso (y=1), head (y=2.5)
+        for (const hitY of [1, 2.5]) {
+          const ePos = new THREE.Vector3(e.position[0], hitY, e.position[2]);
+          const dist = ePos.distanceTo(camera.position);
+          if (dist > 50) continue;
+
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const toEnemy = ePos.clone().sub(camera.position).normalize();
+          const angle = dir.angleTo(toEnemy);
+
+          const hitRange = Math.max(0.12, 0.45 / (dist / 5));
+          if (angle < hitRange && dist < closestDist) {
+            // Can't shoot through walls — check at the actual hit height
+            // Use 3D raycast to see if line from camera to hit point is clear
+            const rayDir = ePos.clone().sub(camera.position).normalize();
+            const rayLen = camera.position.distanceTo(ePos);
+            let blocked = false;
+            const raySteps = Math.ceil(rayLen * 2);
+            for (let s = 1; s < raySteps; s++) {
+              const t = s / raySteps;
+              const px = camera.position.x + rayDir.x * rayLen * t;
+              const py = camera.position.y + rayDir.y * rayLen * t;
+              const pz = camera.position.z + rayDir.z * rayLen * t;
+              // Check if this point is inside any wall
+              for (const wall of walls) {
+                if (px >= wall.min[0] && px <= wall.max[0] &&
+                    py >= wall.min[1] && py <= wall.max[1] &&
+                    pz >= wall.min[2] && pz <= wall.max[2]) {
+                  blocked = true;
+                  break;
+                }
+              }
+              if (blocked) break;
+            }
+            if (blocked) continue;
+            closestDist = dist;
+            closestEnemy = e;
+            closestDamage = 15 + Math.random() * 10;
+            break; // Hit this enemy, no need to check other heights
+          }
+        }
+      }
+
+      const updated = prev.map((e: EnemyData): EnemyData => {
+        if (!e.alive) return e;
+        if (e !== closestEnemy) return e;
+        const newHealth = e.health - closestDamage;
+        if (newHealth <= 0) {
+          player.kills++;
+          const totalEnemies = enemiesRef.current.length;
+          if (player.kills >= totalEnemies && !missionCompleteRef.current) {
+            missionCompleteRef.current = true;
+            gameActiveRef.current = false;
+            player.endTime = now;
+            onPlayerState({
+              health: Math.round(player.health),
+              ammo: player.ammo,
+              kills: player.kills,
+              shotsFired: player.shotsFired,
+              timesHit: player.timesHit,
+              startTime: player.startTime,
+              endTime: now,
+              damageFlash: 0,
+            });
+            onMissionComplete();
+          }
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+          audioManager.play(deathSounds[e.type] ?? 'imp_death');
+          return { ...e, health: 0, alive: false, hitFlash: 0 };
+        }
+        return { ...e, health: newHealth, hitFlash: 1 };
+      });
+      enemiesRef.current = updated;
+      return updated;
+    });
+  }
 }
