@@ -72,6 +72,7 @@ export interface PlayerData {
   shooting: boolean;
   lastShot: number;
   lastContactDmg: number;
+  lastEnvDmg: number;
   damageFlash: number;
   isMoving: boolean;
 }
@@ -125,6 +126,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     shooting: false,
     lastShot: 0,
     lastContactDmg: 0,
+    lastEnvDmg: 0,
     damageFlash: 0,
     isMoving: false,
   });
@@ -185,8 +187,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         id: b.id,
         position: [b.x + 0.5, 0.5, b.z + 0.5] as [number, number, number],
         radius: 0.4,
-        health: 20,
-        maxHealth: 20,
+        health: 10,
+        maxHealth: 10,
         alive: true,
         explosionTimer: 0,
       }));
@@ -447,6 +449,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Process barrel explosions and fade explosion timers
     setBarrels((prevBarrels) => {
       let changed = false;
+      let explodedBarrel: BarrelData | null = null;
+
       const nextBarrels = prevBarrels.map(b => {
         if (!b.alive && b.explosionTimer > 0) {
           changed = true;
@@ -454,44 +458,31 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         }
         if (b.alive && b.health <= 0) {
           changed = true;
-          audioManager.play('explosion');
-          const { updatedEnemies } = explodeBarrelSplash(
-            b,
-            playerRef.current,
-            enemiesRef.current,
-            onGameOver,
-            (active) => { gameActiveRef.current = active; },
-            prevBarrels,
-            hasLineOfSight
-          );
-          enemiesRef.current = updatedEnemies;
-          setEnemies(updatedEnemies);
+          explodedBarrel = b;
           return { ...b, alive: false, explosionTimer: 1.0 };
         }
         return b;
       });
 
-      const exploded = nextBarrels.find(b => !b.alive && b.explosionTimer === 1.0);
-      if (exploded) {
-        const originalExploded = prevBarrels.find(b => b.id === exploded.id);
-        if (originalExploded && originalExploded.alive) {
-          const { updatedEnemies, updatedBarrels } = explodeBarrelSplash(
-            originalExploded,
-            playerRef.current,
-            enemiesRef.current,
-            onGameOver,
-            (active) => { gameActiveRef.current = active; },
-            prevBarrels,
-            hasLineOfSight
-          );
-          enemiesRef.current = updatedEnemies;
-          setEnemies(updatedEnemies);
-          return nextBarrels.map(b => {
-            if (b.id === exploded.id) return b;
-            const updated = updatedBarrels.find(u => u.id === b.id);
-            return updated ? { ...b, health: updated.health } : b;
-          });
-        }
+      if (explodedBarrel) {
+        audioManager.play('explosion');
+        const { updatedEnemies, updatedBarrels } = explodeBarrelSplash(
+          explodedBarrel,
+          playerRef.current,
+          enemiesRef.current,
+          onGameOver,
+          (active) => { gameActiveRef.current = active; },
+          prevBarrels,
+          hasLineOfSight
+        );
+        enemiesRef.current = updatedEnemies;
+        setEnemies(updatedEnemies);
+
+        return nextBarrels.map(b => {
+          if (b.id === (explodedBarrel as BarrelData).id) return b;
+          const updated = updatedBarrels.find(u => u.id === b.id);
+          return updated ? { ...b, health: updated.health } : b;
+        });
       }
 
       return changed ? nextBarrels : prevBarrels;
@@ -520,9 +511,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
     // Nukage/slime damage — standing in custom lava or slime zones
     player.health = checkSlimeDamageHelper(
-      dt,
-      player.position,
-      player.health,
+      now,
+      player,
       onGameOver,
       (active) => { gameActiveRef.current = active; },
       specialFloors

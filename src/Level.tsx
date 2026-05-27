@@ -268,7 +268,7 @@ export interface BarrelData {
 
 export function getBarrels(): BarrelData[] {
   return [
-    { id: 100, position: [22, 0.5, 10], radius: 0.4, health: 20, maxHealth: 20, alive: true, explosionTimer: 0 },
-    { id: 101, position: [22, 0.5, 12], radius: 0.4, health: 20, maxHealth: 20, alive: true, explosionTimer: 0 },
+    { id: 100, position: [22, 0.5, 10], radius: 0.4, health: 10, maxHealth: 10, alive: true, explosionTimer: 0 },
+    { id: 101, position: [22, 0.5, 12], radius: 0.4, health: 10, maxHealth: 10, alive: true, explosionTimer: 0 },
   ];
 }

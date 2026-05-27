@@ -249,21 +249,50 @@ export function updateEnemyAIHelper(
 
 /** Helper to handle standing in nukage pools/slime damage */
 export function checkSlimeDamageHelper(
-  dt: number,
-  playerPos: THREE.Vector3,
-  playerHealth: number,
+  now: number,
+  player: PlayerData,
   onGameOver: () => void,
   setGameActive: (active: boolean) => void,
   specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }>
 ): number {
+  let standingTileType: 'lava' | 'slime' | null = null;
+
   if (specialFloors && specialFloors.length > 0) {
-    const gx = Math.floor(playerPos.x);
-    const gz = Math.floor(playerPos.z);
+    const gx = Math.floor(player.position.x);
+    const gz = Math.floor(player.position.z);
     const standingTile = specialFloors.find(tile => tile.x === gx && tile.z === gz);
     if (standingTile) {
-      // Lava: 20 damage/sec, Slime: 3 damage/sec
-      const dmgRate = standingTile.type === 'lava' ? 20 : 3;
-      const nextHealth = Math.max(0, playerHealth - dt * dmgRate);
+      standingTileType = standingTile.type;
+    }
+  }
+
+  if (!standingTileType) {
+    const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
+      { x: 12, z: 22, radius: 4 }, // Slime room center
+      { x: 8, z: 18, radius: 3 },  // Slime room west
+      { x: 18, z: 28, radius: 3 },  // Slime room east
+    ];
+
+    for (const zone of SLIME_ZONES) {
+      const sdx = player.position.x - zone.x;
+      const sdz = player.position.z - zone.z;
+      if (sdx * sdx + sdz * sdz < zone.radius * zone.radius) {
+        standingTileType = 'slime';
+        break;
+      }
+    }
+  }
+
+  if (standingTileType) {
+    if (now - player.lastEnvDmg > 1.0) {
+      player.lastEnvDmg = now;
+      const dmg = standingTileType === 'lava' ? 20 : 5;
+      const nextHealth = Math.max(0, player.health - dmg);
+      player.health = nextHealth;
+      player.timesHit++;
+      player.damageFlash = 1.0;
+      audioManager.play('player_hurt');
+
       if (nextHealth <= 0) {
         setGameActive(false);
         onGameOver();
@@ -273,27 +302,7 @@ export function checkSlimeDamageHelper(
     }
   }
 
-  const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
-    { x: 12, z: 22, radius: 4 }, // Slime room center
-    { x: 8, z: 18, radius: 3 },  // Slime room west
-    { x: 18, z: 28, radius: 3 },  // Slime room east
-  ];
-
-  for (const zone of SLIME_ZONES) {
-    const sdx = playerPos.x - zone.x;
-    const sdz = playerPos.z - zone.z;
-    if (sdx * sdx + sdz * sdz < zone.radius * zone.radius) {
-      const nextHealth = Math.max(0, playerHealth - dt * 1);
-      if (nextHealth <= 0) {
-        setGameActive(false);
-        onGameOver();
-        audioManager.play('player_death');
-      }
-      return nextHealth;
-    }
-  }
-
-  return playerHealth;
+  return player.health;
 }
 
 
@@ -577,7 +586,7 @@ export function explodeBarrelSplash(
   const playerDist = player.position.distanceTo(new THREE.Vector3(bx, player.position.y, bz));
   if (playerDist <= maxRadius) {
     if (hasLineOfSight(bx, bz, player.position.x, player.position.z)) {
-      const baseDmg = 30 + Math.random() * 20;
+      const baseDmg = 70 + Math.random() * 5;
       const dmg = baseDmg * (1 - playerDist / maxRadius);
       player.health = Math.max(0, player.health - dmg);
       player.timesHit++;
@@ -597,7 +606,7 @@ export function explodeBarrelSplash(
     const dist = Math.sqrt((e.position[0] - bx) ** 2 + (e.position[2] - bz) ** 2);
     if (dist <= maxRadius) {
       if (hasLineOfSight(bx, bz, e.position[0], e.position[2])) {
-        const baseDmg = 30 + Math.random() * 20;
+        const baseDmg = 70 + Math.random() * 5;
         const dmg = baseDmg * (1 - dist / maxRadius);
         const nextHP = Math.max(0, e.health - dmg);
         if (nextHP <= 0) {
@@ -617,7 +626,7 @@ export function explodeBarrelSplash(
     const dist = Math.sqrt((other.position[0] - bx) ** 2 + (other.position[2] - bz) ** 2);
     if (dist <= maxRadius) {
       if (hasLineOfSight(bx, bz, other.position[0], other.position[2])) {
-        const baseDmg = 30 + Math.random() * 20;
+        const baseDmg = 70 + Math.random() * 5;
         const dmg = baseDmg * (1 - dist / maxRadius);
         const nextHP = Math.max(0, other.health - dmg);
         return { ...other, health: nextHP };
