@@ -20,7 +20,7 @@ const ENEMY_CONFIG: Record<EnemyType, {
     attackRange: 2.5, attackCooldown: 1.2, attackDamage: 2,
   },
   zombieman: {
-    bodyW: 0.9, bodyH: 2.2, bodyD: 0.7,
+    bodyW: 0.9, bodyH: 3.2, bodyD: 0.7,
     headSize: 0.55, color: 0x99aa77, speed: 1.0,
     attackRange: 12, attackCooldown: 2.5, attackDamage: 2,
   },
