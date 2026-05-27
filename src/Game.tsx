@@ -27,6 +27,13 @@ import {
 
 const COLLISION_MARGIN = 0.4;
 
+interface CustomLevelData {
+  walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean }>;
+  enemies: Array<{ id: number; x: number; z: number; type: string }>;
+  pickups: Array<{ id: number; x: number; z: number; type: string }>;
+  playerStart: [number, number];
+}
+
 interface GameProps {
   readonly onPlayerState: (state: PlayerState) => void;
   readonly onGameOver: () => void;
@@ -35,6 +42,7 @@ interface GameProps {
   readonly mobileLookRef: React.MutableRefObject<number>;
   readonly mobilePitchRef: React.MutableRefObject<number>;
   readonly useActionRef: React.MutableRefObject<boolean>;
+  readonly levelData?: CustomLevelData | null;
 }
 
 interface PlayerData {
@@ -80,9 +88,17 @@ const INITIAL_PICKUPS: PickupData[] = [
 ];
 
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData }: GameProps): React.JSX.Element {
+  // Use custom level data if provided, otherwise defaults
+  const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
+    const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : 35;
+    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as "imp" | "demon" | "zombieman", health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
+  }) : INITIAL_ENEMIES;
+  const customPickups: PickupData[] = levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS;
+  const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
+
   const playerRef = useRef<PlayerData>({
-    position: new THREE.Vector3(2, 1.7, 3),
+    position: new THREE.Vector3(customPlayerStart ? customPlayerStart[0] : 2, 1.7, customPlayerStart ? customPlayerStart[1] : 3),
     rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,
@@ -106,9 +122,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const { camera } = useThree();
   const pullbackRef = useRef(0);
   const doorTexture = useMemo(() => createDoorTexture(), []);
-  const [enemies, setEnemies] = useState<EnemyData[]>(INITIAL_ENEMIES);
-  const enemiesRef = useRef<EnemyData[]>(INITIAL_ENEMIES);
-  const [pickups, setPickups] = useState<PickupData[]>(INITIAL_PICKUPS);
+  // Use custom level data if provided, otherwise defaults
+  const [enemies, setEnemies] = useState<EnemyData[]>(customEnemies);
+  const enemiesRef = useRef<EnemyData[]>(customEnemies);
+  const [pickups, setPickups] = useState<PickupData[]>(customPickups);
   const [doors, setDoors] = useState<DoorData[]>(INITIAL_DOORS);
   const doorsRef = useRef<DoorData[]>(INITIAL_DOORS);
   // Keep doors ref in sync for collision checks
@@ -117,7 +134,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   }, [doors]);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
 
-  const walls: WallBox[] = useMemo(() => getWalls(), []);
+  // Build wall data for Level component and collision
+  const customWallData = useMemo(() => {
+    if (levelData && levelData.walls.length > 0) {
+      return levelData.walls.map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: w.isDoor ? 0xcc0000 : 0x8b7355, isDoor: w.isDoor }));
+    }
+    return null;
+  }, [levelData]);
+
+  const walls: WallBox[] = useMemo(() => {
+    if (customWallData) return getWalls(customWallData);
+    return getWalls();
+  }, [customWallData]);
   const barrels: BarrelData[] = useMemo(() => getBarrels(), []);
 
   const handlePlayerState = useCallback((): void => {
@@ -652,7 +680,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   return (
     <>
-      <Level />
+      <Level customWalls={levelData ? levelData.walls : null} />
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);

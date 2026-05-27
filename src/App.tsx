@@ -6,6 +6,7 @@ import MobileControls from "./MobileControls";
 import AudioMenu from "./AudioMenu";
 import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
+import type { LevelData } from "./main";
 
 function formatTime(startTime: number, endTime: number): string {
   if (!startTime) return "0:00";
@@ -26,8 +27,33 @@ function calcScore(state: PlayerState): number {
   return Math.max(0, killPoints + timeBonus + accuracyBonus + healthBonus - hitPenalty);
 }
 
-export default function App(): React.JSX.Element {
+function listSavedMaps(): Array<{ name: string; timestamp: number }> {
+  const maps: Array<{ name: string; timestamp: number }> = [];
+  const prefix = 'doom-map-';
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(prefix) && !key.includes('__playing__') && !key.includes('__autosache__')) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const data = JSON.parse(raw);
+          maps.push({ name: data.name, timestamp: data.timestamp });
+        }
+      } catch { /* skip */ }
+    }
+  }
+  maps.sort((a, b) => b.timestamp - a.timestamp);
+  return maps;
+}
+
+interface AppProps {
+  levelData?: LevelData | null;
+  onClearLevelData?: () => void;
+}
+
+export default function App({ levelData }: AppProps): React.JSX.Element {
   const [started, setStarted] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState<string>(levelData ? '__custom__' : '__default__');
   const [playerState, setPlayerState] = useState<PlayerState>({
     health: 100,
     ammo: 50,
@@ -41,11 +67,20 @@ export default function App(): React.JSX.Element {
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
   const [gameKey, setGameKey] = useState(0);
+  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
   const mobilePitchRef = useRef(0);
   const useActionRef = useRef(false);
   const audioMenuOpenRef = useRef(false);
+
+  // Load saved maps list on mount
+  useEffect(() => {
+    setSavedMaps(listSavedMaps());
+  }, []);
+
+  // If we have levelData from the editor, use it
+  const activeLevelData = selectedLevel === '__custom__' && levelData ? levelData : null;
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -53,16 +88,13 @@ export default function App(): React.JSX.Element {
     setMissionComplete(false);
     setGameKey((k) => k + 1);
     setPlayerState({ health: 100, ammo: 50, kills: 0, shotsFired: 0, timesHit: 0, startTime: performance.now() / 1000, endTime: 0, damageFlash: 0 });
-    // Initialize audio and start music on first user gesture
     audioManager.init().then(() => {
       audioManager.resume();
       audioManager.playMusic();
     });
-    // Request pointer lock synchronously while still in user gesture context
     document.body.requestPointerLock();
   }, []);
 
-  // Restart on keyboard/mouse when game over or mission complete
   useEffect(() => {
     const handleRestartKey = (e: KeyboardEvent): void => {
       if (!gameOver && !missionComplete) return;
@@ -72,15 +104,12 @@ export default function App(): React.JSX.Element {
       }
     };
 
-    // Global mousedown for death screen only (click anywhere to restart)
-    // Mission complete has a dedicated button
     const handleMouseDown = (): void => {
       if (!gameOver) return;
       document.exitPointerLock();
       handleStart();
     };
 
-    // Force exit pointer lock if game is over
     const handlePointerLockChange = (): void => {
       if ((gameOver || missionComplete) && document.pointerLockElement) {
         document.exitPointerLock();
@@ -107,7 +136,7 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const handleShootStart = useCallback((): void => {
-    if (audioMenuOpenRef.current) return; // Don't shoot while audio menu is open
+    if (audioMenuOpenRef.current) return;
     window.dispatchEvent(new CustomEvent("game-shoot", { detail: { shooting: true } }));
   }, []);
 
@@ -131,40 +160,52 @@ export default function App(): React.JSX.Element {
           cursor: "pointer",
           overflow: "hidden",
         }}
-        onClick={handleStart}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'OPTION') return;
+          handleStart();
+        }}
       >
-        <h1
-          style={{
-            fontSize: "64px",
-            margin: 0,
-            textShadow: "0 0 20px #f00",
-          }}
-        >
+        <h1 style={{ fontSize: "64px", margin: 0, textShadow: "0 0 20px #f00" }}>
           DOOM
         </h1>
-        <p style={{ fontSize: "18px", color: "#888", marginTop: "20px" }}>
-          E1M1 - Entryway
+
+        {/* Level selector */}
+        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+          <label style={{ fontSize: "14px", color: "#888" }}>Select Level:</label>
+          <select
+            value={selectedLevel}
+            onChange={(e) => setSelectedLevel(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#222",
+              color: "#fff",
+              border: "1px solid #c00",
+              padding: "8px 16px",
+              fontSize: "16px",
+              fontFamily: "monospace",
+              cursor: "pointer",
+            }}
+          >
+            <option value="__default__">E1M1 - Entryway (Default)</option>
+            {levelData && <option value="__custom__">Custom Level (from Editor)</option>}
+            {savedMaps.map(m => (
+              <option key={m.name} value={`saved:${m.name}`}>{m.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <p style={{ fontSize: "14px", color: selectedLevel === '__custom__' ? "#0f0" : "#888", marginTop: "8px" }}>
+          {selectedLevel === '__custom__' ? '▶ Custom Level' : selectedLevel?.startsWith('saved:') ? `▶ ${selectedLevel.slice(6)}` : '▶ E1M1 - Entryway'}
         </p>
-        <p
-          style={{
-            fontSize: "14px",
-            color: "#666",
-            marginTop: "40px",
-            animation: "blink 1s infinite",
-          }}
-        >
+
+        <p style={{ fontSize: "14px", color: "#666", marginTop: "30px", animation: "blink 1s infinite" }}>
           Tap to start
         </p>
         <a
           href="#editor"
           onClick={(e) => e.stopPropagation()}
-          style={{
-            fontSize: "12px",
-            color: "#c00",
-            marginTop: "16px",
-            textDecoration: "none",
-            opacity: 0.7,
-          }}
+          style={{ fontSize: "12px", color: "#c00", marginTop: "16px", textDecoration: "none", opacity: 0.7 }}
         >
           📐 Level Editor
         </a>
@@ -197,40 +238,21 @@ export default function App(): React.JSX.Element {
           mobileLookRef={mobileLookRef}
           mobilePitchRef={mobilePitchRef}
           useActionRef={useActionRef}
+          levelData={activeLevelData}
         />
       </Canvas>
-      <HUD
-        health={playerState.health}
-        ammo={playerState.ammo}
-        kills={playerState.kills}
-      />
+      <HUD health={playerState.health} ammo={playerState.ammo} kills={playerState.kills} />
 
-      {/* Crosshair - CSS overlay, zero lag */}
       <div style={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "4px",
-        height: "4px",
-        borderRadius: "50%",
-        background: "rgba(255,255,255,0.7)",
-        pointerEvents: "none",
-        zIndex: 15,
+        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: "4px", height: "4px", borderRadius: "50%", background: "rgba(255,255,255,0.7)",
+        pointerEvents: "none", zIndex: 15,
       }} />
 
-      {/* Damage flash - subtle red overlay */}
       <div style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
+        position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
         background: "radial-gradient(ellipse at center, rgba(255,0,0,0.2) 0%, rgba(220,0,0,0.7) 60%, rgba(180,0,0,0.85) 100%)",
-        opacity: playerState.damageFlash,
-        pointerEvents: "none",
-        zIndex: 14,
-        transition: "opacity 0.1s ease-out",
+        opacity: playerState.damageFlash, pointerEvents: "none", zIndex: 14, transition: "opacity 0.1s ease-out",
       }} />
 
       <MobileControls
@@ -243,85 +265,30 @@ export default function App(): React.JSX.Element {
       {gameOver && (
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(180,0,0,0.7)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "monospace",
-            color: "#fff",
-            zIndex: 100,
-            cursor: "pointer",
+            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(180,0,0,0.7)", display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#fff", zIndex: 100, cursor: "pointer",
           }}
-          onClick={(): void => {
-            document.exitPointerLock();
-            handleStart();
-          }}
-          onMouseDown={(): void => {
-            document.exitPointerLock();
-          }}
+          onClick={(): void => { document.exitPointerLock(); handleStart(); }}
+          onMouseDown={(): void => { document.exitPointerLock(); }}
         >
-          <h1
-            style={{
-              fontSize: "72px",
-              textShadow: "0 0 30px #f00",
-            }}
-          >
-            YOU DIED
-          </h1>
-          <p
-            style={{
-              fontSize: "18px",
-            }}
-          >
-            Click anywhere to restart
-          </p>
+          <h1 style={{ fontSize: "72px", textShadow: "0 0 30px #f00" }}>YOU DIED</h1>
+          <p style={{ fontSize: "18px" }}>Click anywhere to restart</p>
         </div>
       )}
       {missionComplete && (
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "#1a0a00",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "monospace",
-            color: "#cc8800",
-            zIndex: 100,
-            cursor: "url(/doom-cursor.png) 16 16, crosshair",
-            overflow: "hidden",
-            padding: "20px",
-            boxSizing: "border-box",
+            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+            background: "#1a0a00", display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#cc8800",
+            zIndex: 100, cursor: "url(/doom-cursor.png) 16 16, crosshair", overflow: "hidden", padding: "20px", boxSizing: "border-box",
           }}
         >
-          <h1 style={{
-            fontSize: "clamp(28px, 5vw, 48px)",
-            color: "#ff6600",
-            textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200",
-            margin: "0 0 20px 0",
-            letterSpacing: "4px",
-          }}>
+          <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", color: "#ff6600", textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200", margin: "0 0 20px 0", letterSpacing: "4px" }}>
             LEVEL COMPLETE
           </h1>
-
-          <div style={{
-            border: "2px solid #663300",
-            padding: "20px 40px",
-            background: "rgba(40,20,0,0.9)",
-            margin: "0 0 20px 0",
-            minWidth: "280px",
-          }}>
+          <div style={{ border: "2px solid #663300", padding: "20px 40px", background: "rgba(40,20,0,0.9)", margin: "0 0 20px 0", minWidth: "280px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
               <span style={{ color: "#aa7744" }}>KILLS</span>
               <span style={{ color: "#ffcc00" }}>{playerState.kills}</span>
@@ -347,34 +314,15 @@ export default function App(): React.JSX.Element {
               <span style={{ color: "#ffee00", fontWeight: "bold" }}>{calcScore(playerState)}</span>
             </div>
           </div>
-
           <button
-            onClick={(): void => {
-              document.exitPointerLock();
-              handleStart();
-            }}
+            onClick={(): void => { document.exitPointerLock(); handleStart(); }}
             style={{
-              fontFamily: '"DooM", monospace',
-              fontSize: "clamp(14px, 2.5vw, 18px)",
-              padding: "12px 32px",
-              background: "#663300",
-              color: "#ffcc00",
-              border: "2px solid #aa5500",
-              cursor: "url(/doom-cursor.png) 16 16, crosshair",
-              letterSpacing: "2px",
-              marginTop: "8px",
-              transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+              background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+              letterSpacing: "2px", marginTop: "8px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
             }}
-            onMouseEnter={(e): void => {
-              e.currentTarget.style.background = "#aa5500";
-              e.currentTarget.style.color = "#ffffff";
-              e.currentTarget.style.borderColor = "#ff8800";
-            }}
-            onMouseLeave={(e): void => {
-              e.currentTarget.style.background = "#663300";
-              e.currentTarget.style.color = "#ffcc00";
-              e.currentTarget.style.borderColor = "#aa5500";
-            }}
+            onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
+            onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
           >
             RESTART GAME
           </button>

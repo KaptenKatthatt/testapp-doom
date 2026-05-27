@@ -11,6 +11,19 @@ import {
   createBloodTexture,
 } from "./Textures";
 
+// Custom level data interface (matches editor format)
+export interface CustomWallData {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  isDoor: boolean;
+}
+
+interface LevelProps {
+  customWalls?: CustomWallData[] | null;
+}
+
 // E1M1-inspired level geometry
 const WALL_COLOR = 0xaa9988;
 const WALL_COLOR2 = 0x998877;
@@ -119,14 +132,46 @@ function buildWallMeshes(): WallMeshData[] {
 
 const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
-export function getWalls(): WallBox[] {
-  return WALL_DATA.map((w) => ({
+export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean }>): WallBox[] {
+  const data = wallDataOverride ?? WALL_DATA;
+  return data.map((w) => ({
     min: [w.x, 0, w.z] as [number, number, number],
     max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
   }));
 }
 
-export default function Level(): React.JSX.Element {
+export default function Level({ customWalls }: LevelProps): React.JSX.Element {
+  // Build wall data from custom or default
+  const activeWallData = useMemo(() => {
+    if (customWalls && customWalls.length > 0) {
+      return customWalls.map((w, i) => ({
+        key: i,
+        x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d,
+        color: w.isDoor ? 0xcc0000 : 0x8b7355,
+        isDoor: w.isDoor,
+        position: [w.x + w.w / 2, 2, w.z + w.d / 2] as [number, number, number],
+        scale: [w.w, 4, w.d] as [number, number, number],
+      }));
+    }
+    return WALL_MESHES;
+  }, [customWalls]);
+
+  // Build collision data (exported via getWalls for Game.tsx)
+  // const wallsForCollision = ... // not needed here, Game.tsx calls getWalls()
+
+  // Calculate level size for floor/ceiling
+  const levelSize = useMemo(() => {
+    if (customWalls && customWalls.length > 0) {
+      let maxX = 50, maxZ = 50;
+      for (const w of customWalls) {
+        maxX = Math.max(maxX, w.x + w.w + 2);
+        maxZ = Math.max(maxZ, w.z + w.d + 2);
+      }
+      return Math.max(maxX, maxZ, 50);
+    }
+    return 50;
+  }, [customWalls]);
+
   const textures = useMemo(() => ({
     wall: createWallTexture(),
     floor: createFloorTexture(),
@@ -165,19 +210,19 @@ export default function Level(): React.JSX.Element {
       <pointLight position={[40, 3, 20]} intensity={2.5} color="#88cc88" distance={15} />
 
       {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[22, 0, 22]}>
-        <planeGeometry args={[50, 50]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[levelSize / 2, 0, levelSize / 2]}>
+        <planeGeometry args={[levelSize, levelSize]} />
         <meshLambertMaterial map={textures.floor} color={0x776655} emissive={0x221100} emissiveIntensity={0.2} />
       </mesh>
 
       {/* Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[22, 4, 22]}>
-        <planeGeometry args={[50, 50]} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[levelSize / 2, 4, levelSize / 2]}>
+        <planeGeometry args={[levelSize, levelSize]} />
         <meshLambertMaterial map={textures.ceiling} color={0x666655} emissive={0x222211} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Walls */}
-      {WALL_MESHES.map((w) => {
+      {activeWallData.map((w) => {
         // Choose texture based on wall type
         const isGreenSlime = w.color === GREEN_ACCENT;
         const isMetal = w.color === METAL_COLOR;
@@ -189,7 +234,6 @@ export default function Level(): React.JSX.Element {
         else if (isMetal) wallTexture = textures.metal;
         else if (isDark) wallTexture = textures.wall;
 
-        // Adjust repeat based on wall size
         const materialProps: Record<string, unknown> = {
           map: wallTexture,
           color: w.color,
@@ -198,7 +242,7 @@ export default function Level(): React.JSX.Element {
         };
 
         return (
-          <mesh key={w.key} position={w.position}>
+          <mesh key={`wall-${w.key}`} position={w.position} >
             <boxGeometry args={w.scale} />
             <meshLambertMaterial {...materialProps} />
           </mesh>
