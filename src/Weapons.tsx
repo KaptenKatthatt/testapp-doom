@@ -101,7 +101,7 @@ export default function Weapons({
       if (revolverReloading) {
         // Rapid spinning during reload
         currentCylinderRot.current += dt * 10;
-        cylinderRef.current.rotation.y = currentCylinderRot.current;
+        cylinderRef.current.rotation.z = currentCylinderRot.current;
         // Swing cylinder out on reload (locally on X-axis, proportional to new procedural scale)
         cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, -0.015, dt * 10);
       } else {
@@ -109,7 +109,7 @@ export default function Weapons({
         cylinderRef.current.position.x = THREE.MathUtils.lerp(cylinderRef.current.position.x, 0, dt * 10);
         // Interpolate cylinder to fired target chamber position
         currentCylinderRot.current = THREE.MathUtils.lerp(currentCylinderRot.current, targetCylinderRot.current, dt * 15);
-        cylinderRef.current.rotation.y = currentCylinderRot.current;
+        cylinderRef.current.rotation.z = currentCylinderRot.current;
       }
     }
 
