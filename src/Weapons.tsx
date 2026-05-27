@@ -115,26 +115,26 @@ export default function Weapons({
 
     if (panMagRef.current) {
       if (machinegunReloading) {
-        // Magazine detach / attach animation (proportional to new procedural scale)
+        // Magazine detach / attach animation (recalibrated for bottom banana magazine)
         reloadElapsed.current += dt;
         const progress = reloadElapsed.current; // Max reload time is 2.0s
 
         if (progress < 0.6) {
-          // 0.0s - 0.6s: Pan mag lifted up and off the weapon
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 0.18, dt * 8);
-          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, 0.05, dt * 8);
+          // 0.0s - 0.6s: Mag pulled down and out of receiver
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -0.22, dt * 8);
+          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, -0.02, dt * 8);
         } else if (progress < 1.4) {
           // 0.6s - 1.4s: Magazine completely out of sight (beneath the player camera)
           panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -0.50, dt * 12);
         } else {
-          // 1.4s - 2.0s: New magazine brought up, aligned, and snapped down on top
-          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, 0.038, dt * 10);
-          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, -0.06, dt * 10);
+          // 1.4s - 2.0s: New magazine brought up and snapped back in
+          panMagRef.current.position.y = THREE.MathUtils.lerp(panMagRef.current.position.y, -0.06, dt * 10);
+          panMagRef.current.position.z = THREE.MathUtils.lerp(panMagRef.current.position.z, -0.05, dt * 10);
         }
       } else {
-        // Normal state: mag resting on top of the receiver, rotating when firing
+        // Normal state: mag resting inside receiver at the bottom
         reloadElapsed.current = 0;
-        panMagRef.current.position.set(0, 0.038, -0.06); // original local coordinate position
+        panMagRef.current.position.set(0, -0.06, -0.05); // baseline bottom mag position
         currentMagRot.current = THREE.MathUtils.lerp(currentMagRot.current, targetMagRot.current, dt * 10);
         panMagRef.current.rotation.y = currentMagRot.current;
       }
@@ -229,25 +229,25 @@ export default function Weapons({
           {/* Wooden Grip/Handle */}
           <mesh position={[-0.01, -0.12, 0.06]} rotation={[0.4, 0, 0]}>
             <boxGeometry args={[0.045, 0.12, 0.05]} />
-            <meshStandardMaterial color={0x8b5a2b} roughness={0.7} />
+            <meshStandardMaterial color={0x8b5a2b} emissive={0x8b5a2b} emissiveIntensity={0.25} roughness={0.7} />
           </mesh>
 
           {/* Main Metal Frame/Receiver */}
           <mesh position={[0, -0.01, 0.0]}>
             <boxGeometry args={[0.048, 0.07, 0.22]} />
-            <meshStandardMaterial color={0x444444} metalness={0.85} roughness={0.25} />
+            <meshStandardMaterial color={0x444444} emissive={0x444444} emissiveIntensity={0.25} metalness={0.85} roughness={0.25} />
           </mesh>
 
           {/* Trigger Guard */}
           <mesh position={[0, -0.06, -0.02]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.025, 0.025, 0.04, 8, 1, true]} />
-            <meshStandardMaterial color={0x333333} metalness={0.8} />
+            <meshStandardMaterial color={0x333333} emissive={0x333333} emissiveIntensity={0.3} metalness={0.8} />
           </mesh>
 
           {/* Trigger */}
           <mesh position={[0, -0.05, -0.015]} rotation={[-0.2, 0, 0]}>
             <boxGeometry args={[0.008, 0.025, 0.008]} />
-            <meshStandardMaterial color={0x222222} metalness={0.9} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} metalness={0.9} />
           </mesh>
 
           {/* Rotating Cylinder (Chamber) */}
@@ -255,7 +255,7 @@ export default function Weapons({
             {/* Central Cylinder Body */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.03, 0.03, 0.09, 12]} />
-              <meshStandardMaterial color={0x666666} metalness={0.9} roughness={0.2} />
+              <meshStandardMaterial color={0x666666} emissive={0x666666} emissiveIntensity={0.2} metalness={0.9} roughness={0.2} />
             </mesh>
             {/* Six Bullet Chambers (embedded dark cylinders representing loaded chambers) */}
             {[0, 1, 2, 3, 4, 5].map((i) => {
@@ -266,7 +266,7 @@ export default function Weapons({
               return (
                 <mesh key={i} position={[cx, cy, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <cylinderGeometry args={[0.007, 0.007, 0.092, 6]} />
-                  <meshStandardMaterial color={0x222222} metalness={0.9} roughness={0.8} />
+                  <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.35} metalness={0.9} roughness={0.8} />
                 </mesh>
               );
             })}
@@ -275,19 +275,19 @@ export default function Weapons({
           {/* Gun Hammer */}
           <mesh position={[0, 0.045, 0.09]} rotation={[-0.4, 0, 0]}>
             <boxGeometry args={[0.01, 0.035, 0.012]} />
-            <meshStandardMaterial color={0x222222} metalness={0.9} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} metalness={0.9} />
           </mesh>
 
           {/* Long Hexagonal Barrel */}
           <mesh position={[0, 0.02, -0.22]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.016, 0.016, 0.22, 6]} />
-            <meshStandardMaterial color={0x333333} metalness={0.85} roughness={0.3} />
+            <meshStandardMaterial color={0x333333} emissive={0x333333} emissiveIntensity={0.25} metalness={0.85} roughness={0.3} />
           </mesh>
 
           {/* Front Sight Post */}
           <mesh position={[0, 0.04, -0.31]}>
             <boxGeometry args={[0.006, 0.015, 0.02]} />
-            <meshStandardMaterial color={0x222222} metalness={0.9} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} metalness={0.9} />
           </mesh>
 
           {/* Muzzle Flash relative to new barrel tip */}
@@ -397,98 +397,85 @@ export default function Weapons({
         </>
       )}
 
-      {/* --- FPS PROCEDURAL DP-28 MACHINE GUN (STYLIZED RETRO RENDER) --- */}
+      {/* --- FPS PROCEDURAL TACTICAL MACHINE GUN (MODERN RENDER) --- */}
       {currentWeapon === "machinegun" && (
         <group>
-          {/* Long Receiver/Body */}
+          {/* Main Receiver/Body */}
           <mesh position={[0, 0, -0.05]}>
-            <boxGeometry args={[0.055, 0.055, 0.38]} />
-            <meshStandardMaterial color={0x333333} metalness={0.8} roughness={0.3} />
+            <boxGeometry args={[0.05, 0.055, 0.35]} />
+            <meshStandardMaterial color={0x333333} emissive={0x333333} emissiveIntensity={0.25} metalness={0.8} roughness={0.3} />
           </mesh>
 
-          {/* Wooden Stock */}
-          <mesh position={[0, -0.025, 0.22]} rotation={[-0.1, 0, 0]}>
-            <boxGeometry args={[0.045, 0.05, 0.18]} />
-            <meshStandardMaterial color={0x7a4b2a} roughness={0.6} />
+          {/* Tactical Shroud / Handguard */}
+          <mesh position={[0, 0.005, -0.22]}>
+            <boxGeometry args={[0.046, 0.05, 0.16]} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} metalness={0.7} roughness={0.5} />
+          </mesh>
+          {/* Handguard grip ridges */}
+          {[0, 1, 2, 3].map((i) => (
+            <mesh key={i} position={[0, -0.022, -0.28 + i * 0.04]}>
+              <boxGeometry args={[0.035, 0.006, 0.012]} />
+              <meshStandardMaterial color={0x111111} emissive={0x111111} emissiveIntensity={0.3} />
+            </mesh>
+          ))}
+
+          {/* Modern Tactical Stock */}
+          <mesh position={[0, -0.015, 0.20]} rotation={[-0.05, 0, 0]}>
+            <boxGeometry args={[0.038, 0.045, 0.16]} />
+            <meshStandardMaterial color={0x2a2a2a} emissive={0x2a2a2a} emissiveIntensity={0.25} roughness={0.6} />
+          </mesh>
+          {/* Buttstock pad */}
+          <mesh position={[0, -0.018, 0.28]}>
+            <boxGeometry args={[0.04, 0.06, 0.016]} />
+            <meshStandardMaterial color={0x1a1a1a} emissive={0x1a1a1a} emissiveIntensity={0.3} roughness={0.8} />
           </mesh>
 
-          {/* Stock butt plate */}
-          <mesh position={[0, -0.025, 0.31]}>
-            <boxGeometry args={[0.046, 0.065, 0.02]} />
-            <meshStandardMaterial color={0x222222} metalness={0.9} />
-          </mesh>
-
-          {/* Pistol Grip */}
-          <mesh position={[0, -0.065, 0.12]} rotation={[0.3, 0, 0]}>
-            <boxGeometry args={[0.03, 0.06, 0.035]} />
-            <meshStandardMaterial color={0x7a4b2a} roughness={0.6} />
+          {/* Tactical Pistol Grip */}
+          <mesh position={[0, -0.06, 0.10]} rotation={[0.35, 0, 0]}>
+            <boxGeometry args={[0.028, 0.06, 0.03]} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} roughness={0.7} />
           </mesh>
 
           {/* Trigger Guard */}
-          <mesh position={[0, -0.045, 0.075]}>
-            <boxGeometry args={[0.015, 0.025, 0.045]} />
-            <meshStandardMaterial color={0x222222} metalness={0.8} />
+          <mesh position={[0, -0.042, 0.055]}>
+            <boxGeometry args={[0.014, 0.022, 0.04]} />
+            <meshStandardMaterial color={0x1a1a1a} emissive={0x1a1a1a} emissiveIntensity={0.3} metalness={0.8} />
           </mesh>
 
-          {/* Rotating Pan Magazine (DP-28 disc magazine) */}
-          <group ref={panMagRef} position={[0, 0.038, -0.06]}>
-            {/* Disc Plate */}
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.13, 0.13, 0.018, 16]} />
-              <meshStandardMaterial color={0x4f4f4f} metalness={0.85} roughness={0.4} />
+          {/* Modern Bottom Curved Magazine (Banana Mag) */}
+          <group ref={panMagRef} position={[0, -0.06, -0.05]}>
+            {/* Main curved banana box */}
+            <mesh rotation={[0.2, 0, 0]}>
+              <boxGeometry args={[0.026, 0.12, 0.045]} />
+              <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} roughness={0.7} />
             </mesh>
-            {/* Central Dome Bolt */}
-            <mesh position={[0, 0.012, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.02, 0.02, 0.01, 8]} />
-              <meshStandardMaterial color={0x222222} metalness={0.9} />
-            </mesh>
-            {/* Visual Grooves for Rotation Feedback */}
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-              const angle = (i * Math.PI) / 4;
-              return (
-                <mesh
-                  key={i}
-                  position={[Math.cos(angle) * 0.065, 0.009, Math.sin(angle) * 0.065]}
-                  rotation={[0, -angle, 0]}
-                >
-                  <boxGeometry args={[0.09, 0.003, 0.012]} />
-                  <meshStandardMaterial color={0x2a2a2a} metalness={0.9} />
-                </mesh>
-              );
-            })}
+            {/* Magazine reinforcement ridges */}
+            {[0, 1, 2].map((i) => (
+              <mesh key={i} position={[0, -0.04 + i * 0.03, 0.005]}>
+                <boxGeometry args={[0.03, 0.006, 0.04]} />
+                <meshStandardMaterial color={0x111111} emissive={0x111111} emissiveIntensity={0.3} />
+              </mesh>
+            ))}
           </group>
 
           {/* Recoiling Bolt Slider */}
-          <mesh ref={boltRef} position={[0.03, 0.005, 0.02]}>
-            <boxGeometry args={[0.01, 0.015, 0.035]} />
-            <meshStandardMaterial color={0xdddddd} metalness={0.95} roughness={0.1} />
+          <mesh ref={boltRef} position={[0.027, 0.008, 0.02]}>
+            <boxGeometry args={[0.008, 0.012, 0.03]} />
+            <meshStandardMaterial color={0xdddddd} emissive={0xdddddd} emissiveIntensity={0.2} metalness={0.95} roughness={0.1} />
           </mesh>
 
-          {/* Long Steel Barrel */}
-          <mesh position={[0, 0.01, -0.34]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.014, 0.014, 0.28, 8]} />
-            <meshStandardMaterial color={0x1e1e1e} metalness={0.9} roughness={0.2} />
+          {/* Tactical Steel Barrel */}
+          <mesh position={[0, 0.01, -0.36]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, 0.24, 8]} />
+            <meshStandardMaterial color={0x1a1a1a} emissive={0x1a1a1a} emissiveIntensity={0.3} metalness={0.9} roughness={0.2} />
+          </mesh>
+          {/* Tactical Flash Hider */}
+          <mesh position={[0, 0.01, -0.49]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.015, 0.015, 0.04, 8]} />
+            <meshStandardMaterial color={0x222222} emissive={0x222222} emissiveIntensity={0.3} metalness={0.95} />
           </mesh>
 
-          {/* Bipod Mount */}
-          <mesh position={[0, -0.018, -0.34]}>
-            <boxGeometry args={[0.022, 0.022, 0.04]} />
-            <meshStandardMaterial color={0x222222} metalness={0.9} />
-          </mesh>
-
-          {/* Bipod Left Leg */}
-          <mesh position={[-0.03, -0.09, -0.34]} rotation={[0, 0, 0.25]}>
-            <boxGeometry args={[0.006, 0.14, 0.008]} />
-            <meshStandardMaterial color={0x3a3a3a} metalness={0.8} />
-          </mesh>
-
-          {/* Bipod Right Leg */}
-          <mesh position={[0.03, -0.09, -0.34]} rotation={[0, 0, -0.25]}>
-            <boxGeometry args={[0.006, 0.14, 0.008]} />
-            <meshStandardMaterial color={0x3a3a3a} metalness={0.8} />
-          </mesh>
-
-          {/* Muzzle Flash relative to new barrel tip */}
+          {/* Muzzle Flash relative to new flash hider tip */}
           <mesh ref={machinegunMuzzleRef} position={[0, 0.01, -0.52]} visible={false}>
             <sphereGeometry args={[0.08, 8, 8]} />
             <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
