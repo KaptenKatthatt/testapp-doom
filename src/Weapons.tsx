@@ -159,12 +159,12 @@ export default function Weapons({
       if (currentWeapon === "revolver") {
         // Revolver: placed neatly at waist height on the right, pointing forward
         offset.set(
-          0.16 + sway - pullback * 0.05,
-          -0.40 + bob - recoil * 0.08 - (revolverReloading ? 0.15 : 0) - pullback * 0.15,
-          -0.50 + recoil * 0.12 + pullback * 0.2
+          0.18 + sway - pullback * 0.05,
+          -0.24 + bob - recoil * 0.08 - (revolverReloading ? 0.10 : 0) - pullback * 0.15,
+          -0.45 + recoil * 0.12 + pullback * 0.2
         );
         rotX = 0.02 + recoil * 0.12 - (revolverReloading ? 0.6 : 0) - pullback * 0.4;
-        rotY = 0.02 + sway * 0.2 - (revolverReloading ? 0.2 : 0) - pullback * 0.1;
+        rotY = 0.025 + sway * 0.2 - (revolverReloading ? 0.2 : 0) - pullback * 0.1;
         rotZ = -0.03 + recoil * -0.04 + pullback * 0.08;
       } else if (currentWeapon === "shotgun") {
         // Shotgun: heavy long receiver, over-under layout
@@ -180,11 +180,11 @@ export default function Weapons({
         // DP-28 Machine Gun: placed on the right (like shotgun), pointing diagonally towards the center
         offset.set(
           0.22 + sway - pullback * 0.08,
-          -0.65 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
-          -0.55 + recoil * 0.10 + pullback * 0.3
+          -0.28 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
+          -0.50 + recoil * 0.10 + pullback * 0.3
         );
-        rotX = 0.065 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
-        rotY = 0.035 + sway * 0.3 - pullback * 0.2;
+        rotX = 0.02 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
+        rotY = 0.025 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       }
 
@@ -227,26 +227,26 @@ export default function Weapons({
       {currentWeapon === "revolver" && (
         <group>
           {/* Wooden Grip/Handle */}
-          <mesh position={[-0.01, -0.09, 0.05]} rotation={[0.4, 0, 0]}>
-            <boxGeometry args={[0.032, 0.09, 0.04]} />
+          <mesh position={[-0.01, -0.12, 0.06]} rotation={[0.4, 0, 0]}>
+            <boxGeometry args={[0.045, 0.12, 0.05]} />
             <meshStandardMaterial color={0x8b5a2b} roughness={0.7} />
           </mesh>
 
           {/* Main Metal Frame/Receiver */}
           <mesh position={[0, -0.01, 0.0]}>
-            <boxGeometry args={[0.035, 0.05, 0.16]} />
+            <boxGeometry args={[0.048, 0.07, 0.22]} />
             <meshStandardMaterial color={0x444444} metalness={0.85} roughness={0.25} />
           </mesh>
 
           {/* Trigger Guard */}
-          <mesh position={[0, -0.045, -0.02]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.02, 0.02, 0.03, 8, 1, true]} />
+          <mesh position={[0, -0.06, -0.02]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.04, 8, 1, true]} />
             <meshStandardMaterial color={0x333333} metalness={0.8} />
           </mesh>
 
           {/* Trigger */}
-          <mesh position={[0, -0.04, -0.015]} rotation={[-0.2, 0, 0]}>
-            <boxGeometry args={[0.006, 0.02, 0.006]} />
+          <mesh position={[0, -0.05, -0.015]} rotation={[-0.2, 0, 0]}>
+            <boxGeometry args={[0.008, 0.025, 0.008]} />
             <meshStandardMaterial color={0x222222} metalness={0.9} />
           </mesh>
 
@@ -254,18 +254,18 @@ export default function Weapons({
           <group ref={cylinderRef} position={[0, 0.005, -0.02]}>
             {/* Central Cylinder Body */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.022, 0.022, 0.065, 12]} />
+              <cylinderGeometry args={[0.03, 0.03, 0.09, 12]} />
               <meshStandardMaterial color={0x666666} metalness={0.9} roughness={0.2} />
             </mesh>
             {/* Six Bullet Chambers (embedded dark cylinders representing loaded chambers) */}
             {[0, 1, 2, 3, 4, 5].map((i) => {
               const angle = (i * Math.PI) / 3;
-              const radius = 0.012;
+              const radius = 0.016;
               const cx = Math.cos(angle) * radius;
               const cy = Math.sin(angle) * radius;
               return (
                 <mesh key={i} position={[cx, cy, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <cylinderGeometry args={[0.005, 0.005, 0.066, 6]} />
+                  <cylinderGeometry args={[0.007, 0.007, 0.092, 6]} />
                   <meshStandardMaterial color={0x222222} metalness={0.9} roughness={0.8} />
                 </mesh>
               );
@@ -273,25 +273,25 @@ export default function Weapons({
           </group>
 
           {/* Gun Hammer */}
-          <mesh position={[0, 0.035, 0.065]} rotation={[-0.4, 0, 0]}>
-            <boxGeometry args={[0.008, 0.025, 0.01]} />
+          <mesh position={[0, 0.045, 0.09]} rotation={[-0.4, 0, 0]}>
+            <boxGeometry args={[0.01, 0.035, 0.012]} />
             <meshStandardMaterial color={0x222222} metalness={0.9} />
           </mesh>
 
           {/* Long Hexagonal Barrel */}
-          <mesh position={[0, 0.015, -0.16]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.012, 0.012, 0.16, 6]} />
+          <mesh position={[0, 0.02, -0.22]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.016, 0.016, 0.22, 6]} />
             <meshStandardMaterial color={0x333333} metalness={0.85} roughness={0.3} />
           </mesh>
 
           {/* Front Sight Post */}
-          <mesh position={[0, 0.032, -0.225]}>
-            <boxGeometry args={[0.005, 0.01, 0.015]} />
+          <mesh position={[0, 0.04, -0.31]}>
+            <boxGeometry args={[0.006, 0.015, 0.02]} />
             <meshStandardMaterial color={0x222222} metalness={0.9} />
           </mesh>
 
           {/* Muzzle Flash relative to new barrel tip */}
-          <mesh ref={revolverMuzzleRef} position={[0, 0.015, -0.26]} visible={false}>
+          <mesh ref={revolverMuzzleRef} position={[0, 0.02, -0.34]} visible={false}>
             <sphereGeometry args={[0.05, 8, 8]} />
             <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
           </mesh>
@@ -299,7 +299,7 @@ export default function Weapons({
           {/* Muzzle flash glow ring */}
           <mesh
             ref={revolverMuzzleRingRef}
-            position={[0, 0.015, -0.26]}
+            position={[0, 0.02, -0.34]}
             rotation={[0, 0, 0]}
             visible={false}
           >
