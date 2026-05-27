@@ -46,8 +46,11 @@ export function gridToLevelData(grid: CellData[][], playerPos: [number, number] 
 
   const enemies: Array<{ id: number; x: number; z: number; type: string }> = [];
   const pickups: Array<{ id: number; x: number; z: number; type: string }> = [];
+  const barrels: Array<{ id: number; x: number; z: number }> = [];
+  const specialFloors: Array<{ x: number; z: number; type: 'lava' | 'slime' }> = [];
   let enemyId = 0;
   let pickupId = 1;
+  let barrelId = 0;
 
   for (let z = 0; z < GRID_H; z++) {
     for (let x = 0; x < GRID_W; x++) {
@@ -56,6 +59,10 @@ export function gridToLevelData(grid: CellData[][], playerPos: [number, number] 
         enemies.push({ id: enemyId++, x, z, type: cell.type });
       } else if ((PICKUP_TYPES as readonly string[]).includes(cell.type)) {
         pickups.push({ id: pickupId++, x, z, type: cell.type });
+      } else if (cell.type === 'barrel') {
+        barrels.push({ id: barrelId++, x, z });
+      } else if (cell.type === 'lava' || cell.type === 'slime') {
+        specialFloors.push({ x, z, type: cell.type });
       }
     }
   }
@@ -64,6 +71,8 @@ export function gridToLevelData(grid: CellData[][], playerPos: [number, number] 
     walls,
     enemies,
     pickups,
+    barrels,
+    specialFloors,
     playerStart: playerPos ? [playerPos[0], playerPos[1]] as [number, number] : [2, 2] as [number, number],
   };
 }
@@ -91,6 +100,18 @@ export function buildExportCode(grid: CellData[][], playerPos: [number, number] 
   code += `// Pickups\n`;
   for (const p of levelData.pickups) {
     code += `{ id: ${p.id}, position: [${p.x}, 0.3, ${p.z}], type: "${p.type}", active: true },\n`;
+  }
+  code += `\n`;
+
+  code += `// Barrels\n`;
+  for (const b of levelData.barrels) {
+    code += `{ id: ${b.id}, position: [${b.x}, 0.5, ${b.z}], radius: 0.4, health: 20, maxHealth: 20, alive: true, explosionTimer: 0 },\n`;
+  }
+  code += `\n`;
+
+  code += `// Special Floors\n`;
+  for (const f of levelData.specialFloors) {
+    code += `{ x: ${f.x}, z: ${f.z}, type: "${f.type}" },\n`;
   }
   code += `\n`;
 

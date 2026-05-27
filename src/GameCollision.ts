@@ -34,6 +34,7 @@ export function checkCollision(
   }
   // Also check barrels
   for (const barrel of barrels) {
+    if (!barrel.alive) continue;
     const dx = pos.x - barrel.position[0];
     const dz = pos.z - barrel.position[2];
     const distSq = dx * dx + dz * dz;
@@ -71,6 +72,7 @@ export function checkWallHit(
   if (checkDoorHit(x, z, doors)) return true;
   // Check barrels
   for (const barrel of barrels) {
+    if (!barrel.alive) continue;
     const dx = x - barrel.position[0];
     const dz = z - barrel.position[2];
     if (dx * dx + dz * dz < barrel.radius * barrel.radius) {

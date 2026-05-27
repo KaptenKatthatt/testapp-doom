@@ -531,4 +531,4 @@ export default function Editor() {
   );
 }
 
-const btnStyle: React.CSSProperties = { background: '#444', border: '1px solid #c00', color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: 13, borderRadius: 4, fontFamily: 'monospace' };
+const btnStyle: React.CSSProperties = { background: '#444', border: '1px solid #c00', color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: 13, borderRadius: 4, fontFamily: 'monospace' };

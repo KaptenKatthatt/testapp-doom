@@ -34,15 +34,7 @@ export function LevelDecorations({ textures }: LevelDecorationsProps): React.JSX
         <meshLambertMaterial color={0xcc4444} emissive={0x441111} emissiveIntensity={0.5} />
       </mesh>
 
-      {/* Barrels/crates */}
-      <mesh position={[22, 0.5, 10]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
-      <mesh position={[22, 0.5, 12]}>
-        <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
-        <meshLambertMaterial map={textures.barrel} />
-      </mesh>
+
 
       {/* Torch flames - small emissive cubes on walls */}
       {[

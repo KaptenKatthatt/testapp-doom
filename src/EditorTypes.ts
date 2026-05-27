@@ -1,4 +1,4 @@
-export type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun';
+export type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
 export type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 
 export interface CellData {
@@ -20,6 +20,9 @@ export const CELL_COLORS: Record<CellType, string> = {
   health: '#0044FF',
   ammo: '#FFAA00',
   shotgun: '#00AAFF',
+  barrel: '#556644',
+  lava: '#FF3300',
+  slime: '#006600',
 };
 
 export const CELL_LABELS: Record<CellType, string> = {
@@ -33,6 +36,9 @@ export const CELL_LABELS: Record<CellType, string> = {
   health: '💊 Health',
   ammo: '🔫 Ammo',
   shotgun: '🔫 Shotgun',
+  barrel: '🛢️ Barrel',
+  lava: '🌋 Lava',
+  slime: '🤢 Slime',
 };
 
 export const ENTITY_TYPES = ['imp', 'demon', 'zombieman'] as const;

@@ -330,3 +330,50 @@ export function createBloodTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   return texture;
 }
+
+/** Create lava pool texture */
+export function createLavaTexture(): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = getCtx(canvas);
+
+  // Base dark red
+  ctx.fillStyle = "#660000";
+  ctx.fillRect(0, 0, 64, 64);
+
+  // Lava veins / glowing spots
+  for (let i = 0; i < 20; i++) {
+    const x = Math.random() * 64;
+    const y = Math.random() * 64;
+    const r = 3 + Math.random() * 6;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, "rgba(255, 120, 0, 0.9)"); // Hot glowing orange/yellow
+    grad.addColorStop(0.4, "rgba(220, 50, 0, 0.6)"); // Red-orange
+    grad.addColorStop(1, "rgba(80, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  // Yellow crack lines / hot highlights
+  ctx.strokeStyle = "rgba(255, 220, 0, 0.4)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * 64, 0);
+    ctx.bezierCurveTo(
+      Math.random() * 64, Math.random() * 64,
+      Math.random() * 64, Math.random() * 64,
+      Math.random() * 64, 64
+    );
+    ctx.stroke();
+  }
+
+  // Noise
+  addNoise(ctx, 400, 0.12);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}

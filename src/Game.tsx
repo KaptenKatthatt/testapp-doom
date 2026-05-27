@@ -10,7 +10,7 @@ import Projectiles from "./Projectiles";
 import { audioManager } from "./Audio";
 import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
 import type { DoorData } from "./Doors";
-import { createDoorTexture } from "./Textures";
+import { createDoorTexture, createBarrelTexture } from "./Textures";
 import type {
   PlayerState,
   EnemyData,
@@ -31,6 +31,7 @@ import {
   updatePickupCollectionHelper,
   handlePlayerMovementHelper,
   handlePlayerShootingHelper,
+  explodeBarrelSplash,
 } from "./GameHelpers";
 import { useGameInputs } from "./useGameInputs";
 
@@ -41,6 +42,8 @@ interface CustomLevelData {
   enemies: Array<{ id: number; x: number; z: number; type: string }>;
   pickups: Array<{ id: number; x: number; z: number; type: string }>;
   playerStart: [number, number];
+  barrels?: Array<{ id: number; x: number; z: number }>;
+  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }>;
 }
 
 interface GameProps {
@@ -52,6 +55,7 @@ interface GameProps {
   readonly mobilePitchRef: React.MutableRefObject<number>;
   readonly useActionRef: React.MutableRefObject<boolean>;
   readonly levelData?: CustomLevelData | null;
+  readonly paused?: boolean;
 }
 
 export interface PlayerData {
@@ -97,7 +101,8 @@ const INITIAL_PICKUPS: PickupData[] = [
 ];
 
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData, paused }: GameProps): React.JSX.Element {
+  const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
   const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
     const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : 35;
@@ -174,7 +179,30 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (customWallData) return getWalls(customWallData);
     return getWalls();
   }, [customWallData]);
-  const barrels: BarrelData[] = useMemo(() => getBarrels(), []);
+  const customBarrels: BarrelData[] = useMemo(() => {
+    if (levelData && levelData.barrels) {
+      return levelData.barrels.map((b: { id: number; x: number; z: number }) => ({
+        id: b.id,
+        position: [b.x + 0.5, 0.5, b.z + 0.5] as [number, number, number],
+        radius: 0.4,
+        health: 20,
+        maxHealth: 20,
+        alive: true,
+        explosionTimer: 0,
+      }));
+    }
+    return getBarrels();
+  }, [levelData]);
+
+  const [barrels, setBarrels] = useState<BarrelData[]>(customBarrels);
+  const barrelsRef = useRef<BarrelData[]>(customBarrels);
+  useEffect(() => {
+    barrelsRef.current = barrels;
+  }, [barrels]);
+
+  const specialFloors = useMemo(() => {
+    return levelData?.specialFloors ?? [];
+  }, [levelData]);
 
   const handlePlayerState = useCallback((): void => {
     const p = playerRef.current;
@@ -214,6 +242,20 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   useFrame((_state, delta) => {
     const player = playerRef.current;
     if (player.health <= 0) return;
+
+    if (paused) {
+      // Pause camera setup - keep camera sync but skip all logic
+      camera.position.set(player.position.x, player.position.y, player.position.z);
+      const lookDir = new THREE.Vector3(
+        -Math.sin(player.rotation) * Math.cos(player.pitch),
+        Math.sin(player.pitch),
+        -Math.cos(player.rotation) * Math.cos(player.pitch),
+      );
+      const lookTarget = camera.position.clone().add(lookDir.multiplyScalar(10));
+      camera.lookAt(lookTarget);
+      camera.updateMatrixWorld(true);
+      return;
+    }
 
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
@@ -287,9 +329,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       missionCompleteRef,
       gameActiveRef,
       onPlayerState,
-      onMissionComplete
+      onMissionComplete,
+      barrelsRef,
+      setBarrels
     );
-    // Enemy AI + projectile spawning
     const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
       dt,
       now,
@@ -404,13 +447,84 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       : 0;
     pullbackRef.current = Math.max(0, Math.min(1, pullbackVal));
 
-    // Nukage/slime damage — 1 damage per second when standing in slime zones
+    // Process barrel explosions and fade explosion timers
+    setBarrels((prevBarrels) => {
+      let changed = false;
+      const nextBarrels = prevBarrels.map(b => {
+        if (!b.alive && b.explosionTimer > 0) {
+          changed = true;
+          return { ...b, explosionTimer: Math.max(0, b.explosionTimer - dt * 2.5) };
+        }
+        if (b.alive && b.health <= 0) {
+          changed = true;
+          audioManager.play('explosion');
+          const { updatedEnemies } = explodeBarrelSplash(
+            b,
+            playerRef.current,
+            enemiesRef.current,
+            onGameOver,
+            (active) => { gameActiveRef.current = active; },
+            prevBarrels,
+            hasLineOfSight
+          );
+          setEnemies(updatedEnemies);
+          return { ...b, alive: false, explosionTimer: 1.0 };
+        }
+        return b;
+      });
+
+      const exploded = nextBarrels.find(b => !b.alive && b.explosionTimer === 1.0);
+      if (exploded) {
+        const originalExploded = prevBarrels.find(b => b.id === exploded.id);
+        if (originalExploded && originalExploded.alive) {
+          const { updatedBarrels } = explodeBarrelSplash(
+            originalExploded,
+            playerRef.current,
+            enemiesRef.current,
+            onGameOver,
+            (active) => { gameActiveRef.current = active; },
+            prevBarrels,
+            hasLineOfSight
+          );
+          return nextBarrels.map(b => {
+            if (b.id === exploded.id) return b;
+            const updated = updatedBarrels.find(u => u.id === b.id);
+            return updated ? { ...b, health: updated.health } : b;
+          });
+        }
+      }
+
+      return changed ? nextBarrels : prevBarrels;
+    });
+
+    // Centralized mission completion check: if all enemies are dead, player wins!
+    const totalEnemies = enemiesRef.current.length;
+    const aliveEnemies = enemiesRef.current.filter(e => e.alive).length;
+    if (totalEnemies > 0 && aliveEnemies === 0 && !missionCompleteRef.current) {
+      missionCompleteRef.current = true;
+      gameActiveRef.current = false;
+      player.endTime = now;
+      onPlayerState({
+        health: Math.round(player.health),
+        ammo: player.ammo,
+        kills: player.kills,
+        shotsFired: player.shotsFired,
+        timesHit: player.timesHit,
+        startTime: player.startTime,
+        endTime: now,
+        damageFlash: 0,
+      });
+      onMissionComplete();
+    }
+
+    // Nukage/slime damage — standing in custom lava or slime zones
     player.health = checkSlimeDamageHelper(
       dt,
       player.position,
       player.health,
       onGameOver,
-      (active) => { gameActiveRef.current = active; }
+      (active) => { gameActiveRef.current = active; },
+      specialFloors
     );
 
     handlePlayerState();
@@ -418,7 +532,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   return (
     <>
-      <Level customWalls={customWallData} />
+      <Level customWalls={customWallData} specialFloors={specialFloors} />
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);
@@ -441,6 +555,32 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       <Enemies enemies={enemies} />
       <Pickups pickups={pickups} />
       <Projectiles projectiles={projectiles} />
+      {/* Barrels */}
+      {barrels.map((barrel) => {
+        if (!barrel.alive && barrel.explosionTimer <= 0) return null;
+        if (!barrel.alive) {
+          const progress = 1 - barrel.explosionTimer;
+          const scale = 0.5 + progress * 3.5;
+          const opacity = barrel.explosionTimer;
+          return (
+            <mesh key={`explosion-${barrel.id}`} position={barrel.position}>
+              <sphereGeometry args={[scale, 16, 16]} />
+              <meshBasicMaterial
+                color="#ff5500"
+                transparent
+                opacity={opacity * 0.8}
+                blending={THREE.AdditiveBlending}
+              />
+            </mesh>
+          );
+        }
+        return (
+          <mesh key={`barrel-${barrel.id}`} position={barrel.position}>
+            <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+            <meshLambertMaterial map={barrelTexture} />
+          </mesh>
+        );
+      })}
       <Weapons
         shooting={playerRef.current.shooting}
         lastShot={playerRef.current.lastShot}
