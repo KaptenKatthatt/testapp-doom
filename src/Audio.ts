@@ -192,17 +192,42 @@ class AudioManager {
     return this.menuMusicPlaying;
   }
 
+  // Cache for loaded music buffers
+  private trackBuffers: Map<TrackStyle, AudioBuffer> = new Map();
+
+  private async loadTrackBuffer(track: TrackStyle): Promise<AudioBuffer | null> {
+    if (this.trackBuffers.has(track)) return this.trackBuffers.get(track)!;
+    if (!this.audioContext) return null;
+    try {
+      const response = await fetch(`/audio/${track}.ogg`);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.trackBuffers.set(track, buffer);
+      return buffer;
+    } catch (e) {
+      console.warn(`Failed to load track ${track}:`, e);
+      return null;
+    }
+  }
+
   // Play game music (track style from level data)
-  playGameMusic(track: TrackStyle): void {
+  async playGameMusic(track: TrackStyle): Promise<void> {
     if (!this.loaded || !this.audioContext || !this.musicGain) return;
     this.stopGameMusic();
     this.stopMenuMusic();
     this.stopMusic();
 
-    if (track === 'classic') {
-      // Play the original E1M1 OGG file
-      this.playMusic();
+    // Try to play OGG file first, fall back to procedural synth
+    const buffer = await this.loadTrackBuffer(track);
+    if (buffer) {
+      this.musicSource = this.audioContext.createBufferSource();
+      this.musicSource.buffer = buffer;
+      this.musicSource.loop = true;
+      this.musicSource.connect(this.musicGain);
+      this.musicSource.start(0);
+      this.musicPlaying = true;
     } else {
+      // Fallback to procedural synth
       if (!this.musicEngine) {
         this.musicEngine = new MusicEngine();
       }

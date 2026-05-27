@@ -400,7 +400,6 @@ export default function Editor() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const musicBufferRef = useRef<AudioBuffer | null>(null);
 
   const stopMusicPreview = () => {
     if (musicEngineRef.current) musicEngineRef.current.stop();
@@ -427,52 +426,40 @@ export default function Editor() {
       gain.connect(ctx.destination);
       stopMusicPreview();
 
-      if (musicTrack === 'classic') {
-        // Load and play the E1M1 OGG file
-        try {
-          if (!musicBufferRef.current) {
-            const response = await fetch('/audio/e1m1.ogg');
-            const arrayBuffer = await response.arrayBuffer();
-            musicBufferRef.current = await ctx.decodeAudioData(arrayBuffer);
-          }
+      // Try OGG file first, fall back to procedural
+      const trackFile = musicTrack === 'classic' ? 'e1m1' : musicTrack;
+      try {
+        const response = await fetch(`/audio/${trackFile}.ogg`);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await ctx.decodeAudioData(arrayBuffer);
           const source = ctx.createBufferSource();
-          source.buffer = musicBufferRef.current;
+          source.buffer = buffer;
           source.loop = true;
           source.connect(gain);
           source.start(0);
           musicSourceRef.current = source;
           musicEngineRef.current = null;
           setMusicPlaying(true);
-        } catch (e) {
-          console.warn('Failed to play classic track:', e);
+          return;
         }
-      } else {
-        const engine = new MusicEngine();
-        engine.start(ctx, gain, musicTrack);
-        musicEngineRef.current = engine;
-        musicSourceRef.current = null;
-        setMusicPlaying(true);
-      }
+      } catch { /* fall back to procedural */ }
+
+      // Fallback to procedural synth
+      const engine = new MusicEngine();
+      engine.start(ctx, gain, musicTrack);
+      musicEngineRef.current = engine;
+      musicSourceRef.current = null;
+      setMusicPlaying(true);
     }
   };
 
   // Restart preview when track changes
   useEffect(() => {
     if (musicPlaying && audioCtxRef.current) {
-      const ctx = audioCtxRef.current;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.5;
-      gain.connect(ctx.destination);
+      // Stop current and re-trigger toggle
       stopMusicPreview();
-
-      if (musicTrack === 'classic') {
-        // For classic, we need async load — just stop and let user re-click
-        setMusicPlaying(false);
-      } else {
-        const engine = new MusicEngine();
-        engine.start(ctx, gain, musicTrack);
-        musicEngineRef.current = engine;
-      }
+      setMusicPlaying(false);
     }
     return () => {
       stopMusicPreview();
