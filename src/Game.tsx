@@ -703,6 +703,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);
+        // Don't render door mesh when fully open (visible height near zero)
+        if (door.state === 'open' || (door.state === 'opening' && visual.size[1] < 0.1)) {
+          return null;
+        }
         return (
           <mesh key={`door-${door.id}`} position={visual.position}>
             <boxGeometry args={visual.size} />
