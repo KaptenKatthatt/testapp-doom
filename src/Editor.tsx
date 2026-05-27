@@ -21,6 +21,7 @@ import {
   loadAutosave,
 } from './StorageHelpers';
 import { MusicEngine } from './MusicEngine';
+import { audioManager } from './Audio';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
@@ -415,6 +416,8 @@ export default function Editor() {
       stopMusicPreview();
       setMusicPlaying(false);
     } else {
+      // Stop menu music first
+      audioManager.stopMenuMusic();
       // Play
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
