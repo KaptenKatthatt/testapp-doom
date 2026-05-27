@@ -6,7 +6,7 @@ function getCell(grid: CellData[][], x: number, z: number): CellData {
 }
 
 // Export grid-to-level-data converter for use by the game and export
-export function gridToLevelData(grid: CellData[][], playerPos: [number, number] | null) {
+export function gridToLevelData(grid: CellData[][], playerPos: [number, number] | null, musicTrack?: string) {
   const visited = new Set<string>();
   const walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; color?: string }> = [];
 
@@ -74,6 +74,7 @@ export function gridToLevelData(grid: CellData[][], playerPos: [number, number] 
     barrels,
     specialFloors,
     playerStart: playerPos ? [playerPos[0], playerPos[1]] as [number, number] : [2, 2] as [number, number],
+    musicTrack,
   };
 }
 

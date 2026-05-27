@@ -1,11 +1,16 @@
 import React from 'react';
 import type { LevelData } from './main';
 import { audioManager } from './Audio';
+import { TRACK_OPTIONS, TrackStyle } from './EditorTypes';
+
+const TRACK_EMOJI: Record<string, string> = {};
+TRACK_OPTIONS.forEach(o => { TRACK_EMOJI[o.value] = o.emoji; });
 
 interface SavedMap {
   name: string;
   timestamp: number;
   validated: boolean;
+  musicTrack?: string;
 }
 
 interface MainMenuProps {
@@ -252,7 +257,7 @@ export default function MainMenu({
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
                 onMouseLeave={(e) => { const sel = selectedLevel === `saved:${m.name}`; e.currentTarget.style.color = sel ? '#ff0' : '#aaa'; e.currentTarget.style.background = sel ? '#331100' : 'transparent'; }}
               >
-                <span>► {m.name.toUpperCase()}</span>
+                <span>► {m.name.toUpperCase()}{m.musicTrack ? ` ${TRACK_EMOJI[m.musicTrack as TrackStyle] || '🎵'}` : ''}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

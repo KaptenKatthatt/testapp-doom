@@ -1,3 +1,13 @@
+export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom';
+
+export const TRACK_OPTIONS: { value: TrackStyle; label: string; emoji: string }[] = [
+  { value: 'inferno', label: 'Inferno', emoji: '🔥' },
+  { value: 'darkness', label: 'Darkness', emoji: '🌑' },
+  { value: 'rampage', label: 'Rampage', emoji: '⚡' },
+  { value: 'eerie', label: 'Eerie', emoji: '🏚️' },
+  { value: 'doom', label: 'Doom', emoji: '💀' },
+];
+
 export type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
 export type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 

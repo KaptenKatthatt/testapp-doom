@@ -1,6 +1,7 @@
 // AudioManager — handles all game audio (sound effects + music)
 // Uses Web Audio API for low-latency playback
 import { MenuSynth } from "./MenuSynth";
+import { MusicEngine, TrackStyle } from "./MusicEngine";
 
 class AudioManager {
   private audioContext: AudioContext | null = null;
@@ -14,6 +15,8 @@ class AudioManager {
   private musicPlaying = false;
   private menuSynth: MenuSynth | null = null;
   private menuMusicPlaying = false;
+  private musicEngine: MusicEngine | null = null;
+  
   private loaded = false;
 
   async init(): Promise<void> {
@@ -187,6 +190,25 @@ class AudioManager {
   // Check if menu music is playing
   isMenuMusicPlaying(): boolean {
     return this.menuMusicPlaying;
+  }
+
+  // Play game music (track style from level data)
+  playGameMusic(track: TrackStyle): void {
+    if (!this.loaded || !this.audioContext || !this.musicGain) return;
+    this.stopMenuMusic();
+    this.stopMusic();
+
+    if (!this.musicEngine) {
+      this.musicEngine = new MusicEngine();
+    }
+    this.musicEngine.start(this.audioContext, this.musicGain, track);
+  }
+
+  // Stop game music
+  stopGameMusic(): void {
+    if (this.musicEngine) {
+      this.musicEngine.stop();
+    }
   }
 
   // Set music volume (0-1)

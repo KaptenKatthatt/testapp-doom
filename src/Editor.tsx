@@ -9,6 +9,8 @@ import {
   GRID_H,
   CELL_COLORS,
   CELL_LABELS,
+  TRACK_OPTIONS,
+  TrackStyle as TrackStyleType,
 } from './EditorTypes';
 import {
   saveMapToStorage,
@@ -72,6 +74,7 @@ export default function Editor() {
   const [exportCode, setExportCode] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveValidation, setSaveValidation] = useState<{ errors: string[]; warnings: string[] } | null>(null);
+  const [musicTrack, setMusicTrack] = useState<TrackStyleType>('inferno');
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
@@ -364,7 +367,7 @@ export default function Editor() {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
-    saveMapToStorage(name, grid, playerPos, isValid);
+    saveMapToStorage(name, grid, playerPos, isValid, musicTrack);
     setShowSaveDialog(false);
     setSaveName('');
   };
@@ -374,10 +377,12 @@ export default function Editor() {
     setShowLoadDialog(true);
   };
 
-  const handleLoadMap = (name: string) => {
+  const handleLoadMap = (name: string, track?: TrackStyleType) => {
     const data = loadMapFromStorage(name);
     if (data) {
       updateGrid(data.grid, data.playerPos);
+      if (track) setMusicTrack(track);
+      else if (data.musicTrack) setMusicTrack(data.musicTrack);
       setShowLoadDialog(false);
     }
   };
@@ -391,10 +396,10 @@ export default function Editor() {
 
   const handlePlayMap = () => {
     // Save current map and level data so the game can load it
-    const ld = gridToLevelData(grid, playerPos);
+    const ld = gridToLevelData(grid, playerPos, musicTrack);
     localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
     // Also save grid data for the editor to restore
-    saveMapToStorage('__playing__', grid, playerPos, false);
+    saveMapToStorage('__playing__', grid, playerPos, false, musicTrack);
     // Navigate to game — use hash without reload so React picks it up
     window.location.hash = '';
   };
@@ -487,6 +492,24 @@ export default function Editor() {
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
         <button onClick={handlePlayMap} style={{ ...btnStyle, background: '#050', border: '1px solid #0a0' }}>🎮 Play This Map</button>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginTop: 8, justifyContent: 'center', alignItems: 'center' }}>
+        <span style={{ color: '#aaa', fontFamily: 'monospace', fontSize: 13 }}>🎵 Music:</span>
+        {TRACK_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setMusicTrack(opt.value)}
+            style={{
+              ...btnStyle,
+              background: musicTrack === opt.value ? '#600' : '#333',
+              border: musicTrack === opt.value ? '2px solid #f00' : '1px solid #c00',
+              fontSize: 11,
+              padding: '4px 8px',
+            }}
+          >
+            {opt.emoji} {opt.label}
+          </button>
+        ))}
       </div>
 
       <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>

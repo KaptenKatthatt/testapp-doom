@@ -9,6 +9,7 @@ import type { PlayerState } from "./types";
 import type { LevelData } from "./main";
 import { gridToLevelData } from "./EditorExport";
 import { listSavedMaps } from "./StorageHelpers";
+import type { TrackStyle } from "./EditorTypes";
 
 type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun';
 
@@ -64,7 +65,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
   const [gameKey, setGameKey] = useState(0);
-  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean }>>([]);
+  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean; musicTrack?: string }>>([]);
   const [showMapModal, setShowMapModal] = useState(false);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
@@ -91,7 +92,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           const data = JSON.parse(raw);
           const grid = data.grid.map((row: CellType[]) => row.map((t: CellType) => ({ type: t })));
           const playerPos: [number, number] = data.playerPos || [2, 2];
-          return gridToLevelData(grid, playerPos);
+          return gridToLevelData(grid, playerPos, data.musicTrack);
         } catch { /* fall through */ }
       }
     }
@@ -123,7 +124,12 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     audioManager.init().then(() => {
       audioManager.resume();
       audioManager.stopMenuMusic();
-      audioManager.playMusic();
+      const track = activeLevelData?.musicTrack as TrackStyle | undefined;
+      if (track) {
+        audioManager.playGameMusic(track);
+      } else {
+        audioManager.playMusic();
+      }
     });
     document.body.requestPointerLock();
   }, []);
