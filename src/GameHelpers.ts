@@ -129,8 +129,18 @@ export function updateEnemyAIHelper(
     let newAttack = e.lastAttack;
     const newHitFlash = Math.max(0, e.hitFlash - dt * 4);
 
-    // Check line of sight before moving or attacking
-    const canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
+    // Throttle line-of-sight checks to once every 150ms per enemy to optimize performance
+    let canSeePlayer = false;
+    let nextLosCheck = e.lastLosCheck;
+    let nextLosResult = e.lastLosResult;
+
+    if (e.lastLosCheck !== undefined && now - e.lastLosCheck < 0.15 && e.lastLosResult !== undefined) {
+      canSeePlayer = e.lastLosResult;
+    } else {
+      canSeePlayer = hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z);
+      nextLosCheck = now;
+      nextLosResult = canSeePlayer;
+    }
 
     const alerted = e.hasAlerted || canSeePlayer;
 
@@ -146,6 +156,8 @@ export function updateEnemyAIHelper(
         ...e,
         hitFlash: newHitFlash,
         lastPosition: [e.position[0], 0, e.position[2]] as [number, number, number],
+        lastLosCheck: nextLosCheck,
+        lastLosResult: nextLosResult,
       };
     }
 
@@ -241,6 +253,8 @@ export function updateEnemyAIHelper(
       rotation: Math.atan2(player.position.x - newX, player.position.z - newZ) + Math.PI,
       lastPosition: [e.position[0], 0, e.position[2]] as [number, number, number],
       hasAlerted: e.hasAlerted || canSeePlayer,
+      lastLosCheck: nextLosCheck,
+      lastLosResult: nextLosResult,
     };
   });
 

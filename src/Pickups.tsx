@@ -24,8 +24,18 @@ function Pickup({ pickup }: { readonly pickup: PickupData }): React.JSX.Element 
         pickup.position[1] + Math.sin(state.clock.getElapsedTime() * 3) * 0.1;
     }
     if (lightRef.current) {
-      const pulse = 0.5 + Math.sin(state.clock.getElapsedTime() * 4) * 0.3;
-      lightRef.current.intensity = pulse;
+      // Calculate squared distance to camera
+      const dx = pickup.position[0] - state.camera.position.x;
+      const dz = pickup.position[2] - state.camera.position.z;
+      const distSq = dx * dx + dz * dz;
+      // Only enable light if within 12 units to reduce rendering overhead from many active lights
+      if (distSq < 144) { // 12 * 12
+        lightRef.current.visible = true;
+        const pulse = 0.5 + Math.sin(state.clock.getElapsedTime() * 4) * 0.3;
+        lightRef.current.intensity = pulse;
+      } else {
+        lightRef.current.visible = false;
+      }
     }
   });
 
