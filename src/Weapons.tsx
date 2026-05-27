@@ -328,15 +328,15 @@ export default function Weapons({
         rotY = 0.015 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       } else if (currentWeapon === "machinegun") {
-        // DP-28 Machine Gun: placed at waist height, centered more, pointing forward
+        // DP-28 Machine Gun: placed on the right (like shotgun), pointing diagonally towards the center
         offset.set(
-          0.08 + sway - pullback * 0.05,
-          -0.55 + bob - recoil * 0.04 - (machinegunReloading ? 0.25 : 0) - pullback * 0.15,
-          -0.65 + recoil * 0.08 + pullback * 0.2
+          0.22 + sway - pullback * 0.08,
+          -0.35 + bob - recoil * 0.06 - (machinegunReloading ? 0.25 : 0) - pullback * 0.22,
+          -0.55 + recoil * 0.10 + pullback * 0.3
         );
-        rotX = 0.03 + recoil * 0.06 - (machinegunReloading ? 0.5 : 0) - pullback * 0.4;
-        rotY = 0.01 + sway * 0.2 - pullback * 0.1;
-        rotZ = -0.02 + recoil * -0.02 + pullback * 0.06;
+        rotX = -0.04 + recoil * 0.12 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
+        rotY = 0.06 + sway * 0.3 - pullback * 0.2;
+        rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       }
 
       offset.applyQuaternion(camera.quaternion);
@@ -495,7 +495,7 @@ export default function Weapons({
             <primitive object={dp28Group} />
 
             {/* Muzzle flash sphere in accurate world coordinates */}
-            <mesh ref={machinegunMuzzleRef} position={[0.08, -0.55, -1.3]} visible={false}>
+            <mesh ref={machinegunMuzzleRef} position={[0.15, -0.35, -1.35]} visible={false}>
               <sphereGeometry args={[0.08, 8, 8]} />
               <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
             </mesh>
@@ -503,7 +503,7 @@ export default function Weapons({
             {/* Muzzle flash glow ring */}
             <mesh
               ref={machinegunMuzzleRingRef}
-              position={[0.08, -0.55, -1.3]}
+              position={[0.15, -0.35, -1.35]}
               rotation={[0, 0, 0]}
               visible={false}
             >
