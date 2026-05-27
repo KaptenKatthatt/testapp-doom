@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun';
-type DrawMode = 'paint' | 'line' | 'rect';
+type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 
 interface CellData {
   type: CellType;
@@ -630,7 +630,7 @@ export default function Editor() {
     } else if (drawMode === 'line') {
       setLineStart(pos);
       setPreviewCells([[pos[0], pos[1]]]);
-    } else if (drawMode === 'rect') {
+    } else if (drawMode === 'rect' || drawMode === 'hollowRect') {
       setRectStart(pos);
       setPreviewCells([[pos[0], pos[1]]]);
     }
@@ -649,7 +649,7 @@ export default function Editor() {
         const cells = bresenhamLine(lineStart[0], lineStart[1], pos[0], pos[1]);
         setPreviewCells(cells);
       }
-    } else if (drawMode === 'rect' && rectStart) {
+    } else if ((drawMode === 'rect' || drawMode === 'hollowRect') && rectStart) {
       const pos = getGridPos(e);
       if (pos) {
         const cells: [number, number][] = [];
@@ -657,9 +657,18 @@ export default function Editor() {
         const x2 = Math.max(rectStart[0], pos[0]);
         const z1 = Math.min(rectStart[1], pos[1]);
         const z2 = Math.max(rectStart[1], pos[1]);
-        for (let z = z1; z <= z2; z++) {
-          for (let x = x1; x <= x2; x++) {
-            cells.push([x, z]);
+        if (drawMode === 'hollowRect') {
+          // Only border cells
+          for (let z = z1; z <= z2; z++) {
+            for (let x = x1; x <= x2; x++) {
+              if (z === z1 || z === z2 || x === x1 || x === x2) cells.push([x, z]);
+            }
+          }
+        } else {
+          for (let z = z1; z <= z2; z++) {
+            for (let x = x1; x <= x2; x++) {
+              cells.push([x, z]);
+            }
           }
         }
         setPreviewCells(cells);
@@ -681,16 +690,24 @@ export default function Editor() {
       paintCells(cells, tool);
       setLineStart(null);
       setPreviewCells([]);
-    } else if (drawMode === 'rect' && rectStart) {
+    } else if ((drawMode === 'rect' || drawMode === 'hollowRect') && rectStart) {
       const end = pos || rectStart;
       const cells: [number, number][] = [];
       const x1 = Math.min(rectStart[0], end[0]);
       const x2 = Math.max(rectStart[0], end[0]);
       const z1 = Math.min(rectStart[1], end[1]);
       const z2 = Math.max(rectStart[1], end[1]);
-      for (let z = z1; z <= z2; z++) {
-        for (let x = x1; x <= x2; x++) {
-          cells.push([x, z]);
+      if (drawMode === 'hollowRect') {
+        for (let z = z1; z <= z2; z++) {
+          for (let x = x1; x <= x2; x++) {
+            if (z === z1 || z === z2 || x === x1 || x === x2) cells.push([x, z]);
+          }
+        }
+      } else {
+        for (let z = z1; z <= z2; z++) {
+          for (let x = x1; x <= x2; x++) {
+            cells.push([x, z]);
+          }
         }
       }
       paintCells(cells, tool);
@@ -978,7 +995,7 @@ export default function Editor() {
     }
   };
 
-  const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect' };
+  const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect', hollowRect: '🔲 Hollow' };
 
   return (
     <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
