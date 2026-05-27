@@ -187,68 +187,65 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         onClick={(e) => {
           const target = e.target as HTMLElement;
           if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'OPTION') return;
-          handleStart();
         }}
       >
-        <h1 style={{ fontSize: "64px", margin: 0, textShadow: "0 0 20px #f00" }}>
+        <h1 style={{ fontSize: "72px", margin: "0 0 8px", textShadow: "0 0 30px #f00, 0 0 60px #a00", fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "8px" }}>
           DOOM
         </h1>
 
-        {/* Level selector */}
-        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-          <label style={{ fontSize: "14px", color: "#888" }}>Select Level:</label>
-          <select
-            value={selectedLevel}
-            onChange={(e) => setSelectedLevel(e.target.value)}
+        {/* Menu items in classic Doom style */}
+        <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: "280px" }}>
+          {/* Current level indicator */}
+          <p style={{ fontSize: "12px", color: "#666", margin: "0 0 8px 8px", fontFamily: 'monospace' }}>
+            {selectedLevel === '__custom__' ? '▶ CUSTOM LEVEL' : selectedLevel?.startsWith('saved:') ? `▶ ${selectedLevel.slice(6).toUpperCase()}` : '▶ E1M1 - ENTRYWAY'}
+          </p>
+
+          {/* Start Game */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleStart(); }}
+            style={{
+              background: 'none', border: 'none', color: '#ff0', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
+              cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
+              textShadow: '0 0 10px rgba(255,255,0,0.5)', transition: 'all 0.1s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.textShadow = '0 0 20px #ff0'; e.currentTarget.style.transform = 'scale(1.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#ff0'; e.currentTarget.style.textShadow = '0 0 10px rgba(255,255,0,0.5)'; e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            ► START GAME
+          </button>
+
+          {/* Custom Maps */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setSavedMaps(listSavedMaps()); setShowMapModal(true); }}
+            style={{
+              background: 'none', border: 'none', color: '#c00', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
+              cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
+              transition: 'all 0.1s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#f44'; e.currentTarget.style.textShadow = '0 0 20px #f00'; e.currentTarget.style.transform = 'scale(1.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c00'; e.currentTarget.style.textShadow = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            ► CUSTOM MAPS
+          </button>
+
+          {/* Level Editor */}
+          <a
+            href="#editor"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#222",
-              color: "#fff",
-              border: "1px solid #c00",
-              padding: "8px 16px",
-              fontSize: "16px",
-              fontFamily: "monospace",
-              cursor: "pointer",
+              background: 'none', border: 'none', color: '#c00', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
+              cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
+              textDecoration: 'none', display: 'block', transition: 'all 0.1s',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#f44'; e.currentTarget.style.textShadow = '0 0 20px #f00'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c00'; e.currentTarget.style.textShadow = 'none'; }}
           >
-            <option value="__default__">E1M1 - Entryway (Default)</option>
-            {levelData && <option value="__custom__">Custom Level (from Editor)</option>}
-            {savedMaps.map(m => (
-              <option key={m.name} value={`saved:${m.name}`}>{m.name}</option>
-            ))}
-          </select>
+            ► LEVEL EDITOR
+          </a>
         </div>
 
-        <p style={{ fontSize: "14px", color: selectedLevel === '__custom__' ? "#0f0" : "#888", marginTop: "8px" }}>
-          {selectedLevel === '__custom__' ? '▶ Custom Level' : selectedLevel?.startsWith('saved:') ? `▶ ${selectedLevel.slice(6)}` : '▶ E1M1 - Entryway'}
-        </p>
-
-        {/* Custom Map button */}
-        <button
-          onClick={(e) => { e.stopPropagation(); setSavedMaps(listSavedMaps()); setShowMapModal(true); }}
-          style={{
-            marginTop: "16px", padding: "10px 24px", background: "#222", color: "#c00", border: "2px solid #c00",
-            fontFamily: '"DooM", monospace', fontSize: "16px", cursor: "pointer", letterSpacing: "2px",
-            transition: "background 0.15s, color 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#c00"; e.currentTarget.style.color = "#fff"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#c00"; }}
-        >
-          🗺️ CUSTOM MAP
-        </button>
-
-        <p style={{ fontSize: "14px", color: "#666", marginTop: "20px", animation: "blink 1s infinite" }}>
-          Tap to start
-        </p>
-        <a
-          href="#editor"
-          onClick={(e) => e.stopPropagation()}
-          style={{ fontSize: "12px", color: "#c00", marginTop: "12px", textDecoration: "none", opacity: 0.7 }}
-        >
-          📐 Level Editor
-        </a>
-        <p style={{ fontSize: "12px", color: "#444", marginTop: "10px" }}>
-          WASD / Joystick · Mouse / Touch · Click to shoot
+        <p style={{ fontSize: "11px", color: "#444", marginTop: "24px", fontFamily: 'monospace' }}>
+          WASD · MOUSE · CLICK TO SHOOT · E TO OPEN DOORS
         </p>
 
         {/* Custom Map Modal */}
@@ -257,26 +254,30 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
             onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-              background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center",
-              zIndex: 10000, fontFamily: '"DooM", monospace',
+              background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 10000, fontFamily: '"DooM", Impact, sans-serif',
             }}
           >
             <div style={{
-              background: "#1a0a00", border: "2px solid #c00", borderRadius: 6, padding: "20px 24px",
-              minWidth: "320px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
+              background: "#111", border: "2px solid #c00", padding: "24px 32px",
+              minWidth: "300px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
             }}>
-              <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px" }}>🗺️ CUSTOM MAPS</h2>
+              <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px", fontSize: "28px" }}>SELECT MAP</h2>
 
               {/* Default level option */}
               <div
                 onClick={() => { setSelectedLevel('__default__'); setShowMapModal(false); }}
                 style={{
-                  padding: "10px 12px", margin: "4px 0", background: selectedLevel === '__default__' ? '#331100' : '#222',
-                  border: selectedLevel === '__default__' ? '1px solid #c00' : '1px solid #444',
-                  cursor: "pointer", color: "#ffcc00", fontSize: "14px",
+                  padding: "10px 12px", margin: "2px 0", background: selectedLevel === '__default__' ? '#331100' : 'transparent',
+                  border: selectedLevel === '__default__' ? '1px solid #f80' : '1px solid transparent',
+                  cursor: "pointer", color: selectedLevel === '__default__' ? '#ff0' : '#ccc', fontSize: "18px",
+                  fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
+                  transition: 'all 0.1s',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = selectedLevel === '__default__' ? '#ff0' : '#ccc'; e.currentTarget.style.background = selectedLevel === '__default__' ? '#331100' : 'transparent'; }}
               >
-                🏚️ E1M1 - Entryway (Default)
+                ► E1M1 - ENTRYWAY
               </div>
 
               {/* Editor level if available */}
@@ -284,19 +285,23 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                 <div
                   onClick={() => { setSelectedLevel('__custom__'); setShowMapModal(false); }}
                   style={{
-                    padding: "10px 12px", margin: "4px 0", background: selectedLevel === '__custom__' ? '#331100' : '#222',
-                    border: selectedLevel === '__custom__' ? '1px solid #c00' : '1px solid #444',
-                    cursor: "pointer", color: "#0f0", fontSize: "14px",
+                    padding: "10px 12px", margin: "2px 0", background: selectedLevel === '__custom__' ? '#0a2a0a' : 'transparent',
+                    border: selectedLevel === '__custom__' ? '1px solid #0f0' : '1px solid transparent',
+                    cursor: "pointer", color: selectedLevel === '__custom__' ? '#0f0' : '#0a0', fontSize: "18px",
+                    fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
+                    transition: 'all 0.1s',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#0f0'; e.currentTarget.style.background = '#0a2a0a'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = selectedLevel === '__custom__' ? '#0f0' : '#0a0'; e.currentTarget.style.background = selectedLevel === '__custom__' ? '#0a2a0a' : 'transparent'; }}
                 >
-                  ✏️ Custom Level (from Editor)
+                  ► CUSTOM LEVEL
                 </div>
               )}
 
               {/* Saved maps */}
               {savedMaps.length === 0 && !levelData && (
-                <p style={{ color: "#666", fontSize: "13px", marginTop: "8px" }}>
-                  No saved maps yet. Create one in the Level Editor!
+                <p style={{ color: "#555", fontSize: "13px", marginTop: "12px", fontFamily: 'monospace' }}>
+                  No saved maps yet.<br/>Create one in the Level Editor!
                 </p>
               )}
               {savedMaps.map(m => (
@@ -304,22 +309,26 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                   key={m.name}
                   onClick={() => { setSelectedLevel(`saved:${m.name}`); setShowMapModal(false); }}
                   style={{
-                    padding: "10px 12px", margin: "4px 0", background: selectedLevel === `saved:${m.name}` ? '#331100' : '#222',
-                    border: selectedLevel === `saved:${m.name}` ? '1px solid #c00' : '1px solid #444',
-                    cursor: "pointer", color: "#ffcc00", fontSize: "14px",
+                    padding: "10px 12px", margin: "2px 0", background: selectedLevel === `saved:${m.name}` ? '#331100' : 'transparent',
+                    border: selectedLevel === `saved:${m.name}` ? '1px solid #f80' : '1px solid transparent',
+                    cursor: "pointer", color: selectedLevel === `saved:${m.name}` ? '#ff0' : '#aaa', fontSize: "18px",
+                    fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
                     display: "flex", justifyContent: "space-between", alignItems: "center",
+                    transition: 'all 0.1s',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
+                  onMouseLeave={(e) => { const sel = selectedLevel === `saved:${m.name}`; e.currentTarget.style.color = sel ? '#ff0' : '#aaa'; e.currentTarget.style.background = sel ? '#331100' : 'transparent'; }}
                 >
-                  <span>🗺️ {m.name}</span>
+                  <span>► {m.name.toUpperCase()}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       localStorage.removeItem(`doom-map-${m.name}`);
                       setSavedMaps(listSavedMaps());
                     }}
-                    style={{ background: "#660000", color: "#ff4444", border: "1px solid #ff4444", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+                    style={{ background: "none", color: "#600", border: "1px solid #600", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
                   >
-                    🗑️
+                    ✕
                   </button>
                 </div>
               ))}
@@ -327,11 +336,14 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               <button
                 onClick={() => setShowMapModal(false)}
                 style={{
-                  marginTop: "16px", padding: "8px 20px", background: "#333", color: "#aaa",
-                  border: "1px solid #555", cursor: "pointer", fontFamily: '"DooM", monospace', fontSize: "14px",
+                  marginTop: "16px", padding: "8px 16px", background: "none", color: "#c00",
+                  border: "1px solid #c00", cursor: "pointer", fontFamily: '"DooM", Impact, sans-serif',
+                  fontSize: "18px", letterSpacing: "2px", transition: 'all 0.1s',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#c00'; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#c00'; }}
               >
-                CLOSE
+                ► BACK
               </button>
             </div>
           </div>
