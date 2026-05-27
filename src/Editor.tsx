@@ -21,7 +21,6 @@ import {
   loadAutosave,
 } from './StorageHelpers';
 import { MusicEngine } from './MusicEngine';
-import { MenuSynth } from './MenuSynth';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
@@ -399,14 +398,18 @@ export default function Editor() {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
-  const menuSynthRef = useRef<MenuSynth | null>(null);
+  const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const musicBufferRef = useRef<AudioBuffer | null>(null);
 
   const stopMusicPreview = () => {
     if (musicEngineRef.current) musicEngineRef.current.stop();
-    if (menuSynthRef.current) menuSynthRef.current.stop();
+    if (musicSourceRef.current) {
+      try { musicSourceRef.current.stop(); } catch { /* already stopped */ }
+      musicSourceRef.current = null;
+    }
   };
 
-  const toggleMusicPreview = () => {
+  const toggleMusicPreview = async () => {
     if (musicPlaying) {
       // Stop
       stopMusicPreview();
@@ -415,23 +418,38 @@ export default function Editor() {
       // Play
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
+      if (ctx.state === 'suspended') await ctx.resume();
       const gain = ctx.createGain();
       gain.gain.value = 0.5;
       gain.connect(ctx.destination);
       stopMusicPreview();
+
       if (musicTrack === 'classic') {
-        const synth = new MenuSynth();
-        synth.start(ctx, gain);
-        menuSynthRef.current = synth;
-        musicEngineRef.current = null;
+        // Load and play the E1M1 OGG file
+        try {
+          if (!musicBufferRef.current) {
+            const response = await fetch('/audio/e1m1.ogg');
+            const arrayBuffer = await response.arrayBuffer();
+            musicBufferRef.current = await ctx.decodeAudioData(arrayBuffer);
+          }
+          const source = ctx.createBufferSource();
+          source.buffer = musicBufferRef.current;
+          source.loop = true;
+          source.connect(gain);
+          source.start(0);
+          musicSourceRef.current = source;
+          musicEngineRef.current = null;
+          setMusicPlaying(true);
+        } catch (e) {
+          console.warn('Failed to play classic track:', e);
+        }
       } else {
         const engine = new MusicEngine();
         engine.start(ctx, gain, musicTrack);
         musicEngineRef.current = engine;
-        menuSynthRef.current = null;
+        musicSourceRef.current = null;
+        setMusicPlaying(true);
       }
-      setMusicPlaying(true);
     }
   };
 
@@ -443,16 +461,14 @@ export default function Editor() {
       gain.gain.value = 0.5;
       gain.connect(ctx.destination);
       stopMusicPreview();
+
       if (musicTrack === 'classic') {
-        const synth = new MenuSynth();
-        synth.start(ctx, gain);
-        menuSynthRef.current = synth;
-        musicEngineRef.current = null;
+        // For classic, we need async load — just stop and let user re-click
+        setMusicPlaying(false);
       } else {
         const engine = new MusicEngine();
         engine.start(ctx, gain, musicTrack);
         musicEngineRef.current = engine;
-        menuSynthRef.current = null;
       }
     }
     return () => {

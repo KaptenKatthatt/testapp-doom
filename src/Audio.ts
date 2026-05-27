@@ -200,12 +200,8 @@ class AudioManager {
     this.stopMusic();
 
     if (track === 'classic') {
-      // Use the original MenuSynth for the classic track
-      if (!this.menuSynth) {
-        this.menuSynth = new MenuSynth();
-      }
-      this.menuSynth.start(this.audioContext, this.musicGain);
-      this.menuMusicPlaying = true;
+      // Play the original E1M1 OGG file
+      this.playMusic();
     } else {
       if (!this.musicEngine) {
         this.musicEngine = new MusicEngine();
@@ -219,10 +215,7 @@ class AudioManager {
     if (this.musicEngine) {
       this.musicEngine.stop();
     }
-    if (this.menuSynth && this.menuMusicPlaying) {
-      this.menuSynth.stop();
-      this.menuMusicPlaying = false;
-    }
+    this.stopMusic();
   }
 
   // Set music volume (0-1)
