@@ -3,7 +3,6 @@ import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
 import HUD from "./HUD";
 import MobileControls from "./MobileControls";
-import AudioMenu from "./AudioMenu";
 import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
 import type { LevelData } from "./main";
@@ -82,6 +81,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const mobilePitchRef = useRef(0);
   const useActionRef = useRef(false);
   const audioMenuOpenRef = useRef(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [musicVol, setMusicVol] = useState(audioManager.getMusicVolume());
+  const [sfxVol, setSfxVol] = useState(audioManager.getSfxVolume());
 
   // Load saved maps list on mount
   useEffect(() => {
@@ -379,6 +381,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           mobilePitchRef={mobilePitchRef}
           useActionRef={useActionRef}
           levelData={activeLevelData}
+          paused={menuOpen}
         />
       </Canvas>
       <HUD health={playerState.health} ammo={playerState.ammo} kills={playerState.kills} />
@@ -468,42 +471,227 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           </button>
         </div>
       )}
-      <AudioMenu
-        onMenuOpen={() => { audioMenuOpenRef.current = true; handleShootEnd(); }}
-        onMenuClose={() => { audioMenuOpenRef.current = false; }}
-        onExit={() => { setStarted(false); document.exitPointerLock(); }}
-      />
-      {/* Exit button — discrete, below volume button */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setStarted(false); document.exitPointerLock(); }}
-        onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        onMouseDown={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 12,
-          width: 30,
-          height: 18,
-          background: 'rgba(0,0,0,0.3)',
-          border: '1px solid rgba(255,0,0,0.3)',
-          borderRadius: 3,
-          color: 'rgba(255,100,100,0.5)',
-          fontSize: 8,
-          cursor: 'pointer',
-          zIndex: 1002,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          touchAction: 'none',
-          lineHeight: 1,
-          fontFamily: "'Courier New', monospace",
-          padding: 0,
-        }}
-        title="Exit to menu"
-      >
-        EXIT
-      </button>
+      {/* Sleek, state-of-the-art Menu Button — bottom right corner, above HUD */}
+      {!gameOver && !missionComplete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen(true);
+            document.exitPointerLock?.();
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setMenuOpen(true);
+            document.exitPointerLock?.();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            bottom: 60,
+            right: 12,
+            padding: '8px 16px',
+            background: 'rgba(20, 10, 10, 0.85)',
+            border: '2px solid #c00',
+            borderRadius: 4,
+            color: '#ff4444',
+            fontFamily: "'Courier New', monospace",
+            fontSize: 12,
+            fontWeight: 'bold',
+            letterSpacing: '1px',
+            cursor: 'pointer',
+            zIndex: 1002,
+            boxShadow: '0 0 10px rgba(255, 0, 0, 0.2)',
+            transition: 'all 0.15s ease-in-out',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#c00';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 0, 0, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(20, 10, 10, 0.85)';
+            e.currentTarget.style.color = '#ff4444';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.2)';
+          }}
+        >
+          ⚙️ MENU
+        </button>
+      )}
+
+      {/* Modern Retro Game Menu Modal */}
+      {menuOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(15, 8, 8, 0.96)',
+              border: '3px solid #c00',
+              borderRadius: 8,
+              padding: '24px 32px',
+              width: '320px',
+              boxShadow: '0 0 35px rgba(255, 0, 0, 0.4)',
+              fontFamily: "'Courier New', monospace",
+              color: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 20,
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Title */}
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: '#c00',
+                textShadow: '0 0 10px #f00',
+                textAlign: 'center',
+                letterSpacing: 2,
+                borderBottom: '2px solid #c00',
+                paddingBottom: 10,
+              }}
+            >
+              GAME MENU
+            </div>
+
+            {/* Volume settings */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Music Volume */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: '#aa7744' }}>🎵 MUSIC VOLUME</span>
+                  <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>{musicVol.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1.5}
+                  step={0.05}
+                  value={musicVol}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setMusicVol(val);
+                    audioManager.setMusicVolume(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    accentColor: '#c00',
+                    cursor: 'pointer',
+                  }}
+                />
+              </div>
+
+              {/* SFX Volume */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: '#aa7744' }}>💥 SFX VOLUME</span>
+                  <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>{sfxVol.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={sfxVol}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setSfxVol(val);
+                    audioManager.setSfxVolume(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    accentColor: '#c00',
+                    cursor: 'pointer',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Menu Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+              {/* Continue Button */}
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  document.body.requestPointerLock?.();
+                }}
+                style={{
+                  padding: '12px 0',
+                  background: '#224422',
+                  border: '2px solid #33aa33',
+                  borderRadius: 4,
+                  color: '#55ff55',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  letterSpacing: 1.5,
+                  transition: 'all 0.1s ease-in-out',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#336633';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#224422';
+                  e.currentTarget.style.color = '#55ff55';
+                }}
+              >
+                CONTINUE
+              </button>
+
+              {/* Exit Button */}
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setStarted(false);
+                  document.exitPointerLock?.();
+                }}
+                style={{
+                  padding: '12px 0',
+                  background: '#551111',
+                  border: '2px solid #bb2222',
+                  borderRadius: 4,
+                  color: '#ff4444',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  letterSpacing: 1.5,
+                  transition: 'all 0.1s ease-in-out',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#882222';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#551111';
+                  e.currentTarget.style.color = '#ff4444';
+                }}
+              >
+                EXIT GAME
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

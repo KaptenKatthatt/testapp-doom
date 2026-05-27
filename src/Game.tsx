@@ -10,7 +10,7 @@ import Projectiles from "./Projectiles";
 import { audioManager } from "./Audio";
 import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
 import type { DoorData } from "./Doors";
-import { createDoorTexture } from "./Textures";
+import { createDoorTexture, createBarrelTexture } from "./Textures";
 import type {
   PlayerState,
   EnemyData,
@@ -23,6 +23,7 @@ import {
   updateEnemyAIHelper,
   checkSlimeDamageHelper,
   updatePickupCollectionHelper,
+  explodeBarrelSplash,
 } from "./GameHelpers";
 
 const COLLISION_MARGIN = 0.4;
@@ -32,6 +33,8 @@ interface CustomLevelData {
   enemies: Array<{ id: number; x: number; z: number; type: string }>;
   pickups: Array<{ id: number; x: number; z: number; type: string }>;
   playerStart: [number, number];
+  barrels?: Array<{ id: number; x: number; z: number }>;
+  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }>;
 }
 
 interface GameProps {
@@ -43,6 +46,7 @@ interface GameProps {
   readonly mobilePitchRef: React.MutableRefObject<number>;
   readonly useActionRef: React.MutableRefObject<boolean>;
   readonly levelData?: CustomLevelData | null;
+  readonly paused?: boolean;
 }
 
 interface PlayerData {
@@ -88,7 +92,8 @@ const INITIAL_PICKUPS: PickupData[] = [
 ];
 
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData }: GameProps): React.JSX.Element {
+export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData, paused }: GameProps): React.JSX.Element {
+  const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
   const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
     const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : 35;
@@ -165,7 +170,30 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (customWallData) return getWalls(customWallData);
     return getWalls();
   }, [customWallData]);
-  const barrels: BarrelData[] = useMemo(() => getBarrels(), []);
+  const customBarrels: BarrelData[] = useMemo(() => {
+    if (levelData && levelData.barrels) {
+      return levelData.barrels.map((b: { id: number; x: number; z: number }) => ({
+        id: b.id,
+        position: [b.x + 0.5, 0.5, b.z + 0.5] as [number, number, number],
+        radius: 0.4,
+        health: 20,
+        maxHealth: 20,
+        alive: true,
+        explosionTimer: 0,
+      }));
+    }
+    return getBarrels();
+  }, [levelData]);
+
+  const [barrels, setBarrels] = useState<BarrelData[]>(customBarrels);
+  const barrelsRef = useRef<BarrelData[]>(customBarrels);
+  useEffect(() => {
+    barrelsRef.current = barrels;
+  }, [barrels]);
+
+  const specialFloors = useMemo(() => {
+    return levelData?.specialFloors ?? [];
+  }, [levelData]);
 
   const handlePlayerState = useCallback((): void => {
     const p = playerRef.current;
@@ -262,7 +290,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       }
     }
     // Also check barrels
-    for (const barrel of barrels) {
+    for (const barrel of barrelsRef.current) {
+      if (!barrel.alive) continue;
       const dx = pos.x - barrel.position[0];
       const dz = pos.z - barrel.position[2];
       const distSq = dx * dx + dz * dz;
@@ -272,7 +301,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       }
     }
     return false;
-  }, [walls, barrels]);
+  }, [walls]);
 
   // Check if a point hits a door (only when closed)
   const checkDoorHit = useCallback((x: number, z: number): boolean => {
@@ -295,7 +324,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     }
     if (checkDoorHit(x, z)) return true;
     // Check barrels
-    for (const barrel of barrels) {
+    for (const barrel of barrelsRef.current) {
+      if (!barrel.alive) continue;
       const dx = x - barrel.position[0];
       const dz = z - barrel.position[2];
       if (dx * dx + dz * dz < barrel.radius * barrel.radius) {
@@ -303,7 +333,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       }
     }
     return false;
-  }, [walls, checkDoorHit, barrels]);
+  }, [walls, checkDoorHit]);
 
   // Check if position collides with any alive enemy
   const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {
@@ -341,6 +371,20 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   useFrame((_state, delta) => {
     const player = playerRef.current;
     if (player.health <= 0) return;
+
+    if (paused) {
+      // Pause camera setup - keep camera sync but skip all logic
+      camera.position.set(player.position.x, player.position.y, player.position.z);
+      const lookDir = new THREE.Vector3(
+        -Math.sin(player.rotation) * Math.cos(player.pitch),
+        Math.sin(player.pitch),
+        -Math.cos(player.rotation) * Math.cos(player.pitch),
+      );
+      const lookTarget = camera.position.clone().add(lookDir.multiplyScalar(10));
+      camera.lookAt(lookTarget);
+      camera.updateMatrixWorld(true);
+      return;
+    }
 
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
@@ -488,90 +532,127 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
       raycaster.far = 50;
 
-      setEnemies((prev: EnemyData[]): EnemyData[] => {
-        // Find the closest enemy in the hit cone — only damage that one
-        let closestEnemy: EnemyData | null = null;
-        let closestDist = Infinity;
-        let closestDamage = 0;
+      let closestTarget: { type: 'enemy'; e: EnemyData } | { type: 'barrel'; b: BarrelData } | null = null;
+      let closestDist = Infinity;
+      let closestDamage = 0;
 
-        for (const e of prev) {
-          if (!e.alive) continue;
-          // Check hit at multiple body heights: torso (y=1), head (y=2.5)
-          for (const hitY of [1, 2.5]) {
-            const ePos = new THREE.Vector3(e.position[0], hitY, e.position[2]);
-            const dist = ePos.distanceTo(camera.position);
-            if (dist > 50) continue;
+      // 1. Check enemies
+      for (const e of enemiesRef.current) {
+        if (!e.alive) continue;
+        for (const hitY of [1, 2.5]) {
+          const ePos = new THREE.Vector3(e.position[0], hitY, e.position[2]);
+          const dist = ePos.distanceTo(camera.position);
+          if (dist > 50) continue;
 
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const toEnemy = ePos.clone().sub(camera.position).normalize();
-            const angle = dir.angleTo(toEnemy);
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const toEnemy = ePos.clone().sub(camera.position).normalize();
+          const angle = dir.angleTo(toEnemy);
 
-            const hitRange = Math.max(0.12, 0.45 / (dist / 5));
-            if (angle < hitRange && dist < closestDist) {
-              // Can't shoot through walls — check at the actual hit height
-              // Use 3D raycast to see if line from camera to hit point is clear
-              const rayDir = ePos.clone().sub(camera.position).normalize();
-              const rayLen = camera.position.distanceTo(ePos);
-              let blocked = false;
-              const raySteps = Math.ceil(rayLen * 2);
-              for (let s = 1; s < raySteps; s++) {
-                const t = s / raySteps;
-                const px = camera.position.x + rayDir.x * rayLen * t;
-                const py = camera.position.y + rayDir.y * rayLen * t;
-                const pz = camera.position.z + rayDir.z * rayLen * t;
-                // Check if this point is inside any wall
-                for (const wall of walls) {
-                  if (px >= wall.min[0] && px <= wall.max[0] &&
-                      py >= wall.min[1] && py <= wall.max[1] &&
-                      pz >= wall.min[2] && pz <= wall.max[2]) {
-                    blocked = true;
-                    break;
-                  }
+          const hitRange = Math.max(0.12, 0.45 / (dist / 5));
+          if (angle < hitRange && dist < closestDist) {
+            // Check blocked by walls
+            const rayDir = ePos.clone().sub(camera.position).normalize();
+            const rayLen = camera.position.distanceTo(ePos);
+            let blocked = false;
+            const raySteps = Math.ceil(rayLen * 2);
+            for (let s = 1; s < raySteps; s++) {
+              const t = s / raySteps;
+              const px = camera.position.x + rayDir.x * rayLen * t;
+              const py = camera.position.y + rayDir.y * rayLen * t;
+              const pz = camera.position.z + rayDir.z * rayLen * t;
+              for (const wall of walls) {
+                if (px >= wall.min[0] && px <= wall.max[0] &&
+                    py >= wall.min[1] && py <= wall.max[1] &&
+                    pz >= wall.min[2] && pz <= wall.max[2]) {
+                  blocked = true;
+                  break;
                 }
-                if (blocked) break;
               }
-              if (blocked) continue;
-              closestDist = dist;
-              closestEnemy = e;
-              closestDamage = 15 + Math.random() * 10;
-              break; // Hit this enemy, no need to check other heights
+              if (blocked) break;
             }
+            if (blocked) continue;
+            closestDist = dist;
+            closestTarget = { type: 'enemy', e };
+            closestDamage = 15 + Math.random() * 10;
+            break;
           }
         }
+      }
 
-        const updated = prev.map((e: EnemyData): EnemyData => {
-          if (!e.alive) return e;
-          if (e !== closestEnemy) return e;
-          const newHealth = e.health - closestDamage;
-          if (newHealth <= 0) {
-            player.kills++;
-            const totalEnemies = enemiesRef.current.length;
-            if (player.kills >= totalEnemies && !missionCompleteRef.current) {
-              missionCompleteRef.current = true;
-              gameActiveRef.current = false;
-              player.endTime = now;
-              onPlayerState({
-                health: Math.round(player.health),
-                ammo: player.ammo,
-                kills: player.kills,
-                shotsFired: player.shotsFired,
-                timesHit: player.timesHit,
-                startTime: player.startTime,
-                endTime: now,
-                damageFlash: 0,
-              });
-              onMissionComplete();
+      // 2. Check barrels
+      for (const b of barrelsRef.current) {
+        if (!b.alive) continue;
+        const bPos = new THREE.Vector3(b.position[0], 0.5, b.position[2]);
+        const dist = bPos.distanceTo(camera.position);
+        if (dist > 50) continue;
+
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        const toBarrel = bPos.clone().sub(camera.position).normalize();
+        const angle = dir.angleTo(toBarrel);
+
+        const hitRange = Math.max(0.12, 0.45 / (dist / 5));
+        if (angle < hitRange && dist < closestDist) {
+          // Check blocked by walls
+          const rayDir = bPos.clone().sub(camera.position).normalize();
+          const rayLen = camera.position.distanceTo(bPos);
+          let blocked = false;
+          const raySteps = Math.ceil(rayLen * 2);
+          for (let s = 1; s < raySteps; s++) {
+            const t = s / raySteps;
+            const px = camera.position.x + rayDir.x * rayLen * t;
+            const py = camera.position.y + rayDir.y * rayLen * t;
+            const pz = camera.position.z + rayDir.z * rayLen * t;
+            for (const wall of walls) {
+              if (px >= wall.min[0] && px <= wall.max[0] &&
+                  py >= wall.min[1] && py <= wall.max[1] &&
+                  pz >= wall.min[2] && pz <= wall.max[2]) {
+                blocked = true;
+                break;
+              }
             }
-            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
-            audioManager.play(deathSounds[e.type] ?? 'imp_death');
-            return { ...e, health: 0, alive: false, hitFlash: 0 };
+            if (blocked) break;
           }
-          return { ...e, health: newHealth, hitFlash: 1 };
-        });
-        enemiesRef.current = updated;
-        return updated;
-      });
+          if (blocked) continue;
+          closestDist = dist;
+          closestTarget = { type: 'barrel', b };
+          closestDamage = 15 + Math.random() * 10;
+        }
+      }
+
+      // 3. Apply damage
+      if (closestTarget) {
+        if (closestTarget.type === 'enemy') {
+          const targetEnemy = closestTarget.e;
+          setEnemies((prev) => {
+            const updated = prev.map((e) => {
+              if (e.id !== targetEnemy.id) return e;
+              const newHealth = e.health - closestDamage;
+              if (newHealth <= 0) {
+                player.kills++;
+                const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+                audioManager.play(deathSounds[e.type] ?? 'imp_death');
+                return { ...e, health: 0, alive: false, hitFlash: 0 };
+              }
+              return { ...e, health: newHealth, hitFlash: 1 };
+            });
+            enemiesRef.current = updated;
+            return updated;
+          });
+        } else {
+          const targetBarrel = closestTarget.b;
+          setBarrels((prev) => {
+            const updated = prev.map((b) => {
+              if (b.id !== targetBarrel.id) return b;
+              const newHealth = Math.max(0, b.health - closestDamage);
+              return { ...b, health: newHealth };
+            });
+            barrelsRef.current = updated;
+            return updated;
+          });
+        }
+      }
     }    // Enemy AI + projectile spawning
     const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
       dt,
@@ -687,13 +768,84 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       : 0;
     pullbackRef.current = Math.max(0, Math.min(1, pullbackVal));
 
-    // Nukage/slime damage — 1 damage per second when standing in slime zones
+    // Process barrel explosions and fade explosion timers
+    setBarrels((prevBarrels) => {
+      let changed = false;
+      const nextBarrels = prevBarrels.map(b => {
+        if (!b.alive && b.explosionTimer > 0) {
+          changed = true;
+          return { ...b, explosionTimer: Math.max(0, b.explosionTimer - dt * 2.5) };
+        }
+        if (b.alive && b.health <= 0) {
+          changed = true;
+          audioManager.play('explosion');
+          const { updatedEnemies } = explodeBarrelSplash(
+            b,
+            playerRef.current,
+            enemiesRef.current,
+            onGameOver,
+            (active) => { gameActiveRef.current = active; },
+            prevBarrels,
+            hasLineOfSight
+          );
+          setEnemies(updatedEnemies);
+          return { ...b, alive: false, explosionTimer: 1.0 };
+        }
+        return b;
+      });
+
+      const exploded = nextBarrels.find(b => !b.alive && b.explosionTimer === 1.0);
+      if (exploded) {
+        const originalExploded = prevBarrels.find(b => b.id === exploded.id);
+        if (originalExploded && originalExploded.alive) {
+          const { updatedBarrels } = explodeBarrelSplash(
+            originalExploded,
+            playerRef.current,
+            enemiesRef.current,
+            onGameOver,
+            (active) => { gameActiveRef.current = active; },
+            prevBarrels,
+            hasLineOfSight
+          );
+          return nextBarrels.map(b => {
+            if (b.id === exploded.id) return b;
+            const updated = updatedBarrels.find(u => u.id === b.id);
+            return updated ? { ...b, health: updated.health } : b;
+          });
+        }
+      }
+
+      return changed ? nextBarrels : prevBarrels;
+    });
+
+    // Centralized mission completion check: if all enemies are dead, player wins!
+    const totalEnemies = enemiesRef.current.length;
+    const aliveEnemies = enemiesRef.current.filter(e => e.alive).length;
+    if (totalEnemies > 0 && aliveEnemies === 0 && !missionCompleteRef.current) {
+      missionCompleteRef.current = true;
+      gameActiveRef.current = false;
+      player.endTime = now;
+      onPlayerState({
+        health: Math.round(player.health),
+        ammo: player.ammo,
+        kills: player.kills,
+        shotsFired: player.shotsFired,
+        timesHit: player.timesHit,
+        startTime: player.startTime,
+        endTime: now,
+        damageFlash: 0,
+      });
+      onMissionComplete();
+    }
+
+    // Nukage/slime damage — standing in custom lava or slime zones
     player.health = checkSlimeDamageHelper(
       dt,
       player.position,
       player.health,
       onGameOver,
-      (active) => { gameActiveRef.current = active; }
+      (active) => { gameActiveRef.current = active; },
+      specialFloors
     );
 
     handlePlayerState();
@@ -701,7 +853,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   return (
     <>
-      <Level customWalls={customWallData} />
+      <Level customWalls={customWallData} specialFloors={specialFloors} />
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);
@@ -724,6 +876,32 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       <Enemies enemies={enemies} />
       <Pickups pickups={pickups} />
       <Projectiles projectiles={projectiles} />
+      {/* Barrels */}
+      {barrels.map((barrel) => {
+        if (!barrel.alive && barrel.explosionTimer <= 0) return null;
+        if (!barrel.alive) {
+          const progress = 1 - barrel.explosionTimer;
+          const scale = 0.5 + progress * 3.5;
+          const opacity = barrel.explosionTimer;
+          return (
+            <mesh key={`explosion-${barrel.id}`} position={barrel.position}>
+              <sphereGeometry args={[scale, 16, 16]} />
+              <meshBasicMaterial
+                color="#ff5500"
+                transparent
+                opacity={opacity * 0.8}
+                blending={THREE.AdditiveBlending}
+              />
+            </mesh>
+          );
+        }
+        return (
+          <mesh key={`barrel-${barrel.id}`} position={barrel.position}>
+            <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
+            <meshLambertMaterial map={barrelTexture} />
+          </mesh>
+        );
+      })}
       <Weapons
         shooting={playerRef.current.shooting}
         lastShot={playerRef.current.lastShot}
