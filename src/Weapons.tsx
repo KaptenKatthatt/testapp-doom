@@ -119,6 +119,9 @@ export default function Weapons({
                 map: revWoodColor,
                 normalMap: revWoodNormal,
                 roughnessMap: revWoodRough,
+                emissive: 0xffffff,
+                emissiveMap: revWoodColor,
+                emissiveIntensity: 0.55, // brighten wood grip
                 roughness: 0.75,
                 metalness: 0.1,
               });
@@ -128,6 +131,9 @@ export default function Weapons({
                 map: revMetal2Color,
                 normalMap: revMetal2Normal,
                 roughnessMap: revMetal2Rough,
+                emissive: 0xffffff,
+                emissiveMap: revMetal2Color,
+                emissiveIntensity: 0.45, // brighten cylinder
                 metalness: 0.95,
                 roughness: 0.12,
               });
@@ -137,6 +143,9 @@ export default function Weapons({
                 map: revMetal3Color,
                 normalMap: revMetal3Normal,
                 roughnessMap: revMetal3Rough,
+                emissive: 0xffffff,
+                emissiveMap: revMetal3Color,
+                emissiveIntensity: 0.45, // brighten barrel/parts
                 metalness: 0.85,
                 roughness: 0.28,
               });
@@ -146,6 +155,9 @@ export default function Weapons({
                 map: revMetal1Color,
                 normalMap: revMetal1Normal,
                 roughnessMap: revMetal1Rough,
+                emissive: 0xffffff,
+                emissiveMap: revMetal1Color,
+                emissiveIntensity: 0.45, // brighten frame
                 metalness: 0.88,
                 roughness: 0.22,
               });
@@ -153,9 +165,9 @@ export default function Weapons({
           }
         });
 
-        // Set scaling and orient pointing forward (Y = Math.PI * 1.5)
+        // Set scaling and orient pointing forward (only modify Y rotation to keep loader's X/Z Z-up conversion)
         fbx.scale.set(0.038, 0.038, 0.038);
-        fbx.rotation.set(0, Math.PI * 1.5, 0); 
+        fbx.rotation.y = Math.PI * 1.5; 
         setRevolverGroup(fbx);
       },
       undefined,
@@ -185,15 +197,18 @@ export default function Weapons({
               metalnessMap: dp28Metal,
               normalMap: dp28Normal,
               roughnessMap: dp28Rough,
+              emissive: 0xffffff,
+              emissiveMap: dp28Albedo,
+              emissiveIntensity: 0.52, // brighten machinegun
               metalness: 0.85,
               roughness: 0.32,
             });
           }
         });
 
-        // Scale up DP-28 to look heavy and massive, and orient pointing forward (Y = Math.PI)
+        // Scale up DP-28 and orient pointing forward (only modify Y rotation to keep loader's X/Z Z-up conversion)
         fbx.scale.set(0.024, 0.024, 0.024);
-        fbx.rotation.set(0, Math.PI, 0); 
+        fbx.rotation.y = Math.PI; 
         setDp28Group(fbx);
       },
       undefined,
@@ -293,15 +308,15 @@ export default function Weapons({
       let rotX = 0, rotY = 0, rotZ = 0;
 
       if (currentWeapon === "revolver") {
-        // Revolver: placed neatly on the right, tilted slightly up, closer in view
+        // Revolver: placed neatly at waist height on the right, pointing forward
         offset.set(
           0.16 + sway - pullback * 0.05,
-          -0.18 + bob - recoil * 0.08 - (revolverReloading ? 0.2 : 0) - pullback * 0.2,
-          -0.34 + recoil * 0.12 + pullback * 0.25
+          -0.40 + bob - recoil * 0.08 - (revolverReloading ? 0.15 : 0) - pullback * 0.15,
+          -0.50 + recoil * 0.12 + pullback * 0.2
         );
-        rotX = -0.02 + recoil * 0.15 - (revolverReloading ? 0.7 : 0) - pullback * 0.5;
-        rotY = 0.03 + sway * 0.2 - (revolverReloading ? 0.3 : 0) - pullback * 0.1;
-        rotZ = -0.05 + recoil * -0.06 + pullback * 0.1;
+        rotX = 0.02 + recoil * 0.12 - (revolverReloading ? 0.6 : 0) - pullback * 0.4;
+        rotY = 0.02 + sway * 0.2 - (revolverReloading ? 0.2 : 0) - pullback * 0.1;
+        rotZ = -0.03 + recoil * -0.04 + pullback * 0.08;
       } else if (currentWeapon === "shotgun") {
         // Shotgun: heavy long receiver, over-under layout
         offset.set(
@@ -313,15 +328,15 @@ export default function Weapons({
         rotY = 0.015 + sway * 0.3 - pullback * 0.2;
         rotZ = -0.06 + recoil * -0.08 + pullback * 0.15;
       } else if (currentWeapon === "machinegun") {
-        // DP-28 Machine Gun: heavy massive automatic weapon centered more
+        // DP-28 Machine Gun: placed at waist height, centered more, pointing forward
         offset.set(
-          0.12 + sway - pullback * 0.08,
-          -0.24 + bob - recoil * 0.04 - (machinegunReloading ? 0.35 : 0) - pullback * 0.22,
-          -0.45 + recoil * 0.08 + pullback * 0.3
+          0.08 + sway - pullback * 0.05,
+          -0.55 + bob - recoil * 0.04 - (machinegunReloading ? 0.25 : 0) - pullback * 0.15,
+          -0.65 + recoil * 0.08 + pullback * 0.2
         );
-        rotX = -0.05 + recoil * 0.08 - (machinegunReloading ? 0.6 : 0) - pullback * 0.5;
-        rotY = 0.01 + sway * 0.25 - pullback * 0.15;
-        rotZ = -0.03 + recoil * -0.04 + pullback * 0.1;
+        rotX = 0.03 + recoil * 0.06 - (machinegunReloading ? 0.5 : 0) - pullback * 0.4;
+        rotY = 0.01 + sway * 0.2 - pullback * 0.1;
+        rotZ = -0.02 + recoil * -0.02 + pullback * 0.06;
       }
 
       offset.applyQuaternion(camera.quaternion);
@@ -368,7 +383,7 @@ export default function Weapons({
             <primitive object={revolverGroup} />
 
             {/* Muzzle flash sphere in accurate world coordinates */}
-            <mesh ref={revolverMuzzleRef} position={[0.18, -0.16, -0.55]} visible={false}>
+            <mesh ref={revolverMuzzleRef} position={[0.16, -0.4, -1.0]} visible={false}>
               <sphereGeometry args={[0.05, 8, 8]} />
               <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
             </mesh>
@@ -376,7 +391,7 @@ export default function Weapons({
             {/* Muzzle flash glow ring */}
             <mesh
               ref={revolverMuzzleRingRef}
-              position={[0.18, -0.16, -0.55]}
+              position={[0.16, -0.4, -1.0]}
               rotation={[0, 0, 0]}
               visible={false}
             >
@@ -480,7 +495,7 @@ export default function Weapons({
             <primitive object={dp28Group} />
 
             {/* Muzzle flash sphere in accurate world coordinates */}
-            <mesh ref={machinegunMuzzleRef} position={[0.15, -0.26, -0.85]} visible={false}>
+            <mesh ref={machinegunMuzzleRef} position={[0.08, -0.55, -1.3]} visible={false}>
               <sphereGeometry args={[0.08, 8, 8]} />
               <meshBasicMaterial color={0xffcc00} transparent opacity={0.95} />
             </mesh>
@@ -488,7 +503,7 @@ export default function Weapons({
             {/* Muzzle flash glow ring */}
             <mesh
               ref={machinegunMuzzleRingRef}
-              position={[0.15, -0.26, -0.85]}
+              position={[0.08, -0.55, -1.3]}
               rotation={[0, 0, 0]}
               visible={false}
             >
