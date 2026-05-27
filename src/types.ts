@@ -29,6 +29,8 @@ export interface EnemyData {
   stuckCounter: number;
   lastPosition: [number, number, number];
   hasAlerted: boolean;
+  lastLosCheck?: number | undefined;
+  lastLosResult?: boolean | undefined;
 }
 
 export type EnemyType = "imp" | "demon" | "zombieman";
