@@ -851,11 +851,12 @@ export default function Editor() {
 
   const handlePlayMap = () => {
     // Save current map and level data so the game can load it
+    const ld = gridToLevelData(grid, playerPos);
+    localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
+    // Also save grid data for the editor to restore
     saveMapToStorage('__playing__', grid, playerPos);
-    const levelData = gridToLevelData(grid, playerPos);
-    localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(levelData));
+    // Navigate to game — use hash without reload so React picks it up
     window.location.hash = '';
-    window.location.reload();
   };
 
   const validate = () => {

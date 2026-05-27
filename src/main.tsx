@@ -23,19 +23,10 @@ function Router() {
 
   // Check for saved playing map
   useEffect(() => {
-    const playingMap = localStorage.getItem('doom-map-__playing__');
-    if (playingMap && window.location.hash !== '#editor') {
+    const storedLevelData = localStorage.getItem('doom-leveldata-__playing__');
+    if (storedLevelData && window.location.hash !== '#editor') {
       try {
-        const data = JSON.parse(playingMap);
-        if (data.grid && data.playerStart) {
-          // We need to convert the grid to LevelData
-          // Use the gridToLevelData function from Editor
-          // But since we can't import it here easily, we'll store level data directly
-          const storedLevelData = localStorage.getItem('doom-leveldata-__playing__');
-          if (storedLevelData) {
-            setLevelData(JSON.parse(storedLevelData));
-          }
-        }
+        setLevelData(JSON.parse(storedLevelData));
       } catch { /* ignore */ }
     }
   }, [route]);

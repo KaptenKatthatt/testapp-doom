@@ -56,7 +56,12 @@ interface AppProps {
 
 export default function App({ levelData }: AppProps): React.JSX.Element {
   const [started, setStarted] = useState(false);
-  const [selectedLevel, setSelectedLevel] = useState<string>(levelData ? '__custom__' : '__default__');
+  const [selectedLevel, setSelectedLevel] = useState<string>('__default__');
+
+  // When levelData arrives from editor play, auto-select it
+  useEffect(() => {
+    if (levelData) setSelectedLevel('__custom__');
+  }, [levelData]);
   const [playerState, setPlayerState] = useState<PlayerState>({
     health: 100,
     ammo: 50,
