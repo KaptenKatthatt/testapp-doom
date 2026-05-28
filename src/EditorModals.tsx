@@ -102,7 +102,7 @@ export function SaveModal({
 }
 
 interface LoadModalProps {
-  savedMaps: Array<{ name: string; timestamp: number }>;
+  savedMaps: Array<{ name: string; timestamp: number; cloudSaved?: boolean }>;
   onLoadMap: (name: string) => void;
   onDeleteMap: (name: string) => void;
   onClose: () => void;
@@ -137,7 +137,7 @@ export function LoadModal({
                   onClick={() => onLoadMap(m.name)}
                   style={{ ...btnStyle, background: '#222', border: '1px solid #0a0', color: '#0f0' }}
                 >
-                  📂 {m.name}
+                  📂 {m.name} {m.cloudSaved ? '☁️' : '💻'}
                 </button>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, color: '#666' }}>

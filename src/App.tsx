@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MainMenu from "./MainMenu";
 import { Canvas } from "@react-three/fiber";
 import Game from "./Game";
@@ -9,7 +9,7 @@ import type { PlayerState } from "./types";
 import type { LevelData } from "./main";
 import { gridToLevelData } from "./EditorExport";
 import { E1M1_GRID } from "./E1M1Grid";
-import { listSavedMaps } from "./StorageHelpers";
+import { listSavedMaps, loadMapFromStorage } from "./StorageHelpers";
 import type { TrackStyle } from "./EditorTypes";
 
 import { type CellType } from "./EditorTypes";
@@ -80,38 +80,48 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
 
   // Load saved maps list on mount
   useEffect(() => {
-    setSavedMaps(listSavedMaps());
+    let active = true;
+    listSavedMaps().then(maps => {
+      if (active) setSavedMaps(maps);
+    });
+    return () => { active = false; };
   }, []);
 
-  // If we have levelData from the editor, use it; otherwise load saved map or E1M1
-  const activeLevelData = useMemo(() => {
-    if (selectedLevel === '__custom__' && levelData) return levelData;
-    if (selectedLevel?.startsWith('saved:')) {
-      const mapName = selectedLevel.slice(6);
-      const raw = localStorage.getItem('doom-map-' + mapName);
-      if (raw) {
-        try {
-          const data = JSON.parse(raw);
-          const grid = data.grid.map((row: CellType[]) => row.map((t: CellType) => ({ type: t })));
-          const playerPos: [number, number] = data.playerPos || [2, 2];
-          return gridToLevelData(grid, playerPos, data.musicTrack);
-        } catch { /* fall through */ }
+  const [activeLevelData, setActiveLevelData] = useState<LevelData | null>(null);
+
+  // If we have levelData from the editor, use it; otherwise load saved map or E1M1 asynchronously
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (selectedLevel === '__custom__' && levelData) {
+        if (active) setActiveLevelData(levelData);
+        return;
       }
-    }
-    // Default E1M1 — check for saved custom version first, fallback to E1M1Grid
-    if (selectedLevel === '__default__') {
-      const raw = localStorage.getItem('doom-map-__e1m1__');
-      if (raw) {
-        try {
-          const data = JSON.parse(raw);
-          const grid = data.grid.map((row: CellType[]) => row.map((t: CellType) => ({ type: t })));
-          return gridToLevelData(grid, data.playerPos || [2, 3], data.musicTrack);
-        } catch { /* fall through to built-in */ }
+      if (selectedLevel?.startsWith('saved:')) {
+        const mapName = selectedLevel.slice(6);
+        const data = await loadMapFromStorage(mapName);
+        if (data && active) {
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos || [2, 2], data.musicTrack));
+        } else if (active) {
+          setActiveLevelData(null);
+        }
+        return;
       }
-      const grid = E1M1_GRID.map(row => row.map((t: CellType) => ({ type: t })));
-      return gridToLevelData(grid, [2, 3] as [number, number], 'classic');
-    }
-    return null;
+      // Default E1M1 — check for saved custom version first, fallback to E1M1Grid
+      if (selectedLevel === '__default__') {
+        const data = await loadMapFromStorage('__e1m1__');
+        if (data && active) {
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos || [2, 3], data.musicTrack));
+        } else if (active) {
+          const grid = E1M1_GRID.map(row => row.map((t: CellType) => ({ type: t })));
+          setActiveLevelData(gridToLevelData(grid, [2, 3] as [number, number], 'classic'));
+        }
+        return;
+      }
+      if (active) setActiveLevelData(null);
+    };
+    load();
+    return () => { active = false; };
   }, [selectedLevel, levelData]);
 
   const handleStart = useCallback((): void => {
