@@ -34,4 +34,9 @@
 
 ## Known Issues (as of 2026-05-28)
 - ~~Weapon pullback jitter near walls~~ (fixed with lerping)
+- ~~Weapon bobbing jitter (world-space sync)~~ (fixed: restored portal rendering)
 - Mobile shoot/USE buttons were overlapping HUD (fixed in 0cd2f5e)
+
+## Critical: Antigravity Pitfalls
+- Antigravity replaced `createPortal(<group/>, camera)` with a world-space group that manually synced position/quaternion. This **broke weapon bobbing** by introducing frame-lag jitter. The portal approach is essential because it makes the weapon a child of the camera in the scene graph, so it moves with zero latency.
+- **Never replace portal-rendering with manual world-space sync** — it will always be one frame behind the camera.
