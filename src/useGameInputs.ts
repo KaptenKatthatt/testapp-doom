@@ -10,15 +10,41 @@ export function useGameInputs(
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       keysRef.current[e.code] = true;
+      const keyLower = e.key ? e.key.toLowerCase() : "";
+      if (e.code === "KeyW" || keyLower === "w" || e.code === "ArrowUp") {
+        keysRef.current["KeyW"] = true;
+      }
+      if (e.code === "KeyS" || keyLower === "s" || e.code === "ArrowDown") {
+        keysRef.current["KeyS"] = true;
+      }
+      if (e.code === "KeyA" || keyLower === "a" || e.code === "ArrowLeft") {
+        keysRef.current["KeyA"] = true;
+      }
+      if (e.code === "KeyD" || keyLower === "d" || e.code === "ArrowRight") {
+        keysRef.current["KeyD"] = true;
+      }
+      if ((e.code === "KeyE" || keyLower === "e") && useActionRef) {
+        useActionRef.current = true;
+      }
       if (e.code === "Escape") {
         document.exitPointerLock?.();
-      }
-      if (e.code === "KeyE" && useActionRef) {
-        useActionRef.current = true;
       }
     };
     const handleKeyUp = (e: KeyboardEvent): void => {
       keysRef.current[e.code] = false;
+      const keyLower = e.key ? e.key.toLowerCase() : "";
+      if (e.code === "KeyW" || keyLower === "w" || e.code === "ArrowUp") {
+        keysRef.current["KeyW"] = false;
+      }
+      if (e.code === "KeyS" || keyLower === "s" || e.code === "ArrowDown") {
+        keysRef.current["KeyS"] = false;
+      }
+      if (e.code === "KeyA" || keyLower === "a" || e.code === "ArrowLeft") {
+        keysRef.current["KeyA"] = false;
+      }
+      if (e.code === "KeyD" || keyLower === "d" || e.code === "ArrowRight") {
+        keysRef.current["KeyD"] = false;
+      }
     };
     const handleMouseDown = (e: MouseEvent): void => {
       if (e.button === 0) {
