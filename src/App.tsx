@@ -64,6 +64,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   });
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
+  const [completionCountdown, setCompletionCountdown] = useState<number | null>(null);
   const [gameKey, setGameKey] = useState(0);
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean; musicTrack?: string }>>([]);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -133,6 +134,15 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     });
     document.body.requestPointerLock();
   }, []);
+
+  // Completion countdown timer effect
+  useEffect(() => {
+    if (completionCountdown === null || completionCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setCompletionCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [completionCountdown]);
 
   useEffect(() => {
     const handleRestartKey = (e: KeyboardEvent): void => {
@@ -216,6 +226,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           }}
           onMissionComplete={(): void => {
             setMissionComplete(true);
+            setCompletionCountdown(3);
             document.exitPointerLock();
           }}
           mobileMoveRef={mobileMoveRef}
@@ -300,73 +311,115 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         </div>
       )}
       {missionComplete && (
-        <div
-          style={{
-            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-            background: "#1a0a00", display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#cc8800",
-            zIndex: 100, cursor: "url(/doom-cursor.png) 16 16, crosshair", overflow: "hidden", padding: "20px", boxSizing: "border-box",
-          }}
-        >
-          <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", color: "#ff6600", textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200", margin: "0 0 20px 0", letterSpacing: "4px" }}>
-            LEVEL COMPLETE
-          </h1>
-          <div style={{ border: "2px solid #663300", padding: "20px 40px", background: "rgba(40,20,0,0.9)", margin: "0 0 20px 0", minWidth: "280px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
-              <span style={{ color: "#aa7744" }}>KILLS</span>
-              <span style={{ color: "#ffcc00" }}>{playerState.kills}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
-              <span style={{ color: "#aa7744" }}>ITEMS</span>
-              <span style={{ color: "#ffcc00" }}>{playerState.kills * 100}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
-              <span style={{ color: "#aa7744" }}>TIME</span>
-              <span style={{ color: "#ffcc00" }}>{formatTime(playerState.startTime, playerState.endTime)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
-              <span style={{ color: "#aa7744" }}>SHOTS FIRED</span>
-              <span style={{ color: "#ffcc00" }}>{playerState.shotsFired}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
-              <span style={{ color: "#aa7744" }}>TIMES HIT</span>
-              <span style={{ color: "#ff4400" }}>{playerState.timesHit}</span>
-            </div>
-            <div style={{ borderTop: "1px solid #663300", marginTop: "12px", paddingTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "clamp(16px, 3vw, 22px)" }}>
-              <span style={{ color: "#ff6600" }}>TOTAL SCORE</span>
-              <span style={{ color: "#ffee00", fontWeight: "bold" }}>{calcScore(playerState)}</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
-            <button
-              onClick={(): void => { document.exitPointerLock(); handleStart(); }}
+        <>
+          <style>{`
+            @keyframes completionPulse {
+              0% { transform: scale(1); opacity: 0.8; }
+              50% { transform: scale(1.15); opacity: 1; text-shadow: 0 0 30px #ff9900, 0 0 60px #ff3300; }
+              100% { transform: scale(1); opacity: 0.8; }
+            }
+            @keyframes completionFadeIn {
+              from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+              to { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+          {completionCountdown !== null && completionCountdown > 0 ? (
+            <div
               style={{
-                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
-                background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
-                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                background: "rgba(0, 0, 0, 0.65)", backdropFilter: "blur(2px)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                zIndex: 100, pointerEvents: "none", boxSizing: "border-box",
               }}
-              onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
-              onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
             >
-              RESTART GAME
-            </button>
-            <button
-              onClick={(): void => {
-                document.exitPointerLock();
-                setStarted(false);
-              }}
+              <h1 style={{
+                fontSize: "clamp(24px, 5vw, 54px)", color: "#ff6600",
+                textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200", margin: "0 0 24px 0",
+                letterSpacing: "4px", textAlign: "center", fontFamily: "monospace",
+                animation: "completionFadeIn 0.6s ease-out"
+              }}>
+                MISSION ACCOMPLISHED
+              </h1>
+              <div style={{
+                fontSize: "clamp(48px, 10vw, 80px)", color: "#ffcc00",
+                textShadow: "0 0 20px #ff9900, 0 0 40px #aa5500", fontWeight: "bold",
+                fontFamily: "monospace",
+                animation: "completionPulse 1s infinite ease-in-out"
+              }}>
+                {completionCountdown}
+              </div>
+            </div>
+          ) : (
+            <div
               style={{
-                fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
-                background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
-                letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                background: "#1a0a00", display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", fontFamily: "monospace", color: "#cc8800",
+                zIndex: 100, cursor: "url(/doom-cursor.png) 16 16, crosshair", overflow: "hidden", padding: "20px", boxSizing: "border-box",
+                animation: "completionFadeIn 0.5s ease-out"
               }}
-              onMouseEnter={(e): void => { e.currentTarget.style.background = "#882222"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff4444"; }}
-              onMouseLeave={(e): void => { e.currentTarget.style.background = "#551111"; e.currentTarget.style.color = "#ff4444"; e.currentTarget.style.borderColor = "#bb2222"; }}
             >
-              EXIT TO MAIN MENU
-            </button>
-          </div>
-        </div>
+              <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", color: "#ff6600", textShadow: "0 0 20px #ff4400, 0 0 40px #aa2200", margin: "0 0 20px 0", letterSpacing: "4px" }}>
+                LEVEL COMPLETE
+              </h1>
+              <div style={{ border: "2px solid #663300", padding: "20px 40px", background: "rgba(40,20,0,0.9)", margin: "0 0 20px 0", minWidth: "280px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+                  <span style={{ color: "#aa7744" }}>KILLS</span>
+                  <span style={{ color: "#ffcc00" }}>{playerState.kills}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+                  <span style={{ color: "#aa7744" }}>ITEMS</span>
+                  <span style={{ color: "#ffcc00" }}>{playerState.kills * 100}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+                  <span style={{ color: "#aa7744" }}>TIME</span>
+                  <span style={{ color: "#ffcc00" }}>{formatTime(playerState.startTime, playerState.endTime)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+                  <span style={{ color: "#aa7744" }}>SHOTS FIRED</span>
+                  <span style={{ color: "#ffcc00" }}>{playerState.shotsFired}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0", fontSize: "clamp(14px, 2.5vw, 18px)" }}>
+                  <span style={{ color: "#aa7744" }}>TIMES HIT</span>
+                  <span style={{ color: "#ff4400" }}>{playerState.timesHit}</span>
+                </div>
+                <div style={{ borderTop: "1px solid #663300", marginTop: "12px", paddingTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "clamp(16px, 3vw, 22px)" }}>
+                  <span style={{ color: "#ff6600" }}>TOTAL SCORE</span>
+                  <span style={{ color: "#ffee00", fontWeight: "bold" }}>{calcScore(playerState)}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
+                <button
+                  onClick={(): void => { document.exitPointerLock(); handleStart(); }}
+                  style={{
+                    fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                    background: "#663300", color: "#ffcc00", border: "2px solid #aa5500", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                    letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={(e): void => { e.currentTarget.style.background = "#aa5500"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff8800"; }}
+                  onMouseLeave={(e): void => { e.currentTarget.style.background = "#663300"; e.currentTarget.style.color = "#ffcc00"; e.currentTarget.style.borderColor = "#aa5500"; }}
+                >
+                  RESTART GAME
+                </button>
+                <button
+                  onClick={(): void => {
+                    document.exitPointerLock();
+                    setStarted(false);
+                  }}
+                  style={{
+                    fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
+                    background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
+                    letterSpacing: "2px", transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={(e): void => { e.currentTarget.style.background = "#882222"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ff4444"; }}
+                  onMouseLeave={(e): void => { e.currentTarget.style.background = "#551111"; e.currentTarget.style.color = "#ff4444"; e.currentTarget.style.borderColor = "#bb2222"; }}
+                >
+                  EXIT TO MAIN MENU
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
       {/* Sleek, state-of-the-art Menu Button — bottom right corner, above HUD */}
       {!gameOver && !missionComplete && (

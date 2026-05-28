@@ -412,17 +412,19 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     }
 
     // Movement
-    handlePlayerMovementHelper(
-      dt,
-      player,
-      keys,
-      mobileMoveRef.current,
-      mobileLookRef.current,
-      mobilePitchRef.current,
-      checkCollision,
-      checkEnemyCollision,
-      enemiesRef.current
-    );
+    if (gameActiveRef.current) {
+      handlePlayerMovementHelper(
+        dt,
+        player,
+        keys,
+        mobileMoveRef.current,
+        mobileLookRef.current,
+        mobilePitchRef.current,
+        checkCollision,
+        checkEnemyCollision,
+        enemiesRef.current
+      );
+    }
 
     // Contact damage: if player is very close to any alive enemy, take damage
     const contactRadius = 1.0;
