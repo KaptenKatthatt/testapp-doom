@@ -595,7 +595,9 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     const pullbackVal = minDistance < pullbackThreshold
       ? (pullbackThreshold - minDistance) / (pullbackThreshold - 0.4)
       : 0;
-    pullbackRef.current = Math.max(0, Math.min(1, pullbackVal));
+    // Smooth pullback to prevent weapon from jittering rapidly near walls/doors
+    const pullbackTarget = Math.max(0, Math.min(1, pullbackVal));
+    pullbackRef.current = THREE.MathUtils.lerp(pullbackRef.current, pullbackTarget, Math.min(delta, 0.05) * 12);
 
     // Process barrel explosions and fade explosion timers
     setBarrels((prevBarrels) => {
