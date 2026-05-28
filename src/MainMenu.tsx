@@ -1,7 +1,6 @@
 import React from 'react';
 import type { LevelData } from './main';
 import { audioManager } from './Audio';
-import { deleteMapFromStorage } from './StorageHelpers';
 
 interface SavedMap {
   name: string;
@@ -262,19 +261,18 @@ export default function MainMenu({
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
                 onMouseLeave={(e) => { const sel = selectedLevel === `saved:${m.name}`; e.currentTarget.style.color = sel ? '#ff0' : '#aaa'; e.currentTarget.style.background = sel ? '#331100' : 'transparent'; }}
               >
-                <span>► {m.name.toUpperCase()} {m.cloudSaved ? '☁️' : '💻'}</span>
+                <span>► {m.name.toUpperCase()}</span>
                 <button
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm(`Delete map "${m.name}"?`)) {
-                      await deleteMapFromStorage(m.name);
-                      const maps = await listSavedMaps();
-                      setSavedMaps(maps);
-                    }
+                    localStorage.setItem('doom-load-map', m.name);
+                    setShowMapModal(false);
+                    window.location.hash = '#editor';
                   }}
-                  style={{ background: "none", color: "#600", border: "1px solid #600", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
+                  style={{ background: "none", color: "#ff8800", border: "1px solid #ff8800", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
+                  title="Edit Map"
                 >
-                  ✕
+                  ✏️
                 </button>
               </div>
             ))}

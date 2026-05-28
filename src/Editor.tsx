@@ -111,6 +111,7 @@ export default function Editor() {
   useEffect(() => {
     // Check if E1M1 should be loaded (flag set by main menu button)
     const loadE1m1 = localStorage.getItem('doom-load-e1m1');
+    const loadMapName = localStorage.getItem('doom-load-map');
     if (loadE1m1) {
       localStorage.removeItem('doom-load-e1m1');
       const e1m1 = PRESETS.find(p => p.name === 'E1M1 Entryway');
@@ -118,6 +119,15 @@ export default function Editor() {
         setGrid(cloneGrid(e1m1.grid));
         setPlayerPos(e1m1.playerPos);
       }
+    } else if (loadMapName) {
+      localStorage.removeItem('doom-load-map');
+      loadMapFromStorage(loadMapName).then(data => {
+        if (data) {
+          setGrid(data.grid);
+          setPlayerPos(data.playerPos);
+          if (data.musicTrack) setMusicTrack(data.musicTrack);
+        }
+      });
     } else {
       const autoData = loadAutosave();
       if (autoData) {
