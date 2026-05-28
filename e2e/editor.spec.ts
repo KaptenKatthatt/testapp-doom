@@ -67,7 +67,8 @@ test.describe("Custom Map Play", () => {
         name: 'UnitTestMap',
         grid,
         playerPos: [3, 3],
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        validated: true,
       }));
     });
 
@@ -78,8 +79,8 @@ test.describe("Custom Map Play", () => {
     await page.getByRole("button", { name: /CUSTOM MAP/ }).click();
     await page.waitForTimeout(500);
 
-    // Should show the map in the modal
-    await expect(page.getByText('UnitTestMap').first()).toBeVisible({ timeout: 3000 });
+    // Validated maps render uppercase in the modal list
+    await expect(page.getByText(/UNITTESTMAP/).first()).toBeVisible({ timeout: 3000 });
   });
 
   test("selecting saved map in modal sets active level", async ({ page }) => {
@@ -95,7 +96,8 @@ test.describe("Custom Map Play", () => {
         name: 'MyLevel',
         grid,
         playerPos: [5, 5],
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        validated: true,
       }));
     });
 
@@ -106,12 +108,12 @@ test.describe("Custom Map Play", () => {
     await page.getByRole("button", { name: /CUSTOM MAP/ }).click();
     await page.waitForTimeout(500);
 
-    // Click the map entry
-    const mapEntry = page.getByText('MyLevel').first();
+    // Click the validated map entry (displayed uppercase)
+    const mapEntry = page.locator('div').filter({ hasText: /^► MYLEVEL/ }).first();
     await mapEntry.click();
     await page.waitForTimeout(300);
 
-    // Level indicator should show MyLevel
-    await expect(page.getByText(/MyLevel/)).toBeVisible({ timeout: 3000 });
+    // Level indicator shows the selected map name in uppercase
+    await expect(page.locator('p').filter({ hasText: /MYLEVEL/ })).toBeVisible({ timeout: 3000 });
   });
 });

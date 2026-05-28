@@ -30,10 +30,9 @@ test.describe("DOOM - Core Game", () => {
     expect(canvasCount).toBeGreaterThanOrEqual(2);
   });
 
-  test("WebGL context is functional", async ({ page, browserName }) => {
-    // Skip in headless Chrome where WebGL may not be available
-    const isHeadless = process.env.CI === 'true' || process.env.HEADLESS === 'true';
-    test.skip(isHeadless, 'WebGL not available in headless CI');
+  test("WebGL context is functional", async ({ page }) => {
+    // Playwright runs headless by default; WebGL is often unavailable there
+    test.skip(!process.env.CI_WITH_WEBGL, 'WebGL not available in headless Playwright');
 
     await page.goto(BASE_URL);
     await page.waitForTimeout(300);
