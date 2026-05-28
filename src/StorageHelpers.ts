@@ -24,6 +24,8 @@ export interface SavedMapListItem {
 
 /**
  * Saves a map to localStorage, and if Firebase Firestore is connected, uploads it to the database as well.
+ * We bypass Cloud Firestore for reserved system maps starting with double underscores '__'.
+ * We also serialize the 2D grid array as a JSON string to bypass Firestore's nested array limitation.
  */
 export async function saveMapToStorage(
   name: string,
@@ -32,7 +34,7 @@ export async function saveMapToStorage(
   validated: boolean,
   musicTrack?: TrackStyle
 ): Promise<void> {
-  const data: SavedMap = {
+  const localData: SavedMap = {
     name,
     grid: grid.map(row => row.map(c => c.type)),
     playerPos,
@@ -42,13 +44,22 @@ export async function saveMapToStorage(
   };
 
   // 1. Always save to localStorage immediately for fast offline access
-  localStorage.setItem(MAP_PREFIX + name, JSON.stringify(data));
+  localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
 
-  // 2. If Firebase is initialized, sync it to the cloud db
-  if (db) {
+  // 2. If Firebase is initialized and it's not a reserved system map, sync it to the cloud db
+  if (db && !name.startsWith('__')) {
     try {
       const mapDocRef = doc(db, 'maps', name);
-      await setDoc(mapDocRef, data);
+      // Map to Firestore-compatible format by serializing the nested grid array as a JSON string
+      const firestoreData = {
+        name,
+        gridJson: JSON.stringify(localData.grid),
+        playerPos,
+        timestamp: localData.timestamp,
+        validated,
+        ...(musicTrack ? { musicTrack } : {}),
+      };
+      await setDoc(mapDocRef, firestoreData);
       console.log(`Successfully synced map "${name}" with Firebase Cloud Firestore.`);
     } catch (error) {
       console.error(`Failed to sync map "${name}" to Cloud Firestore:`, error);
@@ -57,23 +68,33 @@ export async function saveMapToStorage(
 }
 
 /**
- * Loads a map from Firebase Cloud Firestore first. Fallback to localStorage if Firebase is offline
- * or if the map is not found in the database.
+ * Loads a map from Firebase Cloud Firestore first. Fallback to localStorage if Firebase is offline,
+ * if it's a reserved system map, or if the map is not found in the database.
  */
 export async function loadMapFromStorage(
   name: string
 ): Promise<{ grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } | null> {
-  // Try to load from Cloud Firestore first
-  if (db) {
+  // Try to load from Cloud Firestore first (if not a reserved system map)
+  if (db && !name.startsWith('__')) {
     try {
       const mapDocRef = doc(db, 'maps', name);
       const docSnap = await getDoc(mapDocRef);
       if (docSnap.exists()) {
-        const data = docSnap.data() as SavedMap;
+        const data = docSnap.data();
+        
+        // De-serialize the nested grid array from JSON string format
+        let gridTypes: CellType[][] = [];
+        if (data.gridJson) {
+          gridTypes = JSON.parse(data.gridJson);
+        } else if (data.grid) {
+          // Fallback just in case some legacy non-nested array data exists
+          gridTypes = data.grid;
+        }
+
         return {
-          grid: data.grid.map(row => row.map((t: CellType) => ({ type: t }))),
+          grid: gridTypes.map(row => row.map((t: CellType) => ({ type: t }))),
           playerPos: data.playerPos,
-          ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+          ...(data.musicTrack ? { musicTrack: data.musicTrack as TrackStyle } : {}),
         };
       }
     } catch (error) {
@@ -135,7 +156,7 @@ export async function listSavedMaps(
       const snapshot = await getDocs(mapsQuery);
       snapshot.forEach(docSnap => {
         if (docSnap.exists()) {
-          const data = docSnap.data() as SavedMap;
+          const data = docSnap.data();
           if (!includeSystemMaps && (data.name.includes('__playing__') || data.name.includes('__autosache__') || data.name.includes('__autosave__') || data.name.includes('__e1m1__'))) {
             return;
           }
@@ -143,7 +164,7 @@ export async function listSavedMaps(
             name: data.name,
             timestamp: data.timestamp,
             validated: !!data.validated,
-            ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+            ...(data.musicTrack ? { musicTrack: data.musicTrack as TrackStyle } : {}),
             cloudSaved: true
           });
         }
@@ -166,8 +187,8 @@ export async function deleteMapFromStorage(name: string): Promise<void> {
   // Always delete locally
   localStorage.removeItem(MAP_PREFIX + name);
 
-  // Sync delete with Cloud Firestore if available
-  if (db) {
+  // Sync delete with Cloud Firestore if available (and not a reserved system map)
+  if (db && !name.startsWith('__')) {
     try {
       const mapDocRef = doc(db, 'maps', name);
       await deleteDoc(mapDocRef);
