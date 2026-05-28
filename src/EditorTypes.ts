@@ -9,7 +9,7 @@ export const TRACK_OPTIONS: { value: TrackStyle; label: string; emoji: string }[
   { value: 'classic', label: 'Classic', emoji: '🎸' },
 ];
 
-export type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
+export type CellType = 'empty' | 'wall' | 'halfwall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
 export type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 
 export interface CellData {
@@ -23,6 +23,7 @@ export const GRID_H = 50;
 export const CELL_COLORS: Record<CellType, string> = {
   empty: '#1a1a1a',
   wall: '#8B7355',
+  halfwall: '#6E563A',
   door: '#CC0000',
   player: '#00FF00',
   imp: '#FF8800',
@@ -39,6 +40,7 @@ export const CELL_COLORS: Record<CellType, string> = {
 export const CELL_LABELS: Record<CellType, string> = {
   empty: '🧹 Erase',
   wall: '🧱 Wall',
+  halfwall: '🧱 Half Wall',
   door: '🚪 Door',
   player: '👤 Player',
   imp: '👹 Imp',

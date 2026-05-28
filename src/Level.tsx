@@ -21,6 +21,7 @@ export interface CustomWallData {
   w: number;
   d: number;
   isDoor: boolean;
+  isHalfWall?: boolean;
 }
 
 interface LevelProps {
@@ -122,6 +123,7 @@ interface WallMeshData {
   scale: [number, number, number];
   color: number;
   isDoor: boolean;
+  isHalfWall?: boolean;
 }
 
 function buildWallMeshes(): WallMeshData[] {
@@ -131,16 +133,18 @@ function buildWallMeshes(): WallMeshData[] {
     scale: [w.w, w.h, w.d] as [number, number, number],
     color: w.color,
     isDoor: w.isDoor ?? false,
+    isHalfWall: false,
   }));
 }
 
 const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
-export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean }>): WallBox[] {
-  const data = wallDataOverride ?? WALL_DATA;
+export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean; isHalfWall?: boolean }>): WallBox[] {
+  const data = wallDataOverride ?? (WALL_DATA as Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean; isHalfWall?: boolean }>);
   return data.map((w) => ({
     min: [w.x, 0, w.z] as [number, number, number],
     max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
+    isHalfWall: w.isHalfWall ?? false,
   }));
 }
 
@@ -148,14 +152,20 @@ export default function Level({ customWalls, specialFloors }: LevelProps): React
   // Build wall data from custom or default
   const activeWallData = useMemo(() => {
     if (customWalls && customWalls.length > 0) {
-      return customWalls.map((w, i) => ({
-        key: i,
-        x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d,
-        color: w.isDoor ? 0xcc0000 : 0x8b7355,
-        isDoor: w.isDoor,
-        position: [w.x + w.w / 2, 2, w.z + w.d / 2] as [number, number, number],
-        scale: [w.w, 4, w.d] as [number, number, number],
-      }));
+      return customWalls.map((w, i) => {
+        const isHalfWall = w.isHalfWall ?? false;
+        const height = isHalfWall ? 2 : 4;
+        const yPos = isHalfWall ? 1 : 2;
+        return {
+          key: i,
+          x: w.x, y: yPos, z: w.z, w: w.w, h: height, d: w.d,
+          color: w.isDoor ? 0xcc0000 : isHalfWall ? 0x6e563a : 0x8b7355,
+          isDoor: w.isDoor,
+          isHalfWall,
+          position: [w.x + w.w / 2, yPos, w.z + w.d / 2] as [number, number, number],
+          scale: [w.w, height, w.d] as [number, number, number],
+        };
+      });
     }
     return WALL_MESHES;
   }, [customWalls]);

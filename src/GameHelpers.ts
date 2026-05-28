@@ -42,7 +42,7 @@ export function updateProjectilesHelper(
   projectiles: ProjectileData[],
   player: { health: number; timesHit: number; damageFlash: number; position: THREE.Vector3 },
   enemies: EnemyData[],
-  checkWallHit: (x: number, z: number) => boolean,
+  checkWallHit: (x: number, y: number, z: number) => boolean,
   onGameOver: () => void,
   setGameActive: (active: boolean) => void
 ): ProjectileData[] {
@@ -60,7 +60,7 @@ export function updateProjectilesHelper(
       // Remove if expired
       if (p.life <= 0) return false;
       // Remove if hit wall
-      if (checkWallHit(p.position[0], p.position[2])) return false;
+      if (checkWallHit(p.position[0], p.position[1], p.position[2])) return false;
       // Remove if out of bounds
       if (Math.abs(p.position[0]) > 60 || Math.abs(p.position[2]) > 60) return false;
 
@@ -237,7 +237,7 @@ export function updateEnemyAIHelper(
 
         // Spawn projectile
         const projDir: [number, number, number] = [ndx, 0, ndz];
-        const projPos: [number, number, number] = [e.position[0], 1, e.position[2]];
+        const projPos: [number, number, number] = [e.position[0] + ndx * 0.8, 1.5, e.position[2] + ndz * 0.8];
         const projColor = PROJECTILE_COLORS[e.type] ?? "#ff6600";
         spawnedProjectiles.push({
           id: nextId++,

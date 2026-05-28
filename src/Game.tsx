@@ -38,7 +38,7 @@ import { useGameInputs } from "./useGameInputs";
 const COLLISION_MARGIN = 0.4;
 
 interface CustomLevelData {
-  walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean }>;
+  walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; isHalfWall?: boolean }>;
   enemies: Array<{ id: number; x: number; z: number; type: string }>;
   pickups: Array<{ id: number; x: number; z: number; type: string }>;
   playerStart: [number, number];
@@ -174,7 +174,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   const initialSpawn = useMemo(() => {
     const rawWalls = levelData && levelData.walls.length > 0
-      ? getWalls(levelData.walls.filter(w => !w.isDoor).map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: 0x8b7355 })))
+      ? getWalls(levelData.walls.filter(w => !w.isDoor).map(w => {
+          const isHalf = w.isHalfWall ?? false;
+          return { x: w.x, y: isHalf ? 1 : 2, z: w.z, w: w.w, h: isHalf ? 2 : 4, d: w.d, color: isHalf ? 0x6e563a : 0x8b7355, isHalfWall: isHalf };
+        }))
       : getWalls();
 
     const startX = customPlayerStart ? customPlayerStart[0] + 0.5 : 2.5;
@@ -265,7 +268,10 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (levelData && levelData.walls.length > 0) {
       return levelData.walls
         .filter(w => !w.isDoor)
-        .map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: w.isDoor ? 0xcc0000 : 0x8b7355, isDoor: w.isDoor }));
+        .map(w => {
+          const isHalf = w.isHalfWall ?? false;
+          return { x: w.x, y: isHalf ? 1 : 2, z: w.z, w: w.w, h: isHalf ? 2 : 4, d: w.d, color: w.isDoor ? 0xcc0000 : isHalf ? 0x6e563a : 0x8b7355, isDoor: w.isDoor, isHalfWall: isHalf };
+        });
     }
     return null;
   }, [levelData]);
@@ -368,8 +374,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return checkCollisionPure(pos, walls, doorsRef.current, barrels, radius);
   }, [walls, barrels]);
 
-  const checkWallHit = useCallback((x: number, z: number): boolean => {
-    return checkWallHitPure(x, z, walls, doorsRef.current, barrels);
+  const checkWallHit = useCallback((x: number, y: number, z: number): boolean => {
+    return checkWallHitPure(x, y, z, walls, doorsRef.current, barrels);
   }, [walls, barrels]);
 
   const checkEnemyCollision = useCallback((pos: THREE.Vector3, currentEnemies: EnemyData[], radius = 0.8): boolean => {

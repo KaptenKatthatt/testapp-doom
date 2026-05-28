@@ -59,6 +59,7 @@ export function checkDoorHit(x: number, z: number, doors: DoorData[]): boolean {
 
 export function checkWallHit(
   x: number,
+  y: number,
   z: number,
   walls: WallBox[],
   doors: DoorData[],
@@ -66,7 +67,9 @@ export function checkWallHit(
 ): boolean {
   for (const wall of walls) {
     if (x >= wall.min[0] && x <= wall.max[0] && z >= wall.min[2] && z <= wall.max[2]) {
-      return true;
+      if (y >= wall.min[1] && y <= wall.max[1]) {
+        return true;
+      }
     }
   }
   if (checkDoorHit(x, z, doors)) return true;
@@ -76,7 +79,9 @@ export function checkWallHit(
     const dx = x - barrel.position[0];
     const dz = z - barrel.position[2];
     if (dx * dx + dz * dz < barrel.radius * barrel.radius) {
-      return true;
+      if (y >= 0 && y <= 1.0) {
+        return true;
+      }
     }
   }
   return false;
@@ -109,6 +114,7 @@ export function hasLineOfSight(
     const cz = z1 + (z2 - z1) * t;
     for (const wall of walls) {
       if (cx >= wall.min[0] && cx <= wall.max[0] && cz >= wall.min[2] && cz <= wall.max[2]) {
+        if (wall.isHalfWall) continue;
         return false;
       }
     }
