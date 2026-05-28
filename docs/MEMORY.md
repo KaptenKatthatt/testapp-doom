@@ -177,12 +177,12 @@
 
 ---
 
-## Enemy Stats
-| Type | HP | Speed | Attack | Range | Cooldown |
-|------|-----|-------|--------|-------|----------|
-| Imp | 45 | 1.5 | Fireball | 8 | 2s |
-| Demon | 80 | 3.0 | Melee | 2.5 | 1.2s |
-| Zombieman | 35 | 1.0 | Bullet | 12 | 2.5s |
+## Enemy Stats (GameHelpers.ts — authoritative)
+| Type | HP | Speed | Attack | Range | Cooldown | Projectile |
+|------|-----|-------|--------|-------|----------|------------|
+| Imp | 45 | 3.0 | Fireball | 8 | 1.5s | speed=12, color=#ff6600 |
+| Demon | 80 | 5.0 | Melee | 2.5 | 0.8s | — |
+| Zombieman | 35 | 2.5 | Bullet | 12 | 2.5s | speed=12, color=#88ff44 |
 
 ## Weapon Stats
 | Weapon | Ammo Type | Chamber/Mag | Reload |
@@ -208,3 +208,6 @@
 - ~~CellType duplicate type error~~ (fixed: import from EditorTypes)
 - ~~Edit E1M1 button not working (URL hash)~~ (fixed: localStorage flag)
 - ~~Mobile shoot/USE overlapping HUD~~ (fixed in 0cd2f5e)
+
+## Stale Code Warning
+- **Enemies.tsx ENEMY_CONFIG is stale** — speeds (1.5/3.0/1.0) and cooldowns (2/1.2/2.5) are NOT used for gameplay. Only used for 3D mesh rendering (body size, head size, colors). Authoritative enemy tuning is in **GameHelpers.ts**: ENEMY_SPEEDS (3.0/5.0/2.5), ENEMY_ATTACK_RANGES (8/2.5/12), ENEMY_ATTACK_COOLDOWNS (1.5/0.8/2.5). Do NOT use Enemies.tsx values for balancing.
