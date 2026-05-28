@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "^9.1.0",
-    "firebase": "^11.0.0",
+    "firebase": "^11.10.0",
     "midi-writer-js": "^3.2.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

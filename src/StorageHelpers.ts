@@ -5,6 +5,17 @@ import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy } f
 export const AUTOSAVE_KEY = 'doom-editor-autosave';
 export const MAP_PREFIX = 'doom-map-';
 
+const FIRESTORE_TIMEOUT_MS = 5000;
+
+function withFirestoreTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore request timed out')), FIRESTORE_TIMEOUT_MS)
+    ),
+  ]);
+}
+
 export interface SavedMap {
   name: string;
   grid: CellType[][];
@@ -23,8 +34,63 @@ export interface SavedMapListItem {
 }
 
 /**
+ * Helper to map local map names to valid Firestore document IDs.
+ * Firestore reserves document IDs starting with double underscores '__'.
+ * We map '__e1m1__' to 'system_e1m1' so the player's custom E1M1 edits are persistently saved in the database.
+ * Other transient system maps like '__playing__' and '__autosache__' remain purely local.
+ */
+function getFirestoreDocId(name: string): string | null {
+  if (name === '__e1m1__') return 'system_e1m1';
+  if (name.startsWith('__')) return null; // Ignore __playing__, __autosache__, etc.
+  return name;
+}
+
+function loadMapFromLocalStorage(
+  name: string
+): { grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } | null {
+  const raw = localStorage.getItem(MAP_PREFIX + name);
+  if (!raw) return null;
+  try {
+    const data: SavedMap = JSON.parse(raw);
+    return {
+      grid: data.grid.map(row => row.map((t: CellType) => ({ type: t }))),
+      playerPos: data.playerPos,
+      ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function syncMapToCloud(
+  cloudId: string,
+  name: string,
+  localData: SavedMap,
+  validated: boolean,
+  musicTrack?: TrackStyle
+): void {
+  if (!db) return;
+  const mapDocRef = doc(db, 'maps', cloudId);
+  const firestoreData = {
+    name,
+    gridJson: JSON.stringify(localData.grid),
+    playerPos: localData.playerPos,
+    timestamp: localData.timestamp,
+    validated,
+    ...(musicTrack ? { musicTrack } : {}),
+  };
+  void withFirestoreTimeout(setDoc(mapDocRef, firestoreData))
+    .then(() => {
+      console.log(`Successfully synced map "${name}" (as "${cloudId}") with Firebase Cloud Firestore.`);
+    })
+    .catch((error) => {
+      console.error(`Failed to sync map "${name}" to Cloud Firestore:`, error);
+    });
+}
+
+/**
  * Saves a map to localStorage, and if Firebase Firestore is connected, uploads it to the database as well.
- * We bypass Cloud Firestore for reserved system maps starting with double underscores '__'.
+ * We sanitize the reserved '__e1m1__' ID to 'system_e1m1' for Firestore, and bypass Firestore for other '__' system maps.
  * We also serialize the 2D grid array as a JSON string to bypass Firestore's nested array limitation.
  */
 export async function saveMapToStorage(
@@ -46,48 +112,33 @@ export async function saveMapToStorage(
   // 1. Always save to localStorage immediately for fast offline access
   localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
 
-  // 2. If Firebase is initialized and it's not a reserved system map, sync it to the cloud db
-  if (db && !name.startsWith('__')) {
-    try {
-      const mapDocRef = doc(db, 'maps', name);
-      // Map to Firestore-compatible format by serializing the nested grid array as a JSON string
-      const firestoreData = {
-        name,
-        gridJson: JSON.stringify(localData.grid),
-        playerPos,
-        timestamp: localData.timestamp,
-        validated,
-        ...(musicTrack ? { musicTrack } : {}),
-      };
-      await setDoc(mapDocRef, firestoreData);
-      console.log(`Successfully synced map "${name}" with Firebase Cloud Firestore.`);
-    } catch (error) {
-      console.error(`Failed to sync map "${name}" to Cloud Firestore:`, error);
-    }
+  // 2. Cloud sync runs in the background so Save/Play never blocks on network
+  const cloudId = getFirestoreDocId(name);
+  if (cloudId) {
+    syncMapToCloud(cloudId, name, localData, validated, musicTrack);
   }
 }
 
 /**
  * Loads a map from Firebase Cloud Firestore first. Fallback to localStorage if Firebase is offline,
- * if it's a reserved system map, or if the map is not found in the database.
+ * if it's a local-only system map, or if the map is not found in the database.
  */
 export async function loadMapFromStorage(
   name: string
 ): Promise<{ grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } | null> {
-  // Try to load from Cloud Firestore first (if not a reserved system map)
-  if (db && !name.startsWith('__')) {
+  // Try to load from Cloud Firestore first (if supported)
+  const cloudId = getFirestoreDocId(name);
+  if (db && cloudId) {
     try {
-      const mapDocRef = doc(db, 'maps', name);
-      const docSnap = await getDoc(mapDocRef);
+      const mapDocRef = doc(db, 'maps', cloudId);
+      const docSnap = await withFirestoreTimeout(getDoc(mapDocRef));
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
-        // De-serialize the nested grid array from JSON string format
+
         let gridTypes: CellType[][] = [];
         if (data.gridJson) {
           gridTypes = JSON.parse(data.gridJson);
         } else if (data.grid) {
-          // Fallback just in case some legacy non-nested array data exists
           gridTypes = data.grid;
         }
 
@@ -98,23 +149,11 @@ export async function loadMapFromStorage(
         };
       }
     } catch (error) {
-      console.error(`Failed to retrieve map "${name}" from Cloud Firestore, falling back to local storage:`, error);
+      console.error(`Failed to retrieve map "${name}" (as "${cloudId}") from Cloud Firestore, falling back to local storage:`, error);
     }
   }
 
-  // Local storage fallback
-  const raw = localStorage.getItem(MAP_PREFIX + name);
-  if (!raw) return null;
-  try {
-    const data: SavedMap = JSON.parse(raw);
-    return {
-      grid: data.grid.map(row => row.map((t: CellType) => ({ type: t }))),
-      playerPos: data.playerPos,
-      ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
-    };
-  } catch {
-    return null;
-  }
+  return loadMapFromLocalStorage(name);
 }
 
 /**
@@ -153,10 +192,11 @@ export async function listSavedMaps(
   if (db) {
     try {
       const mapsQuery = query(collection(db, 'maps'), orderBy('timestamp', 'desc'));
-      const snapshot = await getDocs(mapsQuery);
+      const snapshot = await withFirestoreTimeout(getDocs(mapsQuery));
       snapshot.forEach(docSnap => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          // Skip if it is a system map that shouldn't be listed publicly
           if (!includeSystemMaps && (data.name.includes('__playing__') || data.name.includes('__autosache__') || data.name.includes('__autosave__') || data.name.includes('__e1m1__'))) {
             return;
           }
@@ -187,15 +227,17 @@ export async function deleteMapFromStorage(name: string): Promise<void> {
   // Always delete locally
   localStorage.removeItem(MAP_PREFIX + name);
 
-  // Sync delete with Cloud Firestore if available (and not a reserved system map)
-  if (db && !name.startsWith('__')) {
-    try {
-      const mapDocRef = doc(db, 'maps', name);
-      await deleteDoc(mapDocRef);
-      console.log(`Successfully deleted map "${name}" from Cloud Firestore.`);
-    } catch (error) {
-      console.error(`Failed to delete map "${name}" from Cloud Firestore:`, error);
-    }
+  // Sync delete with Cloud Firestore if available
+  const cloudId = getFirestoreDocId(name);
+  if (db && cloudId) {
+    const mapDocRef = doc(db, 'maps', cloudId);
+    void withFirestoreTimeout(deleteDoc(mapDocRef))
+      .then(() => {
+        console.log(`Successfully deleted map "${name}" (as "${cloudId}") from Cloud Firestore.`);
+      })
+      .catch((error) => {
+        console.error(`Failed to delete map "${name}" from Cloud Firestore:`, error);
+      });
   }
 }
 
