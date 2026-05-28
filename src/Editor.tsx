@@ -95,12 +95,23 @@ export default function Editor() {
 
   // Check for autosave on mount — restore silently if available
   useEffect(() => {
-    const autoData = loadAutosave();
-    if (autoData) {
-      const hasContent = autoData.grid.some(row => row.some(c => c.type !== 'empty'));
-      if (hasContent) {
-        setGrid(autoData.grid);
-        setPlayerPos(autoData.playerPos);
+    // Check if E1M1 should be loaded via URL param
+    if (window.location.hash.includes('load=e1m1')) {
+      const e1m1 = PRESETS.find(p => p.name === 'E1M1 Entryway');
+      if (e1m1) {
+        setGrid(cloneGrid(e1m1.grid));
+        setPlayerPos(e1m1.playerPos);
+        // Clean URL
+        window.location.hash = '#editor';
+      }
+    } else {
+      const autoData = loadAutosave();
+      if (autoData) {
+        const hasContent = autoData.grid.some(row => row.some(c => c.type !== 'empty'));
+        if (hasContent) {
+          setGrid(autoData.grid);
+          setPlayerPos(autoData.playerPos);
+        }
       }
     }
   }, []);

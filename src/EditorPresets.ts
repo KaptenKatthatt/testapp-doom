@@ -1,5 +1,6 @@
 import { CellData, CellType, GRID_W, GRID_H } from './EditorTypes';
 import { makeGrid } from './Editor';
+import { E1M1_GRID } from './E1M1Grid';
 
 export interface PresetMap {
   name: string;
@@ -29,7 +30,17 @@ function vWall(g: CellData[][], x: number, z1: number, z2: number) {
 }
 
 export const PRESETS: PresetMap[] = [
-  // 1. TIGHT — narrow corridors, small rooms
+  // E1M1 — The original Entryway map, now editable!
+  {
+    name: 'E1M1 Entryway',
+    description: 'The original default map',
+    grid: (() => {
+      const raw = E1M1_GRID as CellType[][];
+      return raw.map(row => row.map((t: CellType) => ({ type: t })));
+    })(),
+    playerPos: [2, 3],
+  },
+  // 2. TIGHT — narrow corridors, small rooms
   {
     name: 'Tight',
     description: 'Narrow corridors and small rooms',
