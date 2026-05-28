@@ -432,6 +432,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       {/* Sleek, state-of-the-art Menu Button — bottom right corner, above HUD */}
       {!gameOver && !missionComplete && (
         <button
+          data-testid="pause-menu-button"
           onClick={(e) => {
             e.stopPropagation();
             setMenuOpen(true);
