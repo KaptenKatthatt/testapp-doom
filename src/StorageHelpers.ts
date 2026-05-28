@@ -44,7 +44,7 @@ export function listSavedMaps(includeSystemMaps = false): Array<{ name: string; 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key && key.startsWith(MAP_PREFIX)) {
-      if (!includeSystemMaps && (key.includes('__playing__') || key.includes('__autosache__') || key.includes('__autosave__'))) {
+      if (!includeSystemMaps && (key.includes('__playing__') || key.includes('__autosache__') || key.includes('__autosave__') || key.includes('__e1m1__'))) {
         continue;
       }
       try {

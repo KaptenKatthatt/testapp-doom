@@ -574,6 +574,10 @@ export default function Editor() {
         <button onClick={handleLoad} style={btnStyle}>📂 Load</button>
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
+        <button onClick={() => {
+          saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack);
+          alert('✅ Saved as E1M1! This replaces the default map when you play E1M1 from the main menu.');
+        }} style={{ ...btnStyle, background: '#553300', border: '1px solid #c80' }}>🏴‍☠️ Save as E1M1</button>
         <button onClick={handlePlayMap} style={{ ...btnStyle, background: '#050', border: '1px solid #0a0' }}>🎮 Play This Map</button>
       </div>
       <div style={{ display: 'flex', gap: 4, marginTop: 8, justifyContent: 'center', alignItems: 'center' }}>

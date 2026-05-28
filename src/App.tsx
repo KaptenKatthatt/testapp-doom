@@ -8,6 +8,7 @@ import { audioManager } from "./Audio";
 import type { PlayerState } from "./types";
 import type { LevelData } from "./main";
 import { gridToLevelData } from "./EditorExport";
+import { E1M1_GRID } from "./E1M1Grid";
 import { listSavedMaps } from "./StorageHelpers";
 import type { TrackStyle } from "./EditorTypes";
 
@@ -82,7 +83,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setSavedMaps(listSavedMaps());
   }, []);
 
-  // If we have levelData from the editor, use it; otherwise load saved map
+  // If we have levelData from the editor, use it; otherwise load saved map or E1M1
   const activeLevelData = useMemo(() => {
     if (selectedLevel === '__custom__' && levelData) return levelData;
     if (selectedLevel?.startsWith('saved:')) {
@@ -96,6 +97,19 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           return gridToLevelData(grid, playerPos, data.musicTrack);
         } catch { /* fall through */ }
       }
+    }
+    // Default E1M1 — check for saved custom version first, fallback to E1M1Grid
+    if (selectedLevel === '__default__') {
+      const raw = localStorage.getItem('doom-map-__e1m1__');
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          const grid = data.grid.map((row: CellType[]) => row.map((t: CellType) => ({ type: t })));
+          return gridToLevelData(grid, data.playerPos || [2, 3], data.musicTrack);
+        } catch { /* fall through to built-in */ }
+      }
+      const grid = E1M1_GRID.map(row => row.map((t: CellType) => ({ type: t })));
+      return gridToLevelData(grid, [2, 3] as [number, number], 'classic');
     }
     return null;
   }, [selectedLevel, levelData]);
