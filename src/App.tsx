@@ -330,14 +330,18 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               from { opacity: 0; transform: scale(0.9) translateY(-10px); }
               to { opacity: 1; transform: scale(1) translateY(0); }
             }
+            @keyframes completionFadeToBlack {
+              from { background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); }
+              to { background: rgba(0, 0, 0, 1); backdrop-filter: blur(4px); }
+            }
           `}</style>
           {!showStats ? (
             <div
               style={{
                 position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-                background: "rgba(0, 0, 0, 0.65)", backdropFilter: "blur(2px)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 zIndex: 100, cursor: "pointer", boxSizing: "border-box",
+                animation: "completionFadeToBlack 2s forwards ease-in-out"
               }}
               onClick={(): void => {
                 setShowStats(true);

@@ -220,6 +220,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const pullbackRef = useRef(0);
+  const lastEnemyDeathTimeRef = useRef<number | null>(null);
 
   // Pre-allocated objects for pullback raycast (avoid GC pressure per frame)
   const _pullbackDir = useMemo(() => new THREE.Vector3(), []);
@@ -657,12 +658,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     player.kills = enemiesRef.current.filter(e => !e.alive).length;
     const totalEnemies = enemiesRef.current.length;
     const aliveEnemies = enemiesRef.current.filter(e => e.alive).length;
-    if (totalEnemies > 0 && aliveEnemies === 0 && !missionCompleteRef.current) {
-      missionCompleteRef.current = true;
-      gameActiveRef.current = false;
-      player.endTime = now;
-      handlePlayerState();
-      onMissionComplete();
+    if (totalEnemies > 0 && aliveEnemies === 0) {
+      if (lastEnemyDeathTimeRef.current === null) {
+        lastEnemyDeathTimeRef.current = now;
+      } else if (now - lastEnemyDeathTimeRef.current >= 2.0 && !missionCompleteRef.current) {
+        missionCompleteRef.current = true;
+        gameActiveRef.current = false;
+        player.endTime = now;
+        handlePlayerState();
+        onMissionComplete();
+      }
+    } else {
+      lastEnemyDeathTimeRef.current = null;
     }
 
     // Nukage/slime damage — standing in custom lava or slime zones
