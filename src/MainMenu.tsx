@@ -1,16 +1,13 @@
 import React from 'react';
 import type { LevelData } from './main';
 import { audioManager } from './Audio';
-import { TRACK_OPTIONS, TrackStyle } from './EditorTypes';
-
-const TRACK_EMOJI: Record<string, string> = {};
-TRACK_OPTIONS.forEach(o => { TRACK_EMOJI[o.value] = o.emoji; });
 
 interface SavedMap {
   name: string;
   timestamp: number;
   validated: boolean;
   musicTrack?: string;
+  cloudSaved?: boolean;
 }
 
 interface MainMenuProps {
@@ -22,7 +19,7 @@ interface MainMenuProps {
   showMapModal: boolean;
   setShowMapModal: (show: boolean) => void;
   levelData?: LevelData | null | undefined;
-  listSavedMaps: () => SavedMap[];
+  listSavedMaps: () => Promise<SavedMap[]>;
 }
 
 export default function MainMenu({
@@ -152,9 +149,14 @@ export default function MainMenu({
           ► START GAME
         </button>
 
-        {/* Custom Maps */}
         <button
-          onClick={(e) => { e.stopPropagation(); setSavedMaps(listSavedMaps()); setShowMapModal(true); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            listSavedMaps().then(maps => {
+              setSavedMaps(maps);
+              setShowMapModal(true);
+            });
+          }}
           style={{
             background: 'none', border: 'none', color: '#c00', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
             cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
@@ -259,16 +261,18 @@ export default function MainMenu({
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
                 onMouseLeave={(e) => { const sel = selectedLevel === `saved:${m.name}`; e.currentTarget.style.color = sel ? '#ff0' : '#aaa'; e.currentTarget.style.background = sel ? '#331100' : 'transparent'; }}
               >
-                <span>► {m.name.toUpperCase()}{m.musicTrack ? ` ${TRACK_EMOJI[m.musicTrack as TrackStyle] || '🎵'}` : ''}</span>
+                <span>► {m.name.toUpperCase()}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    localStorage.removeItem(`doom-map-${m.name}`);
-                    setSavedMaps(listSavedMaps());
+                    localStorage.setItem('doom-load-map', m.name);
+                    setShowMapModal(false);
+                    window.location.hash = '#editor';
                   }}
-                  style={{ background: "none", color: "#600", border: "1px solid #600", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
+                  style={{ background: "none", color: "#ff8800", border: "1px solid #ff8800", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
+                  title="Edit Map"
                 >
-                  ✕
+                  ✏️
                 </button>
               </div>
             ))}
