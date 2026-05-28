@@ -25,6 +25,15 @@
 2. `bobWeightRef` lerping for smooth walk/stop transitions
 3. Pullback lerping for smooth wall proximity
 4. Camera must be added to scene graph (`scene.add(camera)`) for portal rendering
+5. **Pre-allocated Vector3/Ray/Box3** — never use `new THREE.Vector3()` inside useFrame loops or per-frame hot paths. Use module-level refs (`_v3a`, etc.) or `useMemo()`
+
+## Performance Optimizations
+- Pre-allocated objects for pullback raycast (Game.tsx) — avoids ~20-100+ object allocations per frame
+- Pre-allocated camera look vectors — avoids 4 Vector3 + 1 clone per frame
+- Pre-allocated enemy pathfinding vectors (GameHelpers.ts) — avoids ~6 Vector3 per enemy per frame
+- Pre-allocated player movement vectors — avoids 3 Vector3 per frame
+- Line-of-sight checks throttled to 150ms per enemy (commit 45e7dae)
+- Enemy/pickup pointlights disabled when >12-15 units from camera (commit 45e7dae)
 
 ## Commit History Highlights
 - `c0466be`: Fix weapon viewmodel lag/vibration — portal rendering + smooth bob
