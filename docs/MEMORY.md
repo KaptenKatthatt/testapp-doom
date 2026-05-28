@@ -3,8 +3,9 @@
 ## Development Process (MANDATORY)
 1. **Always run `npx tsc --noEmit && npx vite build` before pushing** — no exceptions
 2. **Never push directly to main** — always create a feature branch → PR → CI green → merge
-3. **dev branch** can receive direct pushes for iteration, but main only via PR
-4. **If Vercel CI fails** — fix immediately before any new work
+3. **Self-code-review every PR before requesting merge** — re-read the diff, verify all facts against actual source code (not assumptions from memory), check for stale docs
+4. **dev branch** can receive direct pushes for iteration, but main only via PR
+5. **If Vercel CI fails** — fix immediately before any new work
 
 ---
 
