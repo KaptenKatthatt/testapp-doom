@@ -122,7 +122,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
 
   const playerRef = useRef<PlayerData>({
-    position: new THREE.Vector3(customPlayerStart ? customPlayerStart[0] : 2, 1.7, customPlayerStart ? customPlayerStart[1] : 3),
+    position: new THREE.Vector3(customPlayerStart ? customPlayerStart[0] + 0.5 : 2.5, 1.7, customPlayerStart ? customPlayerStart[1] + 0.5 : 3.5),
     rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,
