@@ -47,6 +47,7 @@ export type PickupType = "health" | "ammo" | "shotgun";
 export interface WallBox {
   min: [number, number, number];
   max: [number, number, number];
+  isHalfWall?: boolean;
 }
 
 export interface ProjectileData {

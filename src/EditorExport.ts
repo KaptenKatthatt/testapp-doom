@@ -8,14 +8,14 @@ function getCell(grid: CellData[][], x: number, z: number): CellData {
 // Export grid-to-level-data converter for use by the game and export
 export function gridToLevelData(grid: CellData[][], playerPos: [number, number] | null, musicTrack?: string) {
   const visited = new Set<string>();
-  const walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; color?: string }> = [];
+  const walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; isHalfWall?: boolean; color?: string }> = [];
 
   for (let z = 0; z < GRID_H; z++) {
     for (let x = 0; x < GRID_W; x++) {
       const key = `${x},${z}`;
       if (visited.has(key)) continue;
       const cell = getCell(grid, x, z);
-      if (cell.type !== 'wall' && cell.type !== 'door') continue;
+      if (cell.type !== 'wall' && cell.type !== 'door' && cell.type !== 'halfwall') continue;
 
       let maxX = x;
       while (maxX + 1 < GRID_W && getCell(grid, maxX + 1, z).type === cell.type) maxX++;
@@ -34,7 +34,16 @@ export function gridToLevelData(grid: CellData[][], playerPos: [number, number] 
 
       const w = maxX - x + 1;
       const d = maxZ - z + 1;
-      walls.push({ x, z, w, d, isDoor: cell.type === 'door', color: cell.type === 'door' ? '0xcc0000' : '0x8b7355' });
+      const isHalfWall = cell.type === 'halfwall';
+      walls.push({
+        x,
+        z,
+        w,
+        d,
+        isDoor: cell.type === 'door',
+        isHalfWall,
+        color: cell.type === 'door' ? '0xcc0000' : isHalfWall ? '0x6e563a' : '0x8b7355'
+      });
 
       for (let vz = z; vz <= maxZ; vz++) {
         for (let vx = x; vx <= maxX; vx++) {
@@ -87,7 +96,9 @@ export function buildExportCode(grid: CellData[][], playerPos: [number, number] 
 
   code += `const WALL_DATA = [\n`;
   for (const w of levelData.walls) {
-    code += `  { x: ${w.x}, y: 2, z: ${w.z}, w: ${w.w}, h: 4, d: ${w.d}, color: ${w.color} },\n`;
+    const yVal = w.isHalfWall ? 0.5 : 2;
+    const hVal = w.isHalfWall ? 1.0 : 4;
+    code += `  { x: ${w.x}, y: ${yVal}, z: ${w.z}, w: ${w.w}, h: ${hVal}, d: ${w.d}, color: ${w.color}${w.isHalfWall ? ', isHalfWall: true' : ''} },\n`;
   }
   code += `];\n\n`;
 

@@ -65,7 +65,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   });
   const [gameOver, setGameOver] = useState(false);
   const [missionComplete, setMissionComplete] = useState(false);
-  const [completionCountdown, setCompletionCountdown] = useState<number | null>(null);
+  const [showStats, setShowStats] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean; musicTrack?: string }>>([]);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -118,6 +118,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setStarted(true);
     setGameOver(false);
     setMissionComplete(false);
+    setShowStats(false);
     setGameKey((k) => k + 1);
     setPlayerState({ 
       health: 100, 
@@ -149,14 +150,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     document.body.requestPointerLock();
   }, []);
 
-  // Completion countdown timer effect
-  useEffect(() => {
-    if (completionCountdown === null || completionCountdown <= 0) return;
-    const timer = setTimeout(() => {
-      setCompletionCountdown((prev) => (prev !== null ? prev - 1 : null));
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [completionCountdown]);
+  // Completion countdown timer removed in favor of Click to Continue interaction
 
   useEffect(() => {
     const handleRestartKey = (e: KeyboardEvent): void => {
@@ -240,7 +234,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           }}
           onMissionComplete={(): void => {
             setMissionComplete(true);
-            setCompletionCountdown(3);
+            setShowStats(false);
             document.exitPointerLock();
           }}
           mobileMoveRef={mobileMoveRef}
@@ -336,14 +330,21 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               from { opacity: 0; transform: scale(0.9) translateY(-10px); }
               to { opacity: 1; transform: scale(1) translateY(0); }
             }
+            @keyframes completionFadeToBlack {
+              from { background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); }
+              to { background: rgba(0, 0, 0, 1); backdrop-filter: blur(4px); }
+            }
           `}</style>
-          {completionCountdown !== null && completionCountdown > 0 ? (
+          {!showStats ? (
             <div
               style={{
                 position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-                background: "rgba(0, 0, 0, 0.65)", backdropFilter: "blur(2px)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                zIndex: 100, pointerEvents: "none", boxSizing: "border-box",
+                zIndex: 100, cursor: "pointer", boxSizing: "border-box",
+                animation: "completionFadeToBlack 2s forwards ease-in-out"
+              }}
+              onClick={(): void => {
+                setShowStats(true);
               }}
             >
               <h1 style={{
@@ -355,12 +356,13 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                 MISSION ACCOMPLISHED
               </h1>
               <div style={{
-                fontSize: "clamp(48px, 10vw, 80px)", color: "#ffcc00",
+                fontSize: "clamp(18px, 3.5vw, 28px)", color: "#ffcc00",
                 textShadow: "0 0 20px #ff9900, 0 0 40px #aa5500", fontWeight: "bold",
                 fontFamily: "monospace",
-                animation: "completionPulse 1s infinite ease-in-out"
+                animation: "completionPulse 1.5s infinite ease-in-out",
+                marginTop: "10px"
               }}>
-                {completionCountdown}
+                CLICK TO CONTINUE
               </div>
             </div>
           ) : (
