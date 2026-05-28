@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "playwright test",
     "typecheck": "tsc --build --noEmit",
     "type-coverage": "type-coverage -p ./tsconfig.app.json --at-least 100"
   },
