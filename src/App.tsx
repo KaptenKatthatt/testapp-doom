@@ -12,7 +12,7 @@ import { E1M1_GRID } from "./E1M1Grid";
 import { listSavedMaps } from "./StorageHelpers";
 import type { TrackStyle } from "./EditorTypes";
 
-type CellType = 'empty' | 'wall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'health' | 'ammo' | 'shotgun';
+import { type CellType } from "./EditorTypes";
 
 function formatTime(startTime: number, endTime: number): string {
   if (!startTime) return "0:00";
