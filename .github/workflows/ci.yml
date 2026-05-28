@@ -22,6 +22,11 @@ jobs:
         run: npx vite build
       - name: Lint
         run: npx eslint . --max-warnings 0 || true
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: npm test
+
 
   review:
     runs-on: ubuntu-latest
