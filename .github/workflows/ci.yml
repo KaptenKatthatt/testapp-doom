@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Build
+        run: npx vite build
+      - name: Lint
+        run: npx eslint . --max-warnings 0 || true
+
+  review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check for stale docs
+        run: |
+          echo "=== Checking MEMORY.md stats against source ==="
+          # Verify enemy speeds match GameHelpers.ts
+          for enemy in imp demon zombieman; do
+            doc_speed=$(grep -A3 "$enemy" docs/MEMORY.md | grep -oP '\d+\.\d+' | head -1)
+            code_speed=$(grep -oP "ENEMY_SPEEDS.*$enemy.*?[\d.]+" src/GameHelpers.ts | grep -oP '[\d.]+$' || echo "not found")
+            if [ -n "$doc_speed" ] && [ -n "$code_speed" ]; then
+              echo "$enemy: doc=$doc_speed code=$code_speed"
+            fi
+          done
+          echo "=== Checking for new THREE.Vector3() in useFrame loops ==="
+          # This is the #1 performance killer — allocating objects in hot loops
+          count=$(grep -rn "new THREE\.\(Vector3\|Ray\|Box3\|Matrix4\|Quaternion\|Color\)" src/Game.tsx src/Weapons.tsx src/GameHelpers.ts | grep -v "useMemo\|useRef\|const _\|module-level\|//" | wc -l)
+          if [ "$count" -gt 0 ]; then
+            echo "⚠️  Found $count potential per-frame allocations in hot loops!"
+            grep -rn "new THREE\.\(Vector3\|Ray\|Box3\|Matrix4\|Quaternion\|Color\)" src/Game.tsx src/Weapons.tsx src/GameHelpers.ts | grep -v "useMemo\|useRef\|const _\|module-level\|//"
+          else
+            echo "✅ No per-frame allocations detected"
+          fi
+          echo "=== Checking portal rendering ==="
+          if grep -q "createPortal" src/Weapons.tsx; then
+            echo "✅ Portal rendering present in Weapons.tsx"
+          else
+            echo "❌ CRITICAL: Portal rendering missing from Weapons.tsx! Weapon bob WILL jitter!"
+          fi
+          echo "=== Checking for duplicate type imports ==="
+          dupes=$(grep -rn "type CellType" src/ | grep -v "EditorTypes.ts" | grep -v "import" | head -5)
+          if [ -n "$dupes" ]; then
+            echo "⚠️  Possible duplicate CellType definitions:"
+            echo "$dupes"
+          else
+            echo "✅ No duplicate CellType definitions"
+          fi
