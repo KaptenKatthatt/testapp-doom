@@ -110,6 +110,57 @@ const INITIAL_PICKUPS: PickupData[] = [
   { id: 7, position: [42, 0.3, 40], type: "ammo", active: true },
 ];
 
+function findSafeSpawn(startX: number, startZ: number, walls: WallBox[]): THREE.Vector3 {
+  const checkCollisionLocal = (x: number, z: number): boolean => {
+    const radius = 0.4;
+    for (const wall of walls) {
+      const closestX = Math.max(wall.min[0], Math.min(x, wall.max[0]));
+      const closestZ = Math.max(wall.min[2], Math.min(z, wall.max[2]));
+      const dx = x - closestX;
+      const dz = z - closestZ;
+      if (dx * dx + dz * dz < radius * radius) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const initialX = Math.floor(startX) + 0.5;
+  const initialZ = Math.floor(startZ) + 0.5;
+
+  if (!checkCollisionLocal(initialX, initialZ)) {
+    return new THREE.Vector3(initialX, 1.7, initialZ);
+  }
+
+  // Spiral search out to find the nearest non-colliding cell center
+  for (let r = 1; r < 50; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (const dz of [-r, r]) {
+        const cx = initialX + dx;
+        const cz = initialZ + dz;
+        if (cx > 0 && cx < 50 && cz > 0 && cz < 50) {
+          if (!checkCollisionLocal(cx, cz)) {
+            return new THREE.Vector3(cx, 1.7, cz);
+          }
+        }
+      }
+    }
+    for (let dz = -r + 1; dz <= r - 1; dz++) {
+      for (const dx of [-r, r]) {
+        const cx = initialX + dx;
+        const cz = initialZ + dz;
+        if (cx > 0 && cx < 50 && cz > 0 && cz < 50) {
+          if (!checkCollisionLocal(cx, cz)) {
+            return new THREE.Vector3(cx, 1.7, cz);
+          }
+        }
+      }
+    }
+  }
+
+  return new THREE.Vector3(initialX, 1.7, initialZ);
+}
+
 
 export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData, paused }: GameProps): React.JSX.Element {
   const barrelTexture = useMemo(() => createBarrelTexture(), []);
@@ -121,8 +172,19 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const customPickups: PickupData[] = levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS;
   const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
 
+  const initialSpawn = useMemo(() => {
+    const rawWalls = levelData && levelData.walls.length > 0
+      ? getWalls(levelData.walls.filter(w => !w.isDoor).map(w => ({ x: w.x, y: 2, z: w.z, w: w.w, h: 4, d: w.d, color: 0x8b7355 })))
+      : getWalls();
+
+    const startX = customPlayerStart ? customPlayerStart[0] + 0.5 : 2.5;
+    const startZ = customPlayerStart ? customPlayerStart[1] + 0.5 : 3.5;
+
+    return findSafeSpawn(startX, startZ, rawWalls);
+  }, [levelData, customPlayerStart]);
+
   const playerRef = useRef<PlayerData>({
-    position: new THREE.Vector3(customPlayerStart ? customPlayerStart[0] + 0.5 : 2.5, 1.7, customPlayerStart ? customPlayerStart[1] + 0.5 : 3.5),
+    position: initialSpawn,
     rotation: -Math.PI / 2,
     pitch: 0,
     health: 100,
