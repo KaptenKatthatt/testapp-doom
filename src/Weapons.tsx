@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useRef, useEffect } from "react";
+import { useFrame, useThree, createPortal } from "@react-three/fiber";
 import * as THREE from "three";
 
 interface WeaponsProps {
@@ -21,10 +21,12 @@ export default function Weapons({
   revolverReloading,
   machinegunReloading,
 }: WeaponsProps): React.JSX.Element {
-  const { camera } = useThree();
+  const { camera, scene } = useThree();
 
-  // Reference for standard world-space group synced to camera position and rotation
-  const cameraSyncGroupRef = useRef<THREE.Group>(null);
+  // Ensure the camera is added to the scene graph so that portal-rendered weapon models are rendered
+  useEffect(() => {
+    scene.add(camera);
+  }, [scene, camera]);
 
   // Weapon Group Refs (FPS container positioning)
   const gunGroupRef = useRef<THREE.Group>(null);
@@ -60,12 +62,6 @@ export default function Weapons({
 
   // Frame processing loop for FPS movement bobbing, sway, recoil, reload and custom rotations
   useFrame((_state, delta) => {
-    // Synchronize the outer group with the active camera's transform in world space
-    if (cameraSyncGroupRef.current) {
-      cameraSyncGroupRef.current.position.copy(camera.position);
-      cameraSyncGroupRef.current.quaternion.copy(camera.quaternion);
-    }
-
     const dt = Math.min(delta, 0.05);
 
     // 1. Trigger recoil
@@ -225,9 +221,8 @@ export default function Weapons({
     }
   });
 
-  return (
-    <group ref={cameraSyncGroupRef}>
-      <group ref={gunGroupRef}>
+  return createPortal(
+    <group ref={gunGroupRef}>
       {/* --- FPS PROCEDURAL REVOLVER (STYLIZED RETRO RENDER) --- */}
       {currentWeapon === "revolver" && (
         <group>
@@ -498,7 +493,7 @@ export default function Weapons({
           </mesh>
         </group>
       )}
-      </group>
-    </group>
+      </group>,
+    camera
   );
 }
