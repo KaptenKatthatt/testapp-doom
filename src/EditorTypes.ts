@@ -54,3 +54,28 @@ export const CELL_LABELS: Record<CellType, string> = {
 
 export const ENTITY_TYPES = ['imp', 'demon', 'zombieman'] as const;
 export const PICKUP_TYPES = ['health', 'ammo', 'shotgun'] as const;
+
+// Limits for performance (enemies have ~12 meshes + 1 pointlight each)
+export const LIMITS: Record<string, number> = {
+  imp: 15,
+  demon: 10,
+  zombieman: 10,
+  health: 20,
+  ammo: 20,
+  shotgun: 10,
+  barrel: 15,
+  door: 20,
+  player: 1,
+  lava: 50,
+  slime: 50,
+  wall: 200,
+};
+
+// Categories for the tool selector
+export const CELL_CATEGORIES: { label: string; types: CellType[] }[] = [
+  { label: '🏗️ Structure', types: ['empty', 'wall', 'door'] },
+  { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman'] },
+  { label: '🎒 Pickups', types: ['health', 'ammo', 'shotgun'] },
+  { label: '🎯 Objects', types: ['player', 'barrel'] },
+  { label: '🌋 Floors', types: ['lava', 'slime'] },
+];

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PRESETS, PresetMap } from './EditorPresets';
 import {
   CellType,
@@ -9,6 +9,8 @@ import {
   GRID_H,
   CELL_COLORS,
   CELL_LABELS,
+  CELL_CATEGORIES,
+  LIMITS,
   TRACK_OPTIONS,
   TrackStyle as TrackStyleType,
 } from './EditorTypes';
@@ -80,6 +82,17 @@ export default function Editor() {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
+
+  // Count entities on the grid
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const row of grid) {
+      for (const cell of row) {
+        c[cell.type] = (c[cell.type] || 0) + 1;
+      }
+    }
+    return c;
+  }, [grid]);
   const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playerPos, setPlayerPos] = useState<[number, number] | null>(null);
@@ -207,6 +220,14 @@ export default function Editor() {
 
 
   const paintCells = useCallback((cells: [number, number][], cellType: CellType) => {
+    // Check limits before painting
+    if (cellType !== 'empty' && cellType !== 'wall' && cellType !== 'lava' && cellType !== 'slime') {
+      const currentCount = grid.flat().filter(c => c.type === cellType).length;
+      const limit = LIMITS[cellType] ?? 999;
+      // Allow painting over same type (replacing)
+      const cellsWithSameType = cells.filter(([x, z]) => grid[z]?.[x]?.type === cellType).length;
+      if (currentCount + cells.length - cellsWithSameType > limit) return; // silently block
+    }
     setGrid(prev => {
       const next = cloneGrid(prev);
       for (const [x, z] of cells) {
@@ -229,7 +250,7 @@ export default function Editor() {
       return next;
     });
     setReachableCells(null);
-  }, [playerPos, scheduleAutosave]);
+  }, [playerPos, scheduleAutosave, grid]);
 
   const paintCell = useCallback((x: number, z: number) => {
     paintCells([[x, z]], tool);
@@ -524,19 +545,44 @@ export default function Editor() {
         ))}
       </div>
 
-      {/* Cell type selector */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8, maxWidth: 600, justifyContent: 'center' }}>
-        {(Object.keys(CELL_LABELS) as CellType[]).map(t => (
-          <button key={t} onClick={() => setTool(t)} style={{
-            background: tool === t ? CELL_COLORS[t] : '#333',
-            border: tool === t ? '2px solid #fff' : '1px solid #555',
-            color: tool === t ? '#000' : '#ccc',
-            padding: '4px 8px', cursor: 'pointer', fontSize: 11, borderRadius: 3, touchAction: 'none',
-          }}>
-            {CELL_LABELS[t]}
-          </button>
-        ))}
+      {/* Entity counters */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap', fontFamily: 'monospace', fontSize: 11 }}>
+        {CELL_CATEGORIES.filter(cat => cat.types[0] !== 'empty').map(cat => {
+          const total = cat.types.reduce((sum, t) => sum + (counts[t] || 0), 0);
+          if (total === 0) return null;
+          const overLimit = cat.types.some(t => (counts[t] || 0) > (LIMITS[t] || 999));
+          return (
+            <span key={cat.label} style={{ color: overLimit ? '#ff4444' : '#aaa', background: overLimit ? '#440000' : '#1a1a1a', padding: '2px 6px', borderRadius: 3, border: overLimit ? '1px solid #f44' : '1px solid #333' }}>
+              {cat.label}: {total}
+            </span>
+          );
+        })}
       </div>
+
+      {/* Categorized tool buttons */}
+      {CELL_CATEGORIES.map(cat => (
+        <div key={cat.label} style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: '#666', marginBottom: 2, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1 }}>{cat.label}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {cat.types.map(t => {
+              const count = counts[t] || 0;
+              const limit = LIMITS[t];
+              const over = count >= limit;
+              return (
+                <button key={t} onClick={() => setTool(t)} style={{
+                  background: tool === t ? CELL_COLORS[t] : '#333',
+                  border: tool === t ? '2px solid #fff' : over ? '1px solid #f44' : '1px solid #555',
+                  color: tool === t ? '#000' : over ? '#f44' : '#ccc',
+                  padding: '3px 7px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 11, borderRadius: 3, touchAction: 'none',
+                  opacity: over && tool !== t ? 0.6 : 1,
+                }}>
+                  {CELL_LABELS[t]} <span style={{ fontSize: 9, color: over ? '#f44' : '#888' }}>{count}/{limit}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       {/* Preset selector */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
