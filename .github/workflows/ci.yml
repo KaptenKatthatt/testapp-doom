@@ -16,6 +16,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Unit tests
+        run: npm run test:unit
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Build

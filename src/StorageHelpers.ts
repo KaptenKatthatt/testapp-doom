@@ -39,7 +39,7 @@ export interface SavedMapListItem {
  * We map '__e1m1__' to 'system_e1m1' so the player's custom E1M1 edits are persistently saved in the database.
  * Other transient system maps like '__playing__' and '__autosache__' remain purely local.
  */
-function getFirestoreDocId(name: string): string | null {
+export function getFirestoreDocId(name: string): string | null {
   if (name === '__e1m1__') return 'system_e1m1';
   if (name.startsWith('__')) return null; // Ignore __playing__, __autosache__, etc.
   return name;
