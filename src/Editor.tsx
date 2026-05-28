@@ -566,7 +566,7 @@ export default function Editor() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
             {cat.types.map(t => {
               const count = counts[t] || 0;
-              const limit = LIMITS[t];
+              const limit = LIMITS[t] ?? 999;
               const over = count >= limit;
               return (
                 <button key={t} onClick={() => setTool(t)} style={{
