@@ -96,8 +96,8 @@ export function buildExportCode(grid: CellData[][], playerPos: [number, number] 
 
   code += `const WALL_DATA = [\n`;
   for (const w of levelData.walls) {
-    const yVal = w.isHalfWall ? 1 : 2;
-    const hVal = w.isHalfWall ? 2 : 4;
+    const yVal = w.isHalfWall ? 0.5 : 2;
+    const hVal = w.isHalfWall ? 1.0 : 4;
     code += `  { x: ${w.x}, y: ${yVal}, z: ${w.z}, w: ${w.w}, h: ${hVal}, d: ${w.d}, color: ${w.color}${w.isHalfWall ? ', isHalfWall: true' : ''} },\n`;
   }
   code += `];\n\n`;

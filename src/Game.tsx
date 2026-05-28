@@ -176,7 +176,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     const rawWalls = levelData && levelData.walls.length > 0
       ? getWalls(levelData.walls.filter(w => !w.isDoor).map(w => {
           const isHalf = w.isHalfWall ?? false;
-          return { x: w.x, y: isHalf ? 1 : 2, z: w.z, w: w.w, h: isHalf ? 2 : 4, d: w.d, color: isHalf ? 0x6e563a : 0x8b7355, isHalfWall: isHalf };
+          return { x: w.x, y: isHalf ? 0.5 : 2.0, z: w.z, w: w.w, h: isHalf ? 1.0 : 4.0, d: w.d, color: isHalf ? 0x6e563a : 0x8b7355, isHalfWall: isHalf };
         }))
       : getWalls();
 
@@ -270,7 +270,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         .filter(w => !w.isDoor)
         .map(w => {
           const isHalf = w.isHalfWall ?? false;
-          return { x: w.x, y: isHalf ? 1 : 2, z: w.z, w: w.w, h: isHalf ? 2 : 4, d: w.d, color: w.isDoor ? 0xcc0000 : isHalf ? 0x6e563a : 0x8b7355, isDoor: w.isDoor, isHalfWall: isHalf };
+          return { x: w.x, y: isHalf ? 0.5 : 2.0, z: w.z, w: w.w, h: isHalf ? 1.0 : 4.0, d: w.d, color: w.isDoor ? 0xcc0000 : isHalf ? 0x6e563a : 0x8b7355, isDoor: w.isDoor, isHalfWall: isHalf };
         });
     }
     return null;

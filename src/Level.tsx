@@ -141,11 +141,15 @@ const WALL_MESHES: WallMeshData[] = buildWallMeshes();
 
 export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean; isHalfWall?: boolean }>): WallBox[] {
   const data = wallDataOverride ?? (WALL_DATA as Array<{ x: number; y: number; z: number; w: number; h: number; d: number; color: number; isDoor?: boolean; isHalfWall?: boolean }>);
-  return data.map((w) => ({
-    min: [w.x, 0, w.z] as [number, number, number],
-    max: [w.x + w.w, w.h, w.z + w.d] as [number, number, number],
-    isHalfWall: w.isHalfWall ?? false,
-  }));
+  return data.map((w) => {
+    const isHalf = w.isHalfWall ?? false;
+    const hVal = isHalf ? 1.0 : w.h;
+    return {
+      min: [w.x, 0, w.z] as [number, number, number],
+      max: [w.x + w.w, hVal, w.z + w.d] as [number, number, number],
+      isHalfWall: isHalf,
+    };
+  });
 }
 
 export default function Level({ customWalls, specialFloors }: LevelProps): React.JSX.Element {
@@ -154,8 +158,8 @@ export default function Level({ customWalls, specialFloors }: LevelProps): React
     if (customWalls && customWalls.length > 0) {
       return customWalls.map((w, i) => {
         const isHalfWall = w.isHalfWall ?? false;
-        const height = isHalfWall ? 2 : 4;
-        const yPos = isHalfWall ? 1 : 2;
+        const height = isHalfWall ? 1.0 : 4.0;
+        const yPos = isHalfWall ? 0.5 : 2.0;
         return {
           key: i,
           x: w.x, y: yPos, z: w.z, w: w.w, h: height, d: w.d,
