@@ -4,6 +4,12 @@ import { audioManager } from "./Audio";
 import type { PlayerData } from "./Game";
 import type { BarrelData } from "./Level";
 
+// Pre-allocated reusable objects to avoid GC pressure per frame
+const _v3a = new THREE.Vector3();
+const _v3b = new THREE.Vector3();
+const _v3c = new THREE.Vector3();
+const _v3d = new THREE.Vector3();
+
 const PROJECTILE_SPEED = 12;
 
 const ENEMY_SPEEDS: Record<string, number> = {
@@ -173,7 +179,7 @@ export function updateEnemyAIHelper(
       const proposedX = e.position[0] + ndx * eSpeed * dt;
       const proposedZ = e.position[2] + ndz * eSpeed * dt;
 
-      if (!checkCollision(new THREE.Vector3(proposedX, 0, proposedZ), 0.6)) {
+      if (!checkCollision(_v3a.set(proposedX, 0, proposedZ), 0.6)) {
         // Can move directly toward player
         newX = proposedX;
         newZ = proposedZ;
@@ -184,11 +190,11 @@ export function updateEnemyAIHelper(
         const slideXPos = e.position[0] + ndx * eSpeed * dt;
         const slideZPos = e.position[2] + ndz * eSpeed * dt;
 
-        if (!checkCollision(new THREE.Vector3(slideXPos, 0, e.position[2]), 0.6)) {
+        if (!checkCollision(_v3a.set(slideXPos, 0, e.position[2]), 0.6)) {
           newX = slideXPos;
           movedX = true;
         }
-        if (!checkCollision(new THREE.Vector3(e.position[0], 0, slideZPos), 0.6)) {
+        if (!checkCollision(_v3a.set(e.position[0], 0, slideZPos), 0.6)) {
           newZ = slideZPos;
           movedZ = true;
         }
@@ -204,7 +210,7 @@ export function updateEnemyAIHelper(
             for (const [mx, mz] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as Array<[number, number]>) {
               const tryX = e.position[0] + mx * eSpeed * dt;
               const tryZ = e.position[2] + mz * eSpeed * dt;
-              if (!checkCollision(new THREE.Vector3(tryX, 0, tryZ), 0.5)) {
+              if (!checkCollision(_v3a.set(tryX, 0, tryZ), 0.5)) {
                 newX = tryX;
                 newZ = tryZ;
                 break;
@@ -214,10 +220,10 @@ export function updateEnemyAIHelper(
             // Sliding — try perpendicular
             const perpX = -ndz * eSpeed * dt;
             const perpZ = ndx * eSpeed * dt;
-            if (!checkCollision(new THREE.Vector3(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
+            if (!checkCollision(_v3a.set(e.position[0] + perpX, 0, e.position[2] + perpZ), 0.6)) {
               newX = e.position[0] + perpX;
               newZ = e.position[2] + perpZ;
-            } else if (!checkCollision(new THREE.Vector3(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
+            } else if (!checkCollision(_v3a.set(e.position[0] - perpX, 0, e.position[2] - perpZ), 0.6)) {
               newX = e.position[0] - perpX;
               newZ = e.position[2] - perpZ;
             }
@@ -361,9 +367,12 @@ export function handlePlayerMovementHelper(
   enemies: EnemyData[]
 ) {
   const speed = 8;
-  const forward = new THREE.Vector3(-Math.sin(player.rotation), 0, -Math.cos(player.rotation));
-  const right = new THREE.Vector3(Math.cos(player.rotation), 0, -Math.sin(player.rotation));
-  const move = new THREE.Vector3();
+  _v3a.set(-Math.sin(player.rotation), 0, -Math.cos(player.rotation)); // forward
+  _v3b.set(Math.cos(player.rotation), 0, -Math.sin(player.rotation)); // right
+  _v3c.set(0, 0, 0); // move (reuse _v3c, reset)
+  const forward = _v3a;
+  const right = _v3b;
+  const move = _v3c;
 
   if (keys["KeyW"] ?? false) move.add(forward);
   if (keys["KeyS"] ?? false) move.sub(forward);
@@ -372,9 +381,9 @@ export function handlePlayerMovementHelper(
 
   const [moveX, moveY] = mobileMove;
   if (Math.abs(moveX) > 0.05 || Math.abs(moveY) > 0.05) {
-    const mobileForward = forward.clone().multiplyScalar(-moveY);
-    const mobileRight = right.clone().multiplyScalar(moveX);
-    move.add(mobileForward).add(mobileRight);
+    // Add mobile input without cloning
+    move.x += forward.x * (-moveY) + right.x * moveX;
+    move.z += forward.z * (-moveY) + right.z * moveX;
   }
 
   const MOBILE_TURN_SPEED = 2.5;
@@ -545,7 +554,7 @@ export function handlePlayerShootingHelper(
 
   // Helper to spawn a projectile bullet
   function spawnBullet(speed: number, color: string) {
-    const camDir = new THREE.Vector3();
+    const camDir = _v3d; // reuse pre-allocated vector
     camera.getWorldDirection(camDir);
     const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
     const bulletPos: [number, number, number] = [

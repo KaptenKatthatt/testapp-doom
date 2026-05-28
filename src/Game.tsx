@@ -217,6 +217,18 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const gameActiveRef = useRef(true);
   const { camera } = useThree();
   const pullbackRef = useRef(0);
+
+  // Pre-allocated objects for pullback raycast (avoid GC pressure per frame)
+  const _pullbackDir = useMemo(() => new THREE.Vector3(), []);
+  const _pullbackRay = useMemo(() => new THREE.Ray(), []);
+  const _pullbackTarget = useMemo(() => new THREE.Vector3(), []);
+  const _pullboxMin = useMemo(() => new THREE.Vector3(), []);
+  const _pullboxMax = useMemo(() => new THREE.Vector3(), []);
+  const _pullbox = useMemo(() => new THREE.Box3(), []);
+
+  // Pre-allocated objects for camera look direction (avoid GC per frame)
+  const _lookDir = useMemo(() => new THREE.Vector3(), []);
+  const _lookTarget = useMemo(() => new THREE.Vector3(), []);
   const prevShootingRef = useRef(false);
   const doorTexture = useMemo(() => createDoorTexture(), []);
   // Use custom level data if provided, otherwise defaults
@@ -374,15 +386,15 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (player.health <= 0) return;
 
     if (paused) {
-      // Pause camera setup - keep camera sync but skip all logic
+      // Pause camera setup - keep camera sync but skip all logic (reuse vectors)
       camera.position.set(player.position.x, player.position.y, player.position.z);
-      const lookDir = new THREE.Vector3(
+      _lookDir.set(
         -Math.sin(player.rotation) * Math.cos(player.pitch),
         Math.sin(player.pitch),
         -Math.cos(player.rotation) * Math.cos(player.pitch),
       );
-      const lookTarget = camera.position.clone().add(lookDir.multiplyScalar(10));
-      camera.lookAt(lookTarget);
+      _lookTarget.copy(camera.position).addScaledVector(_lookDir, 10);
+      camera.lookAt(_lookTarget);
       camera.updateMatrixWorld(true);
       return;
     }
@@ -457,15 +469,15 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       player.damageFlash = Math.max(0, player.damageFlash - dt * 2);
     }
 
-    // Camera follow with pitch
+    // Camera follow with pitch (reuse pre-allocated vectors)
     camera.position.set(player.position.x, player.position.y, player.position.z);
-    const lookDir = new THREE.Vector3(
+    _lookDir.set(
       -Math.sin(player.rotation) * Math.cos(player.pitch),
       Math.sin(player.pitch),
       -Math.cos(player.rotation) * Math.cos(player.pitch),
     );
-    const lookTarget = camera.position.clone().add(lookDir.multiplyScalar(10));
-    camera.lookAt(lookTarget);
+    _lookTarget.copy(camera.position).addScaledVector(_lookDir, 10);
+    camera.lookAt(_lookTarget);
     camera.updateMatrixWorld(true);
 
     // Shooting
@@ -558,35 +570,29 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Reset use action after processing
     if (useActionRef) useActionRef.current = false;
 
-    // Calculate tactical weapon pullback when close to walls/doors
-    const pullbackLookDir = new THREE.Vector3();
-    camera.getWorldDirection(pullbackLookDir);
-    const ray = new THREE.Ray(camera.position, pullbackLookDir);
+    // Calculate tactical weapon pullback when close to walls/doors (reuse pre-allocated objects)
+    camera.getWorldDirection(_pullbackDir);
+    _pullbackRay.set(camera.position, _pullbackDir);
     let minDistance = 1.2; // Max distance we care about for pullback
 
-    const boxes: THREE.Box3[] = [];
     for (const wall of walls) {
-      boxes.push(new THREE.Box3(
-        new THREE.Vector3(wall.min[0], 0, wall.min[2]),
-        new THREE.Vector3(wall.max[0], wall.max[1], wall.max[2])
-      ));
+      _pullboxMin.set(wall.min[0], 0, wall.min[2]);
+      _pullboxMax.set(wall.max[0], wall.max[1], wall.max[2]);
+      _pullbox.set(_pullboxMin, _pullboxMax);
+      if (_pullbackRay.intersectBox(_pullbox, _pullbackTarget)) {
+        const dist = camera.position.distanceTo(_pullbackTarget);
+        if (dist < minDistance) minDistance = dist;
+      }
     }
     for (const door of doorsRef.current) {
       const doorBox = getDoorCollisionBox(door);
       if (doorBox) {
-        boxes.push(new THREE.Box3(
-          new THREE.Vector3(doorBox.min[0], 0, doorBox.min[2]),
-          new THREE.Vector3(doorBox.max[0], doorBox.max[1], doorBox.max[2])
-        ));
-      }
-    }
-
-    for (const box of boxes) {
-      const target = new THREE.Vector3();
-      if (ray.intersectBox(box, target)) {
-        const dist = camera.position.distanceTo(target);
-        if (dist < minDistance) {
-          minDistance = dist;
+        _pullboxMin.set(doorBox.min[0], 0, doorBox.min[2]);
+        _pullboxMax.set(doorBox.max[0], doorBox.max[1], doorBox.max[2]);
+        _pullbox.set(_pullboxMin, _pullboxMax);
+        if (_pullbackRay.intersectBox(_pullbox, _pullbackTarget)) {
+          const dist = camera.position.distanceTo(_pullbackTarget);
+          if (dist < minDistance) minDistance = dist;
         }
       }
     }
