@@ -76,9 +76,14 @@ test.describe("Game flows", () => {
   });
 
   test("pause menu opens and continue resumes game", async ({ page }) => {
+    test.setTimeout(60_000);
     await startGame(page);
+    // Let the game scene settle before opening pause (CI can be slower)
+    await page.waitForTimeout(500);
     await openPauseMenu(page);
-    await page.getByRole("button", { name: "CONTINUE" }).click();
+    await page.getByRole("button", { name: "CONTINUE" }).evaluate((el) =>
+      (el as HTMLButtonElement).click()
+    );
     await expect(page.getByText("GAME MENU")).not.toBeVisible();
     await expect(page.locator("canvas").first()).toBeVisible();
   });

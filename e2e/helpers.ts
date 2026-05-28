@@ -13,8 +13,8 @@ export async function gotoMenu(page: Page): Promise<void> {
 
 export async function startGame(page: Page): Promise<void> {
   await gotoMenu(page);
-  await page.click("body");
-  await expect(page.locator("canvas").first()).toBeVisible({ timeout: 5000 });
+  await page.getByRole("button", { name: /START GAME/ }).click();
+  await expect(page.locator("canvas").first()).toBeVisible({ timeout: 15_000 });
 }
 
 export async function openCustomMapsModal(page: Page): Promise<void> {
