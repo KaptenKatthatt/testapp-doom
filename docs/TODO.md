@@ -15,6 +15,11 @@ Ideer och funktioner vi vill införa. Tar en sak i taget i varsin branch så vi 
 
 ## Arkitektur / Infrastruktur
 
+- [ ] **Spara kartor i databas** — Istället för localStorage, spara skapade kartor och redigerad E1M1 i en databas så de överlever browser-cache rensning och kan delas mellan enheter. Alternativ:
+  - **Firebase** (free): Ingen pausing, 1GB, NoSQL → bra för enkla kartobjekt, alltid aktiv
+  - **Supabase** (free): Pausar efter 7 dagar inaktivitet → ~5-10s uppstart, 500MB PostgreSQL, auth+REST
+  - **Turso** (free): 9GB SQLite edge, ingen pausing, super-snabbt
+  - **Vercel KV** (free): 256MB Redis, redan integrerat med deploy
 - [ ] **Test-suite** — Unit tests för GameCollision, GameHelpers, EditorExport, StorageHelpers
 - [ ] **E2E-tester** — Playwright-tester som verifierar att spelet laddar, editorn funkar, E1M1 laddas korrekt
 - [ ] **CI pipeline** — Kör tsc + vite build + tester på varje PR innan merge
