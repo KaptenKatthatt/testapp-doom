@@ -182,19 +182,22 @@ export default function MainMenu({
         </a>
 
         {/* Edit E1M1 button */}
-        <a
-          href="#editor?load=e1m1"
-          onClick={(e) => e.stopPropagation()}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            localStorage.setItem('doom-load-e1m1', '1');
+            window.location.hash = '#editor';
+          }}
           style={{
             background: 'none', border: 'none', color: '#886644', fontSize: '16px', fontFamily: '"DooM", Impact, sans-serif',
             cursor: 'pointer', padding: '4px 16px', textAlign: 'left', width: '100%', letterSpacing: '2px',
-            textDecoration: 'none', display: 'block', transition: 'all 0.1s', marginTop: '-4px',
+            display: 'block', transition: 'all 0.1s', marginTop: '-4px',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = '#cc9966'; e.currentTarget.style.textShadow = '0 0 10px #886644'; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = '#886644'; e.currentTarget.style.textShadow = 'none'; }}
         >
           ✏️ EDIT E1M1
-        </a>
+        </button>
       </div>
 
       <p style={{ fontSize: "11px", color: "#444", marginTop: "24px", fontFamily: 'monospace' }}>
