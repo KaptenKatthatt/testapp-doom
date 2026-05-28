@@ -15,6 +15,7 @@ Ideer och funktioner vi vill införa. Tar en sak i taget i varsin branch så vi 
 
 ## Arkitektur / Infrastruktur
 
+- [ ] **Spara kartor i databas** — Istället för localStorage, spara skapade kartor och redigerad E1M1 i en databas så de överlever browser-cache rensning och kan delas mellan enheter. Kolla gratisalternativ: NextJS på Vercel? Supabase? Firebase free tier?
 - [ ] **Test-suite** — Unit tests för GameCollision, GameHelpers, EditorExport, StorageHelpers
 - [ ] **E2E-tester** — Playwright-tester som verifierar att spelet laddar, editorn funkar, E1M1 laddas korrekt
 - [ ] **CI pipeline** — Kör tsc + vite build + tester på varje PR innan merge
