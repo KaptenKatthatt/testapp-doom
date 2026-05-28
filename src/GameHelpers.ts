@@ -19,9 +19,9 @@ const ENEMY_SPEEDS: Record<string, number> = {
 };
 
 const ENEMY_ATTACK_RANGES: Record<string, number> = {
-  imp: 8,
+  imp: 25,
   demon: 2.5,
-  zombieman: 12,
+  zombieman: 30,
 };
 
 const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
@@ -246,7 +246,7 @@ export function updateEnemyAIHelper(
           speed: PROJECTILE_SPEED,
           fromEnemy: true,
           color: projColor,
-          life: 2,
+          life: 3.5,
         });
       }
     }
