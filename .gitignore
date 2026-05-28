@@ -3,5 +3,6 @@ dist
 *.local
 .env
 .env.*
-!.env.examplee2e/*.png
+!.env.example
+e2e/*.png
 test-results/

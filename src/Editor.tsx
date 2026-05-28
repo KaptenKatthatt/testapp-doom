@@ -21,6 +21,7 @@ import {
   deleteMapFromStorage,
   autosave,
   loadAutosave,
+  SavedMapListItem,
 } from './StorageHelpers';
 import { MusicEngine } from './MusicEngine';
 import { audioManager } from './Audio';
@@ -93,7 +94,7 @@ export default function Editor() {
     }
     return c;
   }, [grid]);
-  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number }>>([]);
+  const [savedMaps, setSavedMaps] = useState<Array<SavedMapListItem>>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playerPos, setPlayerPos] = useState<[number, number] | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -398,22 +399,23 @@ export default function Editor() {
     updateGrid(cloneGrid(preset.grid), preset.playerPos);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
-    saveMapToStorage(name, grid, playerPos, isValid, musicTrack);
+    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack);
     setShowSaveDialog(false);
     setSaveName('');
   };
 
-  const handleLoad = () => {
-    setSavedMaps(listSavedMaps());
+  const handleLoad = async () => {
+    const maps = await listSavedMaps();
+    setSavedMaps(maps);
     setShowLoadDialog(true);
   };
 
-  const handleLoadMap = (name: string, track?: TrackStyleType) => {
-    const data = loadMapFromStorage(name);
+  const handleLoadMap = async (name: string, track?: TrackStyleType) => {
+    const data = await loadMapFromStorage(name);
     if (data) {
       updateGrid(data.grid, data.playerPos);
       if (track) setMusicTrack(track);
@@ -422,10 +424,11 @@ export default function Editor() {
     }
   };
 
-  const handleDeleteMap = (name: string) => {
+  const handleDeleteMap = async (name: string) => {
     if (confirm(`Delete map "${name}"?`)) {
-      deleteMapFromStorage(name);
-      setSavedMaps(listSavedMaps());
+      await deleteMapFromStorage(name);
+      const maps = await listSavedMaps();
+      setSavedMaps(maps);
     }
   };
 
@@ -498,12 +501,12 @@ export default function Editor() {
     };
   }, [musicTrack]);
 
-  const handlePlayMap = () => {
+  const handlePlayMap = async () => {
     // Save current map and level data so the game can load it
     const ld = gridToLevelData(grid, playerPos, musicTrack);
     localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
     // Also save grid data for the editor to restore
-    saveMapToStorage('__playing__', grid, playerPos, false, musicTrack);
+    await saveMapToStorage('__playing__', grid, playerPos, false, musicTrack);
     // Navigate to game — use hash without reload so React picks it up
     window.location.hash = '';
   };
@@ -607,11 +610,12 @@ export default function Editor() {
         <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
         <button onClick={validate} style={btnStyle}>✅ Validate</button>
         <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
-        <button onClick={() => {
+        <button onClick={async () => {
           const result = runValidation(grid, playerPos);
           setSaveValidation(result);
           if (result.errors.length === 0) {
-            setSavedMaps(listSavedMaps());
+            const maps = await listSavedMaps();
+            setSavedMaps(maps);
             setShowSaveDialog(true);
           } else {
             setShowSaveDialog(true); // show dialog with errors
@@ -620,8 +624,8 @@ export default function Editor() {
         <button onClick={handleLoad} style={btnStyle}>📂 Load</button>
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
-        <button onClick={() => {
-          saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack);
+        <button onClick={async () => {
+          await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack);
           alert('✅ Saved as E1M1! This replaces the default map when you play E1M1 from the main menu.');
         }} style={{ ...btnStyle, background: '#553300', border: '1px solid #c80' }}>🏴‍☠️ Save as E1M1</button>
         <button onClick={handlePlayMap} style={{ ...btnStyle, background: '#050', border: '1px solid #0a0' }}>🎮 Play This Map</button>

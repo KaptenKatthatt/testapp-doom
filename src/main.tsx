@@ -9,7 +9,7 @@ export interface LevelData {
   enemies: Array<{ id: number; x: number; z: number; type: string }>;
   pickups: Array<{ id: number; x: number; z: number; type: string }>;
   playerStart: [number, number];
-  musicTrack?: string;
+  musicTrack?: string | undefined;
 }
 
 function Router() {
