@@ -1,5 +1,11 @@
 # Doom Project Memory
 
+## Development Process (MANDATORY)
+1. **Always run `npx tsc --noEmit && npx vite build` before pushing** — no exceptions
+2. **Never push directly to main** — always create a feature branch → PR → CI green → merge
+3. **dev branch** can receive direct pushes for iteration, but main only via PR
+4. **If Vercel CI fails** — fix immediately before any new work
+
 ## Key Architecture Decisions
 
 ### Weapon Rendering (commit c0466be)
@@ -26,6 +32,7 @@
 3. Pullback lerping for smooth wall proximity
 4. Camera must be added to scene graph (`scene.add(camera)`) for portal rendering
 5. **Pre-allocated Vector3/Ray/Box3** — never use `new THREE.Vector3()` inside useFrame loops or per-frame hot paths. Use module-level refs (`_v3a`, etc.) or `useMemo()`
+6. **No duplicate types** — always import CellType from EditorTypes, never redefine locally
 
 ## Performance Optimizations
 - Pre-allocated objects for pullback raycast (Game.tsx) — avoids ~20-100+ object allocations per frame
@@ -41,11 +48,12 @@
 - `ade8cf5`: Add camera to scene graph for portal rendering
 - `45e7dae`: Optimize enemy/pickup pointlights, throttle line-of-sight checks
 
-## Known Issues (as of 2026-05-28)
-- ~~Weapon pullback jitter near walls~~ (fixed with lerping)
-- ~~Weapon bobbing jitter (world-space sync)~~ (fixed: restored portal rendering)
-- Mobile shoot/USE buttons were overlapping HUD (fixed in 0cd2f5e)
-
 ## Critical: Antigravity Pitfalls
 - Antigravity replaced `createPortal(<group/>, camera)` with a world-space group that manually synced position/quaternion. This **broke weapon bobbing** by introducing frame-lag jitter. The portal approach is essential because it makes the weapon a child of the camera in the scene graph, so it moves with zero latency.
 - **Never replace portal-rendering with manual world-space sync** — it will always be one frame behind the camera.
+
+## Known Issues (as of 2026-05-28)
+- ~~Weapon pullback jitter near walls~~ (fixed with lerping)
+- ~~Weapon bobbing jitter (world-space sync)~~ (fixed: restored portal rendering)
+- ~~CellType duplicate type error~~ (fixed: import from EditorTypes)
+- Mobile shoot/USE buttons were overlapping HUD (fixed in 0cd2f5e)
