@@ -5,7 +5,7 @@ import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy, up
 export const AUTOSAVE_KEY = 'doom-editor-autosave';
 export const MAP_PREFIX = 'doom-map-';
 
-const FIRESTORE_TIMEOUT_MS = 5000;
+const FIRESTORE_TIMEOUT_MS = 15000;
 
 function withFirestoreTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
