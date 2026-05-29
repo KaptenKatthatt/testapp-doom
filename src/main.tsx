@@ -1,23 +1,19 @@
 import "./style.css";
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
-import Editor from "./Editor";
+import App from "@/app/App";
+import Editor from "@/editor/Editor";
+import { initE2EBridge } from "@/shared/e2eBridge";
+import type { LevelData } from "@/shared/levelData";
 
-export interface LevelData {
-  walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean }>;
-  enemies: Array<{ id: number; x: number; z: number; type: string }>;
-  pickups: Array<{ id: number; x: number; z: number; type: string }>;
-  playerStart: [number, number];
-  musicTrack?: string | undefined;
-}
+initE2EBridge();
 
-function Router() {
+function Router(): React.JSX.Element {
   const [route, setRoute] = useState(window.location.hash);
   const [levelData, setLevelData] = useState<LevelData | null>(null);
 
   useEffect(() => {
-    const handler = () => setRoute(window.location.hash);
+    const handler = (): void => { setRoute(window.location.hash); };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
