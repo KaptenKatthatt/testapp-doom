@@ -17,7 +17,9 @@ import type {
   PickupData,
   WallBox,
   ProjectileData,
+  EnemyType,
 } from "./types";
+import { ENEMY_MAX_HEALTH } from "./types";
 import {
   checkCollision as checkCollisionPure,
   checkWallHit as checkWallHitPure,
@@ -167,8 +169,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
   const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
-    const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : e.type === 'mancubus' ? 150 : e.type === 'cacodemon' ? 100 : e.type === 'ratman' ? 35 : 35;
-    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as "imp" | "demon" | "zombieman" | "ratman" | "mancubus" | "cacodemon", health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
+    const hp = ENEMY_MAX_HEALTH[e.type as EnemyType] ?? 35;
+    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as EnemyType, health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
   }) : INITIAL_ENEMIES;
   const customPickups: PickupData[] = levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS;
   const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
@@ -372,12 +374,12 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         audioManager.play("weapon_pickup");
       } else if (e.code === "KeyR" || e.key === "r" || e.key === "R") {
         if (player.currentWeapon === "revolver") {
-          if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > player.revolverChamber) {
+          if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > 0) {
             player.revolverReloadTimer = 1.0;
             audioManager.play("shotgun_cock");
           }
         } else if (player.currentWeapon === "machinegun") {
-          if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > player.machinegunMag) {
+          if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > 0) {
             player.machinegunReloadTimer = 2.0;
             audioManager.play("shotgun_cock");
           }
@@ -438,13 +440,17 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     if (player.revolverReloadTimer > 0) {
       player.revolverReloadTimer = Math.max(0, player.revolverReloadTimer - dt);
       if (player.revolverReloadTimer === 0) {
-        player.revolverChamber = Math.min(6, player.bullets);
+        const toLoad = Math.min(6 - player.revolverChamber, player.bullets);
+        player.revolverChamber += toLoad;
+        player.bullets -= toLoad;
       }
     }
     if (player.machinegunReloadTimer > 0) {
       player.machinegunReloadTimer = Math.max(0, player.machinegunReloadTimer - dt);
       if (player.machinegunReloadTimer === 0) {
-        player.machinegunMag = Math.min(70, player.bullets);
+        const toLoad = Math.min(70 - player.machinegunMag, player.bullets);
+        player.machinegunMag += toLoad;
+        player.bullets -= toLoad;
       }
     }
 

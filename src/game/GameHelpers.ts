@@ -467,18 +467,8 @@ export function handlePlayerShootingHelper(
       return;
     }
 
-    if (player.bullets <= 0) {
-      if (!player.hasPlayedEmptyClick) {
-        audioManager.play('noway');
-        player.hasPlayedEmptyClick = true;
-      }
-      player.shooting = false;
-      return;
-    }
-
     if (now - player.lastShot > 0.3) {
       player.revolverChamber--;
-      player.bullets--;
       player.lastShot = now;
       player.shotsFired++;
       audioManager.play('pistol');
@@ -537,17 +527,8 @@ export function handlePlayerShootingHelper(
       return;
     }
 
-    if (player.bullets <= 0) {
-      if (!player.hasPlayedEmptyClick) {
-        audioManager.play('noway');
-        player.hasPlayedEmptyClick = true;
-      }
-      return;
-    }
-
     if (now - player.lastShot > 0.1) {
       player.machinegunMag--;
-      player.bullets--;
       player.lastShot = now;
       player.shotsFired++;
       audioManager.play('pistol');

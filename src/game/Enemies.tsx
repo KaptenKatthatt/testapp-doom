@@ -430,19 +430,17 @@ function HealthBar({
 
 function EnemyLight({
   lightRef,
-  position,
   bodyH,
   color,
 }: {
   readonly lightRef: React.RefObject<THREE.PointLight | null>;
-  readonly position: [number, number, number];
   readonly bodyH: number;
   readonly color: string;
 }): React.JSX.Element {
   return (
     <pointLight
       ref={lightRef}
-      position={[position[0], position[1] + bodyH + 0.5, position[2]]}
+      position={[0, bodyH + 0.5, 0]}
       color={color}
       intensity={2.0}
       distance={8}
@@ -473,9 +471,9 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
   const isSpriteEnemy = type === "mancubus" || type === "ratman" || type === "cacodemon";
 
-  const mancubusTexture = useMemo(() => getMancubusBaseTexture().clone(), []);
-  const ratmanTexture = useMemo(() => getRatmanBaseTexture().clone(), []);
-  const cacodemonTexture = useMemo(() => getCacodemonBaseTexture().clone(), []);
+  const mancubusTexture = useMemo(() => (type === "mancubus" ? getMancubusBaseTexture().clone() : null), [type]);
+  const ratmanTexture = useMemo(() => (type === "ratman" ? getRatmanBaseTexture().clone() : null), [type]);
+  const cacodemonTexture = useMemo(() => (type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [type]);
 
   const bodyTexture = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -505,7 +503,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   }, [type]);
 
   useFrame((state) => {
-    if (type === "mancubus") {
+    if (type === "mancubus" && mancubusTexture) {
       const diff = getCameraDiff(
         state.camera.position.x,
         state.camera.position.z,
@@ -534,7 +532,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (type === "ratman") {
+    if (type === "ratman" && ratmanTexture) {
       const diff = getCameraDiff(
         state.camera.position.x,
         state.camera.position.z,
@@ -563,7 +561,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (type === "cacodemon") {
+    if (type === "cacodemon" && cacodemonTexture) {
       const diff = getCameraDiff(
         state.camera.position.x,
         state.camera.position.z,
@@ -624,7 +622,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
           />
         </sprite>
         <HealthBar healthPct={healthPct} y={config.bodyH + 0.3} width={1.5} />
-        <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH} color="#ffaa00" />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color="#ffaa00" />
       </group>
     );
   }
@@ -641,7 +639,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
           />
         </sprite>
         <HealthBar healthPct={healthPct} y={config.bodyH + 0.3} width={1.2} />
-        <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH} color="#88ff88" />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color="#ccaa44" />
       </group>
     );
   }
@@ -658,7 +656,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
           />
         </sprite>
         <HealthBar healthPct={healthPct} y={config.bodyH + CACODEMON_FLOAT_HEIGHT + 0.5} width={1.2} />
-        <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH + CACODEMON_FLOAT_HEIGHT} color="#cc44ff" />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH + CACODEMON_FLOAT_HEIGHT} color="#cc44ff" />
       </group>
     );
   }
@@ -722,7 +720,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         </mesh>
       </group>
       <HealthBar healthPct={healthPct} y={config.bodyH + 1.0} />
-      <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH} color={type === "demon" ? "#ff0044" : type === "zombieman" ? "#88ff88" : "#ff6600"} />
+      <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color={type === "demon" ? "#ff0044" : type === "zombieman" ? "#88ff88" : "#ff6600"} />
     </group>
   );
 }
@@ -731,15 +729,15 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const { position } = enemy;
   const config = ENEMY_CONFIG[enemy.type];
   const [deathTime] = useState(() => performance.now() / 1000);
-  const mancubusTexture = useMemo(() => getMancubusBaseTexture().clone(), []);
-  const ratmanTexture = useMemo(() => getRatmanBaseTexture().clone(), []);
-  const cacodemonTexture = useMemo(() => getCacodemonBaseTexture().clone(), []);
+  const mancubusTexture = useMemo(() => (enemy.type === "mancubus" ? getMancubusBaseTexture().clone() : null), [enemy.type]);
+  const ratmanTexture = useMemo(() => (enemy.type === "ratman" ? getRatmanBaseTexture().clone() : null), [enemy.type]);
+  const cacodemonTexture = useMemo(() => (enemy.type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [enemy.type]);
   const spriteRef = useRef<THREE.Sprite>(null);
 
   useFrame(() => {
     const elapsed = (performance.now() / 1000) - deathTime;
 
-    if (enemy.type === "mancubus") {
+    if (enemy.type === "mancubus" && mancubusTexture) {
       let row = 8;
       if (elapsed < 0.1) row = 8;
       else if (elapsed < 0.2) row = 9;
@@ -756,7 +754,7 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (enemy.type === "ratman") {
+    if (enemy.type === "ratman" && ratmanTexture) {
       const rowData = RATMAN_ROWS[7] ?? RATMAN_ROWS[0];
       if (!rowData) return;
       const deathFrame = Math.min(5, Math.floor(elapsed / 0.12));
@@ -767,7 +765,7 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (enemy.type === "cacodemon") {
+    if (enemy.type === "cacodemon" && cacodemonTexture) {
       const rowData = CACODEMON_ROWS[11] ?? CACODEMON_ROWS[0];
       if (!rowData) return;
       const deathFrame = Math.min(7, Math.floor(elapsed / 0.1));

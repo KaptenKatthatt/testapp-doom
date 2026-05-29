@@ -35,6 +35,15 @@ export interface EnemyData {
 
 export type EnemyType = "imp" | "demon" | "zombieman" | "ratman" | "mancubus" | "cacodemon";
 
+export const ENEMY_MAX_HEALTH: Record<EnemyType, number> = {
+  imp: 45,
+  demon: 80,
+  zombieman: 35,
+  ratman: 35,
+  mancubus: 150,
+  cacodemon: 100,
+};
+
 export interface PickupData {
   id: number;
   position: [number, number, number];
