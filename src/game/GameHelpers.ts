@@ -17,6 +17,7 @@ const ENEMY_SPEEDS: Record<string, number> = {
   demon: 5.0,
   zombieman: 2.5,
   mancubus: 1.6,
+  cacodemon: 3.5,
 };
 
 const ENEMY_ATTACK_RANGES: Record<string, number> = {
@@ -24,6 +25,7 @@ const ENEMY_ATTACK_RANGES: Record<string, number> = {
   demon: 2.5,
   zombieman: 30,
   mancubus: 20,
+  cacodemon: 25,
 };
 
 const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
@@ -31,6 +33,7 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   demon: 0.8,
   zombieman: 2.5,
   mancubus: 3.5,
+  cacodemon: 2.0,
 };
 
 const PROJECTILE_COLORS: Record<string, string> = {
@@ -38,6 +41,7 @@ const PROJECTILE_COLORS: Record<string, string> = {
   demon: "#ff0044",
   zombieman: "#88ff44",
   mancubus: "#ffaa00",
+  cacodemon: "#00ffff",
 };
 
 /** Helper to update all projectiles in the game */
@@ -156,7 +160,7 @@ export function updateEnemyAIHelper(
 
     // Alert sound when enemy first sees the player (scaled down to 0.02 volume)
     if (canSeePlayer && !e.hasAlerted) {
-      const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert', mancubus: 'demon_alert' };
+      const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert', mancubus: 'demon_alert', cacodemon: 'demon_alert' };
       audioManager.play(alertSounds[e.type] ?? 'zombie_alert', 0.02);
     }
 
@@ -680,7 +684,7 @@ export function handlePlayerShootingHelper(
           if (e.id !== targetEnemy.id) return e;
           const newHealth = e.health - closestDamage;
           if (newHealth <= 0) {
-            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', mancubus: 'demon_death' };
+            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
             audioManager.play(deathSounds[e.type] ?? 'imp_death');
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
@@ -746,7 +750,7 @@ export function explodeBarrelSplash(
         const dmg = baseDmg * (1 - dist / maxRadius);
         const nextHP = Math.max(0, e.health - dmg);
         if (nextHP <= 0) {
-          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', mancubus: 'demon_death' };
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
           audioManager.play(deathSounds[e.type] ?? 'imp_death');
           return { ...e, health: 0, alive: false, hitFlash: 0 };
         }

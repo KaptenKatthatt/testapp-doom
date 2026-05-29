@@ -9,7 +9,7 @@ export const TRACK_OPTIONS: Array<{ value: TrackStyle; label: string; emoji: str
   { value: 'classic', label: 'Classic', emoji: '🎸' },
 ];
 
-export type CellType = 'empty' | 'wall' | 'halfwall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'mancubus' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
+export type CellType = 'empty' | 'wall' | 'halfwall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'mancubus' | 'cacodemon' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
 export type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 
 export interface CellData {
@@ -30,6 +30,7 @@ export const CELL_COLORS: Record<CellType, string> = {
   demon: '#FF0000',
   zombieman: '#88FF00',
   mancubus: '#FF33AA',
+  cacodemon: '#9400D3',
   health: '#0044FF',
   ammo: '#FFAA00',
   shotgun: '#00AAFF',
@@ -48,6 +49,7 @@ export const CELL_LABELS: Record<CellType, string> = {
   demon: '💀 Demon',
   zombieman: '🧟 Zombie',
   mancubus: '🐘 Mancubus',
+  cacodemon: '👿 Cacodemon',
   health: '💊 Health',
   ammo: '🔫 Ammo',
   shotgun: '🔫 Shotgun',
@@ -56,7 +58,7 @@ export const CELL_LABELS: Record<CellType, string> = {
   slime: '🤢 Slime',
 };
 
-export const ENTITY_TYPES = ['imp', 'demon', 'zombieman', 'mancubus'] as const;
+export const ENTITY_TYPES = ['imp', 'demon', 'zombieman', 'mancubus', 'cacodemon'] as const;
 export const PICKUP_TYPES = ['health', 'ammo', 'shotgun'] as const;
 
 // Limits for performance (enemies have ~12 meshes + 1 pointlight each)
@@ -65,6 +67,7 @@ export const LIMITS: Record<string, number> = {
   demon: 10,
   zombieman: 10,
   mancubus: 8,
+  cacodemon: 8,
   health: 20,
   ammo: 20,
   shotgun: 10,
@@ -79,7 +82,7 @@ export const LIMITS: Record<string, number> = {
 // Categories for the tool selector
 export const CELL_CATEGORIES: Array<{ label: string; types: CellType[] }> = [
   { label: '🏗️ Structure', types: ['empty', 'wall', 'door'] },
-  { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman', 'mancubus'] },
+  { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman', 'mancubus', 'cacodemon'] },
   { label: '🎒 Pickups', types: ['health', 'ammo', 'shotgun'] },
   { label: '🎯 Objects', types: ['player', 'barrel'] },
   { label: '🌋 Floors', types: ['lava', 'slime'] },

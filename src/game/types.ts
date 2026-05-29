@@ -33,7 +33,7 @@ export interface EnemyData {
   lastLosResult?: boolean | undefined;
 }
 
-export type EnemyType = "imp" | "demon" | "zombieman" | "mancubus";
+export type EnemyType = "imp" | "demon" | "zombieman" | "mancubus" | "cacodemon";
 
 export interface PickupData {
   id: number;
