@@ -41,6 +41,8 @@ interface SaveModalProps {
   setSaveName: (name: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  user?: unknown;
+  onSubmitForApproval?: () => void;
 }
 
 export function SaveModal({
@@ -49,6 +51,8 @@ export function SaveModal({
   setSaveName,
   onSave,
   onCancel,
+  user,
+  onSubmitForApproval,
 }: SaveModalProps): React.JSX.Element {
   return (
     <div style={overlayStyle}>
@@ -92,8 +96,11 @@ export function SaveModal({
           }}
           autoFocus
         />
-        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-          <button onClick={onSave} style={btnStyle}>💾 Save</button>
+        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={onSave} style={btnStyle}>💾 Save {user ? 'Cloud Draft' : 'Local'}</button>
+          {!!user && saveValidation?.errors.length === 0 && onSubmitForApproval && (
+            <button onClick={onSubmitForApproval} style={{ ...btnStyle, background: '#050', border: '1px solid #0f0', color: '#0f0' }}>🚀 Submit for Approval</button>
+          )}
           <button onClick={onCancel} style={btnStyle}>❌ Cancel</button>
         </div>
       </div>
@@ -102,7 +109,7 @@ export function SaveModal({
 }
 
 interface LoadModalProps {
-  savedMaps: Array<{ name: string; timestamp: number; cloudSaved?: boolean }>;
+  savedMaps: Array<{ name: string; timestamp: number; cloudSaved?: boolean | undefined }>;
   onLoadMap: (name: string) => void;
   onDeleteMap: (name: string) => void;
   onClose: () => void;

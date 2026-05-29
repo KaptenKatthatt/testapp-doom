@@ -1,6 +1,8 @@
 import { initializeApp, getApps, type FirebaseOptions } from "firebase/app";
 import type { Firestore } from "firebase/firestore";
 import { getFirestore } from "firebase/firestore";
+import type { Auth } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 
 const apiKey: string | undefined = import.meta.env.VITE_FIREBASE_API_KEY;
 const authDomain: string | undefined = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
@@ -12,6 +14,7 @@ const appId: string | undefined = import.meta.env.VITE_FIREBASE_APP_ID;
 // Check if we have the minimum required keys to initialize Firebase
 
 let db: Firestore | null = null;
+let auth: Auth | null = null;
 
 if (apiKey && projectId && appId) {
   try {
@@ -28,7 +31,8 @@ if (apiKey && projectId && appId) {
     const existingApps = getApps();
     const app = existingApps[0] ?? initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("Firebase Cloud Firestore initialized successfully!");
+    auth = getAuth(app);
+    console.log("Firebase Cloud Firestore & Auth initialized successfully!");
   } catch (error: unknown) {
     console.error("Failed to initialize Firebase:", error);
   }
@@ -39,4 +43,5 @@ if (apiKey && projectId && appId) {
   );
 }
 
-export { db };
+export { db, auth };
+

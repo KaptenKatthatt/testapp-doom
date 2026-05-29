@@ -49,7 +49,7 @@ export function useGameInputs(
     const handleMouseDown = (e: MouseEvent): void => {
       if (e.button === 0) {
         if (!gameActiveRef.current) return;
-        if (!document.pointerLockElement) {
+        if (!document.pointerLockElement && !navigator.webdriver) {
           document.body.requestPointerLock?.();
         }
         playerRef.current.shooting = true;

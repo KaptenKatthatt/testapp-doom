@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo, type JSX } from 'react';
-import { PRESETS } from './EditorPresets';
 import type { PresetMap } from './EditorPresets';
+import { FALLBACK_PRESETS } from './EditorPresets';
 import type {
   CellType,
   DrawMode,
@@ -25,13 +25,21 @@ import {
   listSavedMaps,
   deleteMapFromStorage,
   autosave,
-  loadAutosave
+  loadAutosave,
+  submitMapForApproval,
+  listPendingMaps,
+  reviewMap
 } from '@/shared/storage/StorageHelpers';
 import { MusicEngine } from '@/shared/audio/MusicEngine';
 import { audioManager } from '@/shared/audio/Audio';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
+
+import { auth } from '@/shared/storage/firebase';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { loadPresetsFromCloud, savePresetToCloud, lazyMigratePresets } from '@/shared/storage/PresetStorage';
+import AuthModal from './AuthModal';
 
 export { gridToLevelData }; // Re-export for compatibility
 export type { CellType, DrawMode, CellData }; // Re-export for any external files
@@ -88,6 +96,26 @@ export default function Editor(): JSX.Element {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
 
+  // Auth and Preset Storage additions
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [presets, setPresets] = useState<PresetMap[]>(FALLBACK_PRESETS);
+  const [presetsLoading, setPresetsLoading] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [pendingMaps, setPendingMaps] = useState<SavedMapListItem[]>([]);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // Responsive layout state
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState<'canvas' | 'palette' | 'config'>('canvas');
+
+  useEffect(() => {
+    setIsMobile(window.innerWidth <= 768);
+    const handleResize = (): void => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Count entities on the grid
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -111,6 +139,37 @@ export default function Editor(): JSX.Element {
     }, 1000);
   }, []);
 
+  // Subscribe to Firebase Auth and set up admin features
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser?.email === 'jonas.olson@gmail.com') {
+        // Lazy migrate presets on admin login
+        void lazyMigratePresets();
+        // Load pending reviews
+        void listPendingMaps().then(setPendingMaps);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Fetch presets from cloud on mount
+  useEffect(() => {
+    setPresetsLoading(true);
+    loadPresetsFromCloud().then((loaded) => {
+      if (loaded && loaded.length > 0) {
+        setPresets(loaded);
+      } else {
+        setPresets(FALLBACK_PRESETS);
+      }
+      setPresetsLoading(false);
+    }).catch((err: unknown) => {
+      console.error(err);
+      setPresetsLoading(false);
+    });
+  }, []);
+
   // Check for autosave on mount — restore silently if available
   useEffect(() => {
     // Check if E1M1 should be loaded (flag set by main menu button)
@@ -118,10 +177,11 @@ export default function Editor(): JSX.Element {
     const loadMapName = localStorage.getItem('doom-load-map');
     if (loadE1m1) {
       localStorage.removeItem('doom-load-e1m1');
-      const e1m1 = PRESETS.find(p => p.name === 'E1M1 Entryway');
+      const e1m1 = presets.find(p => p.id === 'e1m1') ?? FALLBACK_PRESETS.find(p => p.id === 'e1m1');
       if (e1m1) {
         setGrid(cloneGrid(e1m1.grid));
         setPlayerPos(e1m1.playerPos);
+        setSelectedPresetId('e1m1');
       }
     } else if (loadMapName) {
       localStorage.removeItem('doom-load-map');
@@ -142,7 +202,7 @@ export default function Editor(): JSX.Element {
         }
       }
     }
-  }, []);
+  }, [presets]);
 
   // Update grid + autosave helper
   const updateGrid = useCallback((newGrid: CellData[][], newPlayerPos?: [number, number] | null) => {
@@ -416,15 +476,76 @@ export default function Editor(): JSX.Element {
 
   const loadPreset = (preset: PresetMap): void => {
     updateGrid(cloneGrid(preset.grid), preset.playerPos);
+    setSelectedPresetId(preset.id);
+    if (preset.musicTrack) setMusicTrack(preset.musicTrack);
   };
 
   const handleSave = async (): Promise<void> => {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
-    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack);
+    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack, 'draft');
     setShowSaveDialog(false);
     setSaveName('');
+  };
+
+  const handleSubmitForApproval = async (): Promise<void> => {
+    const name = saveName.trim();
+    if (!name) {
+      alert("Please enter a map name first");
+      return;
+    }
+    try {
+      await submitMapForApproval(name);
+      alert(`✅ Map "${name}" has been submitted successfully for publishing! Status is now pending review.`);
+      setShowSaveDialog(false);
+      setSaveName('');
+    } catch (err: unknown) {
+      const errorObject = err as Error;
+      alert(`❌ Failed to submit map: ${errorObject.message ?? String(err)}`);
+    }
+  };
+
+  const handleSavePreset = async (): Promise<void> => {
+    if (!selectedPresetId) return;
+    const preset = presets.find(p => p.id === selectedPresetId) ?? FALLBACK_PRESETS.find(p => p.id === selectedPresetId);
+    if (!preset) return;
+
+    if (confirm(`Are you sure you want to permanently update the official preset "${preset.name}" for ALL players?`)) {
+      try {
+        const updatedPreset = {
+          id: selectedPresetId,
+          name: preset.name,
+          description: preset.description,
+          grid: grid,
+          playerPos: playerPos ?? [2, 3],
+          musicTrack: musicTrack,
+        };
+        await savePresetToCloud(updatedPreset, user?.uid);
+        alert(`✅ Preset "${preset.name}" has been updated successfully in the cloud database!`);
+        
+        // Reload presets list
+        const loaded = await loadPresetsFromCloud();
+        if (loaded) setPresets(loaded);
+      } catch (err: unknown) {
+        const errorObject = err as Error;
+        alert(`❌ Failed to save preset to cloud: ${errorObject.message ?? String(err)}`);
+      }
+    }
+  };
+
+  const handleReviewMap = async (mapName: string, action: 'approved' | 'rejected', notes?: string): Promise<void> => {
+    try {
+      await reviewMap(mapName, action, notes);
+      alert(`✅ Map "${mapName}" reviewed successfully: ${action.toUpperCase()}`);
+      
+      // Reload pending reviews list
+      const pending = await listPendingMaps();
+      setPendingMaps(pending);
+    } catch (err: unknown) {
+      const errorObject = err as Error;
+      alert(`❌ Failed to review map: ${errorObject.message ?? String(err)}`);
+    }
   };
 
   const handleLoad = async (): Promise<void> => {
@@ -547,159 +668,597 @@ export default function Editor(): JSX.Element {
 
   const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect', hollowRect: '🔲 Hollow' };
 
+  if (isMobile) {
+    return (
+      <div className="editor-mobile" style={{
+        background: '#111',
+        color: '#fff',
+        fontFamily: 'monospace',
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+      }}>
+        {/* MOBILE TABS */}
+        <div style={{
+          display: 'flex',
+          background: 'rgba(20, 10, 10, 0.95)',
+          borderBottom: '2px solid #c00',
+          height: 48,
+          boxSizing: 'border-box',
+          zIndex: 10,
+        }}>
+          {(['canvas', 'palette', 'config'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{
+              flex: 1,
+              background: activeTab === tab ? '#300' : 'none',
+              border: 'none',
+              borderBottom: activeTab === tab ? '3px solid #ff3333' : 'none',
+              color: activeTab === tab ? '#fff' : '#888',
+              fontSize: 12,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              outline: 'none',
+            }}>
+              {tab === 'canvas' ? '🎮 Canvas' : tab === 'palette' ? '🖌️ Palette' : '⚙️ Config'}
+            </button>
+          ))}
+        </div>
+
+        {/* MOBILE TAB CONTENTS */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          boxSizing: 'border-box',
+          padding: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#0d0d0d',
+        }}>
+          {activeTab === 'canvas' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 8 }}>
+              {/* Header Title + Draw Mode */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <h3 style={{ color: '#c00', margin: 0, fontSize: 14, letterSpacing: '1px' }}>🎮 RENDER VIEWPORT</h3>
+                
+                {/* Exit Button */}
+                <button onClick={() => { window.location.hash = String(); }} style={{ color: "#c00", fontSize: 16, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }}>✕</button>
+              </div>
+
+              {/* Draw Mode Selectors */}
+              <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+                {(Object.keys(drawModeLabels) as DrawMode[]).map(m => (
+                  <button key={m} onClick={() => { setDrawMode(m); setLineStart(null); setRectStart(null); setPreviewCells([]); }} style={{
+                    flex: 1,
+                    background: drawMode === m ? '#c00' : '#222',
+                    border: drawMode === m ? '1px solid #fff' : '1px solid #444',
+                    color: drawMode === m ? '#fff' : '#aaa',
+                    padding: '6px 4px', cursor: 'pointer', fontSize: 10, borderRadius: 3, fontFamily: 'monospace',
+                  }}>
+                    {drawModeLabels[m].split(' ')[1] ?? drawModeLabels[m]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Actions Row */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, flex: 1, padding: '6px 4px', fontSize: 10, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
+                <button onClick={validate} style={{ ...btnStyle, flex: 1, padding: '6px 4px', fontSize: 10 }}>✅ Valid</button>
+                <button onClick={async () => {
+                  const result = runValidation(grid, playerPos);
+                  setSaveValidation(result);
+                  const maps = await listSavedMaps();
+                  setSavedMaps(maps);
+                  setShowSaveDialog(true);
+                }} style={{ ...btnStyle, flex: 1, padding: '6px 4px', fontSize: 10, background: '#750' }}>💾 Save</button>
+                <button onClick={handlePlayMap} style={{ ...btnStyle, flex: 1.5, padding: '6px 4px', fontSize: 10, background: '#050', fontWeight: 'bold' }}>🎮 Play</button>
+              </div>
+
+              {/* Canvas Container */}
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#000',
+                border: '1.5px solid #333',
+                borderRadius: 4,
+                overflow: 'hidden',
+                padding: 4,
+                aspectRatio: '1/1',
+              }}>
+                <canvas ref={canvasRef} width={GRID_W * CELL_SIZE} height={GRID_H * CELL_SIZE}
+                  onMouseDown={handlePointerDown} onMouseMove={handlePointerMove}
+                  onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
+                  onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
+                  style={{ border: '1px solid #c00', cursor: drawMode === 'paint' ? 'crosshair' : drawMode === 'line' ? 'crosshair' : 'cell', touchAction: 'none', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', aspectRatio: '1/1', objectFit: 'contain' }}
+                />
+              </div>
+
+              {/* Mobile Canvas Status Info */}
+              <div style={{ fontSize: 10, color: '#888', display: 'flex', justifyContent: 'space-between', padding: '0 4px' }}>
+                <span>Tool: <strong style={{ color: CELL_COLORS[tool] }}>{CELL_LABELS[tool].toUpperCase()}</strong></span>
+                <span>Coord: {GRID_W}×{GRID_H}</span>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'palette' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <h3 style={{ color: '#c00', margin: '0 0 4px 0', fontSize: 14, letterSpacing: '1px', borderBottom: '1px solid #333', paddingBottom: 6 }}>🖌️ BLOCK PALETTE</h3>
+              
+              {/* Entity counters */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+                {CELL_CATEGORIES.filter(cat => cat.types[0] !== 'empty').map(cat => {
+                  const total = cat.types.reduce((sum, t) => sum + (counts[t] ?? 0), 0);
+                  if (total === 0) return null;
+                  const overLimit = cat.types.some(t => (counts[t] ?? 0) > (LIMITS[t] ?? 999));
+                  return (
+                    <span key={cat.label} style={{ fontSize: 9, color: overLimit ? '#ff4444' : '#aaa', background: overLimit ? '#440000' : '#1a1a1a', padding: '2px 4px', borderRadius: 3, border: '1.5px solid #222' }}>
+                      {cat.label.toUpperCase()}: {total}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* Palette Categories */}
+              {CELL_CATEGORIES.map(cat => (
+                <div key={cat.label} style={{ background: 'rgba(20, 10, 10, 0.4)', border: '1.5px solid #222', borderRadius: 4, padding: 8 }}>
+                  <div style={{ fontSize: 10, color: '#ff6666', marginBottom: 6, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>{cat.label}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {cat.types.map(t => {
+                      const count = counts[t] ?? 0;
+                      const limit = LIMITS[t] ?? 999;
+                      const over = t !== 'empty' && count >= limit;
+                      return (
+                        <button key={t} onClick={() => { setTool(t); setActiveTab('canvas'); }} style={{
+                          background: tool === t ? CELL_COLORS[t] : '#222',
+                          border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
+                          color: tool === t ? '#000' : over ? '#f44' : '#ccc',
+                          padding: '4px 8px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
+                          opacity: over && tool !== t ? 0.6 : 1,
+                        }}>
+                          {CELL_LABELS[t]} {t !== 'empty' && <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}/{limit}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'config' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <h3 style={{ color: '#c00', margin: '0 0 4px 0', fontSize: 14, letterSpacing: '1px', borderBottom: '1px solid #333', paddingBottom: 6 }}>⚙️ CONFIG & AUTH</h3>
+              
+              {/* Compact Auth Bar */}
+              <div style={{ padding: 10, background: '#181818', border: '1.5px solid #222', borderRadius: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 8 }}>
+                  {user ? (
+                    <div>
+                      <span>User: <strong style={{ color: '#ffcc00' }}>{(user.displayName ?? user.email ?? '').slice(0, 16)}</strong></span>
+                      {user.email === 'jonas.olson@gmail.com' && <span style={{ color: '#f55', marginLeft: 4 }}>[ADMIN]</span>}
+                    </div>
+                  ) : (
+                    <span style={{ color: '#888' }}>💻 Local Mode active</span>
+                  )}
+                  {user ? (
+                    <button onClick={() => { if (confirm('Log out?') && auth) signOut(auth); }} style={{ ...btnStyle, padding: '3px 8px', fontSize: 10 }}>Log Out</button>
+                  ) : (
+                    <button onClick={() => setShowAuthModal(true)} style={{ ...btnStyle, background: '#c00', border: '1px solid #f66', padding: '4px 10px', fontSize: 10, fontWeight: 'bold' }}>🔑 LOG IN</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Admin Pending Reviews */}
+              {user?.email === 'jonas.olson@gmail.com' && (
+                <div style={{ padding: 10, background: '#1c0d0d', border: '1.5px solid #c00', borderRadius: 4 }}>
+                  <h4 style={{ color: '#ff4444', margin: '0 0 8px 0', fontSize: 11 }}>🛡️ Admin Review Panel ({pendingMaps.length})</h4>
+                  {pendingMaps.length === 0 ? (
+                    <p style={{ color: '#888', fontSize: 10, margin: 0 }}>No pending reviews.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
+                      {pendingMaps.map(m => (
+                        <div key={m.name} style={{ background: '#111', padding: 6, borderRadius: 3, border: '1px solid #333', fontSize: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong style={{ color: '#ffcc00' }}>{m.name}</strong> <span style={{ color: '#888' }}>by {m.ownerName}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => { handleLoadMap(m.name); setActiveTab('canvas'); }} style={{ ...btnStyle, padding: '2px 4px', fontSize: 8 }}>🔍 Load</button>
+                            <button onClick={() => handleReviewMap(m.name, 'approved')} style={{ ...btnStyle, padding: '2px 4px', fontSize: 8, background: '#040', color: '#0f0', border: '1px solid #0f0' }}>👍 Appr</button>
+                            <button onClick={() => {
+                              const notes = prompt("Enter reason:");
+                              if (notes !== null) handleReviewMap(m.name, 'rejected', notes);
+                            }} style={{ ...btnStyle, padding: '2px 4px', fontSize: 8, background: '#400', color: '#f55', border: '1px solid #f33' }}>👎 Rej</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Presets List */}
+              <div style={{ padding: 10, background: '#181818', border: '1.5px solid #222', borderRadius: 4 }}>
+                <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Official presets:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {presets.map(p => (
+                    <button key={p.id} onClick={() => { if (confirm(`Load "${p.name}"?`)) { loadPreset(p); setActiveTab('canvas'); } }}
+                      style={{
+                        background: selectedPresetId === p.id ? '#500' : '#222',
+                        border: selectedPresetId === p.id ? '1px solid #ff4444' : '1px solid #444',
+                        color: selectedPresetId === p.id ? '#ff4444' : '#ccc',
+                        padding: '4px 8px', fontSize: 10, borderRadius: 3,
+                      }}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                {user?.email === 'jonas.olson@gmail.com' && selectedPresetId && (
+                  <button onClick={handleSavePreset} style={{ ...btnStyle, background: '#c00', width: '100%', marginTop: 8, padding: '6px', fontSize: 10, fontWeight: 'bold' }}>
+                    💾 UPDATE PRESET IN CLOUD
+                  </button>
+                )}
+              </div>
+
+              {/* Music Settings */}
+              <div style={{ padding: 10, background: '#181818', border: '1.5px solid #222', borderRadius: 4 }}>
+                <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Level Music:</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {TRACK_OPTIONS.map(opt => (
+                    <button key={opt.value} onClick={() => setMusicTrack(opt.value)}
+                      style={{
+                        ...btnStyle,
+                        background: musicTrack === opt.value ? '#600' : '#222',
+                        border: musicTrack === opt.value ? '1px solid #f00' : '1px solid #444',
+                        fontSize: 10,
+                        padding: '4px 8px',
+                      }}
+                    >
+                      {opt.emoji} {opt.label}
+                    </button>
+                  ))}
+                  <button onClick={toggleMusicPreview}
+                    style={{
+                      ...btnStyle,
+                      background: musicPlaying ? '#050' : '#222',
+                      border: musicPlaying ? '1px solid #0f0' : '1px solid #444',
+                      fontSize: 10,
+                      padding: '4px 10px',
+                    }}
+                  >
+                    {musicPlaying ? '⏸ Mute' : '▶ Play'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Extra Utility Actions */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderTop: '1px solid #333', paddingTop: 10 }}>
+                <button onClick={handleLoad} style={{ ...btnStyle, flex: 1, padding: '8px 4px', fontSize: 11 }}>📂 Load Map</button>
+                <button onClick={exportLevel} style={{ ...btnStyle, flex: 1, padding: '8px 4px', fontSize: 11 }}>📋 Export Code</button>
+                <button onClick={clearGrid} style={{ ...btnStyle, flex: 1, padding: '8px 4px', fontSize: 11, background: '#300' }}>🗑️ Clear Grid</button>
+              </div>
+              <button onClick={async () => {
+                await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack, 'draft');
+                alert('Saved as E1M1!');
+              }} style={{ ...btnStyle, width: '100%', padding: '8px', fontSize: 11, background: '#530', border: '1px solid #c80' }}>
+                🏴‍☠️ Save as Default E1M1
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Modals & Dialogs */}
+        {showSaveDialog && (
+          <SaveModal
+            saveValidation={saveValidation}
+            saveName={saveName}
+            setSaveName={setSaveName}
+            onSave={handleSave}
+            onCancel={() => { setShowSaveDialog(false); setSaveName(''); setSaveValidation(null); }}
+            user={user}
+            onSubmitForApproval={handleSubmitForApproval}
+          />
+        )}
+        {showLoadDialog && (
+          <LoadModal
+            savedMaps={savedMaps}
+            onLoadMap={(n) => { handleLoadMap(n); setActiveTab('canvas'); }}
+            onDeleteMap={handleDeleteMap}
+            onClose={() => setShowLoadDialog(false)}
+          />
+        )}
+        {showExport && <ExportModal exportCode={exportCode} onClose={() => setShowExport(false)} />}
+        {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      </div>
+    );
+  }
+
+  // Desktop Side-by-Side Layout
   return (
-    <div className="editor" style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', justifyContent: 'center' }}><h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
-        <button onClick={() => { window.location.hash = String(); }} style={{ position: "absolute", top: 4, right: 0, color: "#c00", fontSize: 20, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }} title="Exit to menu">✕</button>
-      </div>
-
-      {/* Draw mode selector */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-        {(Object.keys(drawModeLabels) as DrawMode[]).map(m => (
-          <button key={m} onClick={() => { setDrawMode(m); setLineStart(null); setRectStart(null); setPreviewCells([]); }} style={{
-            background: drawMode === m ? '#c00' : '#333',
-            border: drawMode === m ? '2px solid #fff' : '1px solid #555',
-            color: drawMode === m ? '#fff' : '#ccc',
-            padding: '6px 14px', cursor: 'pointer', fontSize: 13, borderRadius: 3, fontFamily: 'monospace',
-          }}>
-            {drawModeLabels[m]}
-          </button>
-        ))}
-      </div>
-
-      {/* Entity counters */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap', fontFamily: 'monospace', fontSize: 11 }}>
-        {CELL_CATEGORIES.filter(cat => cat.types[0] !== 'empty').map(cat => {
-          const total = cat.types.reduce((sum, t) => sum + (counts[t] ?? 0), 0);
-          if (total === 0) return null;
-          const overLimit = cat.types.some(t => (counts[t] ?? 0) > (LIMITS[t] ?? 999));
-          return (
-            <span key={cat.label} style={{ color: overLimit ? '#ff4444' : '#aaa', background: overLimit ? '#440000' : '#1a1a1a', padding: '2px 6px', borderRadius: 3, border: overLimit ? '1px solid #f44' : '1px solid #333' }}>
-              {cat.label}: {total}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Categorized tool buttons */}
-      {CELL_CATEGORIES.map(cat => (
-        <div key={cat.label} style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 10, color: '#666', marginBottom: 2, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1 }}>{cat.label}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {cat.types.map(t => {
-              const count = counts[t] ?? 0;
-              const limit = LIMITS[t] ?? 999;
-              const over = count >= limit;
-              return (
-                <button key={t} onClick={() => setTool(t)} style={{
-                  background: tool === t ? CELL_COLORS[t] : '#333',
-                  border: tool === t ? '2px solid #fff' : over ? '1px solid #f44' : '1px solid #555',
-                  color: tool === t ? '#000' : over ? '#f44' : '#ccc',
-                  padding: '3px 7px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 11, borderRadius: 3, touchAction: 'none',
-                  opacity: over && tool !== t ? 0.6 : 1,
-                }}>
-                  {CELL_LABELS[t]} <span style={{ fontSize: 9, color: over ? '#f44' : '#888' }}>{count}/{limit}</span>
-                </button>
-              );
-            })}
+    <div className="editor-desktop" style={{
+      background: '#111',
+      color: '#fff',
+      fontFamily: 'monospace',
+      height: '100vh',
+      width: '100vw',
+      display: 'flex',
+      flexDirection: 'row',
+      overflow: 'hidden',
+      boxSizing: 'border-box',
+    }}>
+      {/* LEFT SIDEBAR (320px wide) */}
+      <div style={{
+        width: 320,
+        minWidth: 320,
+        background: '#151515',
+        borderRight: '2px solid #c00',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
+        boxShadow: '5px 0 15px rgba(0,0,0,0.5)',
+        zIndex: 5,
+      }}>
+        {/* Compact Auth Bar */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #311', background: 'rgba(20, 10, 10, 0.4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 8 }}>
+            {user ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span>User: <strong style={{ color: '#ffcc00' }}>{(user.displayName ?? user.email ?? '').slice(0, 20)}</strong></span>
+                {user.email === 'jonas.olson@gmail.com' && (
+                  <span style={{ color: '#ff3333', fontSize: 10, fontWeight: 'bold' }}>🛡️ ADMIN</span>
+                )}
+              </div>
+            ) : (
+              <span style={{ color: '#888' }}>💻 Local / Offline Mode</span>
+            )}
+            {user ? (
+              <button onClick={() => { if (confirm('Log out?') && auth) signOut(auth); }} style={{ ...btnStyle, padding: '2px 6px', fontSize: 10 }}>Log Out</button>
+            ) : (
+              <button onClick={() => setShowAuthModal(true)} style={{ ...btnStyle, background: '#c00', border: '1px solid #f66', padding: '3px 8px', fontSize: 10, fontWeight: 'bold' }}>🔑 LOG IN</button>
+            )}
           </div>
         </div>
-      ))}
 
-      {/* Preset selector */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <span style={{ fontSize: 11, color: '#888', lineHeight: '24px' }}>Presets:</span>
-        {PRESETS.map(p => (
-          <button key={p.name} onClick={() => { if (confirm(`Load "${p.name}" preset? This will replace current map.`)) loadPreset(p); }}
-            title={p.description}
-            style={{ background: '#222', border: '1px solid #555', color: '#ccc', padding: '2px 8px', cursor: 'pointer', fontSize: 11, borderRadius: 3, fontFamily: 'monospace' }}>
-            {p.name}
-          </button>
-        ))}
+        {/* Admin Review Panel */}
+        {showAdminPanel && user?.email === 'jonas.olson@gmail.com' && (
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #c00', background: '#1c0d0d' }}>
+            <h4 style={{ color: '#ff4444', margin: '0 0 8px 0', fontSize: 11 }}>🛡️ Pending Reviews ({pendingMaps.length})</h4>
+            {pendingMaps.length === 0 ? (
+              <p style={{ color: '#888', fontSize: 10, margin: 0 }}>No pending reviews.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {pendingMaps.map(m => (
+                  <div key={m.name} style={{ background: '#111', padding: 6, borderRadius: 3, border: '1px solid #333', fontSize: 10 }}>
+                    <div style={{ marginBottom: 4 }}>
+                      <strong style={{ color: '#ffcc00' }}>{m.name}</strong> <span style={{ color: '#888', fontSize: 9 }}>by {m.ownerName}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleLoadMap(m.name)} style={{ ...btnStyle, padding: '1px 4px', fontSize: 9 }}>🔍 Load</button>
+                      <button onClick={() => handleReviewMap(m.name, 'approved')} style={{ ...btnStyle, padding: '1px 4px', fontSize: 9, background: '#040', color: '#0f0', border: '1px solid #0f0' }}>👍 Appr</button>
+                      <button onClick={() => {
+                        const notes = prompt("Enter reason:");
+                        if (notes !== null) handleReviewMap(m.name, 'rejected', notes);
+                      }} style={{ ...btnStyle, padding: '1px 4px', fontSize: 9, background: '#400', color: '#f55', border: '1px solid #f33' }}>👎 Rej</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Presets List */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #311' }}>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Presets:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {presetsLoading ? (
+              <span style={{ fontSize: 10, color: '#888' }}>Loading...</span>
+            ) : (
+              presets.map(p => (
+                <button key={p.id} onClick={() => { if (confirm(`Load "${p.name}"?`)) loadPreset(p); }}
+                  title={p.description}
+                  style={{
+                    background: selectedPresetId === p.id ? '#500' : '#222',
+                    border: selectedPresetId === p.id ? '1px solid #ff4444' : '1px solid #555',
+                    color: selectedPresetId === p.id ? '#ff4444' : '#ccc',
+                    padding: '3px 6px', cursor: 'pointer', fontSize: 10, borderRadius: 3, fontFamily: 'monospace'
+                  }}>
+                  {p.name}
+                </button>
+              ))
+            )}
+          </div>
+          {user?.email === 'jonas.olson@gmail.com' && selectedPresetId && (
+            <button onClick={handleSavePreset} style={{ ...btnStyle, background: '#c00', width: '100%', marginTop: 8, padding: '4px', fontSize: 9, fontWeight: 'bold' }}>
+              💾 SAVE TO PRESET COLLECTION
+            </button>
+          )}
+        </div>
+
+        {/* Music Options */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #311' }}>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Level Music:</div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+            {TRACK_OPTIONS.map(opt => (
+              <button key={opt.value} onClick={() => setMusicTrack(opt.value)}
+                style={{
+                  ...btnStyle,
+                  background: musicTrack === opt.value ? '#600' : '#222',
+                  border: musicTrack === opt.value ? '1px solid #f00' : '1px solid #555',
+                  fontSize: 10,
+                  padding: '2px 4px',
+                }}
+                title={opt.label}
+              >
+                {opt.emoji} {opt.label}
+              </button>
+            ))}
+            <button onClick={toggleMusicPreview}
+              style={{
+                ...btnStyle,
+                background: musicPlaying ? '#050' : '#222',
+                border: musicPlaying ? '1px solid #0f0' : '1px solid #555',
+                fontSize: 10,
+                padding: '2px 6px',
+              }}
+            >
+              {musicPlaying ? '⏸' : '▶'}
+            </button>
+          </div>
+        </div>
+
+        {/* Tool Palette */}
+        <div style={{ padding: '12px 16px', flex: 1 }}>
+          {CELL_CATEGORIES.map(cat => (
+            <div key={cat.label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: '#888', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>{cat.label}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {cat.types.map(t => {
+                  const count = counts[t] ?? 0;
+                  const limit = LIMITS[t] ?? 999;
+                  const over = t !== 'empty' && count >= limit;
+                  return (
+                    <button key={t} onClick={() => setTool(t)} style={{
+                      background: tool === t ? CELL_COLORS[t] : '#222',
+                      border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
+                      color: tool === t ? '#000' : over ? '#f44' : '#ccc',
+                      padding: '2px 5px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
+                      opacity: over && tool !== t ? 0.6 : 1,
+                    }}>
+                      {CELL_LABELS[t]} {t !== 'empty' && <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Entity counters */}
+        <div style={{ padding: '8px 16px', background: 'rgba(0,0,0,0.2)', borderTop: '1px solid #222', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {CELL_CATEGORIES.filter(cat => cat.types[0] !== 'empty').map(cat => {
+            const total = cat.types.reduce((sum, t) => sum + (counts[t] ?? 0), 0);
+            if (total === 0) return null;
+            const overLimit = cat.types.some(t => (counts[t] ?? 0) > (LIMITS[t] ?? 999));
+            return (
+              <span key={cat.label} style={{ fontSize: 9, color: overLimit ? '#ff4444' : '#aaa', background: overLimit ? '#440000' : '#1a1a1a', padding: '1px 4px', borderRadius: 3, border: '1px solid #333' }}>
+                {cat.label.toUpperCase()}: {total}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
-      <canvas ref={canvasRef} width={GRID_W * CELL_SIZE} height={GRID_H * CELL_SIZE}
-        onMouseDown={handlePointerDown} onMouseMove={handlePointerMove}
-        onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
-        onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
-        style={{ border: '2px solid #c00', cursor: drawMode === 'paint' ? 'crosshair' : drawMode === 'line' ? 'crosshair' : 'cell', touchAction: 'none', maxWidth: '95vw', maxHeight: '55vh' }}
-      />
+      {/* RIGHT MAIN VIEWPORT */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        boxSizing: 'border-box',
+        padding: 12,
+        overflow: 'hidden',
+      }}>
+        {/* Header Bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1.5px solid #c00', paddingBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h1 style={{ color: '#c00', margin: 0, fontSize: 18, letterSpacing: '1px', textShadow: '0 0 10px rgba(255,0,0,0.2)' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
+            {user?.email === 'jonas.olson@gmail.com' && (
+              <button onClick={() => { setShowAdminPanel(!showAdminPanel); }} style={{ ...btnStyle, padding: '2px 6px', fontSize: 10, background: showAdminPanel ? '#c00' : '#333', border: '1px solid #f55' }}>
+                🛡️ Reviews ({pendingMaps.length})
+              </button>
+            )}
+          </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
-        <button onClick={validate} style={btnStyle}>✅ Validate</button>
-        <button onClick={() => setReachableCells(null)} style={btnStyle}>🔄 Clear overlay</button>
-        <button onClick={async () => {
-          const result = runValidation(grid, playerPos);
-          setSaveValidation(result);
-          if (result.errors.length === 0) {
+          {/* Draw Mode Selectors */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(Object.keys(drawModeLabels) as DrawMode[]).map(m => (
+              <button key={m} onClick={() => { setDrawMode(m); setLineStart(null); setRectStart(null); setPreviewCells([]); }} style={{
+                background: drawMode === m ? '#c00' : '#222',
+                border: drawMode === m ? '1px solid #fff' : '1px solid #444',
+                color: drawMode === m ? '#fff' : '#aaa',
+                padding: '4px 10px', cursor: 'pointer', fontSize: 11, borderRadius: 3, fontFamily: 'monospace',
+              }}>
+                {drawModeLabels[m]}
+              </button>
+            ))}
+          </div>
+
+          {/* Exit button */}
+          <button onClick={() => { window.location.hash = String(); }} style={{ color: "#c00", fontSize: 20, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }} title="Exit to menu">✕</button>
+        </div>
+
+        {/* Action Button Row */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          <button onClick={handleUndo} disabled={undoStack.length === 0} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11, opacity: undoStack.length === 0 ? 0.3 : 1 }}>↩️ Undo</button>
+          <button onClick={validate} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11 }}>✅ Validate</button>
+          <button onClick={async () => {
+            const result = runValidation(grid, playerPos);
+            setSaveValidation(result);
             const maps = await listSavedMaps();
             setSavedMaps(maps);
             setShowSaveDialog(true);
-          } else {
-            setShowSaveDialog(true); // show dialog with errors
-          }
-        }} style={btnStyle}>💾 Save</button>
-        <button onClick={handleLoad} style={btnStyle}>📂 Load</button>
-        <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
-        <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
-        <button onClick={async () => {
-          await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack);
-          alert('✅ Saved as E1M1! This replaces the default map when you play E1M1 from the main menu.');
-        }} style={{ ...btnStyle, background: '#553300', border: '1px solid #c80' }}>🏴‍☠️ Save as E1M1</button>
-        <button onClick={handlePlayMap} style={{ ...btnStyle, background: '#050', border: '1px solid #0a0' }}>🎮 Play This Map</button>
-      </div>
-      <div style={{ display: 'flex', gap: 4, marginTop: 8, justifyContent: 'center', alignItems: 'center' }}>
-        <span style={{ color: '#aaa', fontFamily: 'monospace', fontSize: 13 }}>🎵 Music:</span>
-        {TRACK_OPTIONS.map(opt => (
-          <button
-            key={opt.value}
-            onClick={() => setMusicTrack(opt.value)}
-            style={{
-              ...btnStyle,
-              background: musicTrack === opt.value ? '#600' : '#333',
-              border: musicTrack === opt.value ? '2px solid #f00' : '1px solid #c00',
-              fontSize: 11,
-              padding: '4px 8px',
-            }}
-          >
-            {opt.emoji} {opt.label}
-          </button>
-        ))}
-        <button
-          onClick={toggleMusicPreview}
-          style={{
-            ...btnStyle,
-            background: musicPlaying ? '#050' : '#333',
-            border: musicPlaying ? '2px solid #0f0' : '1px solid #c00',
-            fontSize: 13,
-            padding: '4px 10px',
-          }}
-        >
-          {musicPlaying ? '⏸' : '▶'}
-        </button>
+          }} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11, background: '#750', border: '1px solid #a80' }}>💾 Save Map</button>
+          <button onClick={handleLoad} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11 }}>📂 Load Map</button>
+          <button onClick={exportLevel} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11 }}>📋 Export Code</button>
+          <button onClick={clearGrid} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11 }}>🗑️ Clear Canvas</button>
+          <button onClick={async () => {
+            await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack, 'draft');
+            alert('Saved as E1M1!');
+          }} style={{ ...btnStyle, padding: '4px 8px', fontSize: 11, background: '#530', border: '1px solid #c80' }}>🏴‍☠️ Save as Default E1M1</button>
+          
+          <div style={{ flex: 1 }} />
+          
+          <button onClick={handlePlayMap} style={{ ...btnStyle, padding: '4px 14px', fontSize: 11, background: '#050', border: '1.5px solid #0f0', fontWeight: 'bold', color: '#0f0', boxShadow: '0 0 10px rgba(0,255,0,0.2)' }}>🎮 Play This Map</button>
+        </div>
+
+        {/* Canvas Display Viewport (Responsive flex center) */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0a0a0a',
+          border: '2px solid #222',
+          borderRadius: 6,
+          overflow: 'hidden',
+          padding: 10,
+          boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8)',
+        }}>
+          <canvas ref={canvasRef} width={GRID_W * CELL_SIZE} height={GRID_H * CELL_SIZE}
+            onMouseDown={handlePointerDown} onMouseMove={handlePointerMove}
+            onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
+            onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
+            style={{ border: '2px solid #c00', cursor: drawMode === 'paint' ? 'crosshair' : drawMode === 'line' ? 'crosshair' : 'cell', touchAction: 'none', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', aspectRatio: '1/1', objectFit: 'contain' }}
+          />
+        </div>
+
+        {/* Statusbar footer */}
+        <div style={{ marginTop: 6, fontSize: 11, color: '#888', display: 'flex', justifyContent: 'space-between', padding: '0 4px' }}>
+          <span>Mode: <strong style={{ color: '#ff0' }}>{drawModeLabels[drawMode]}</strong> | Active Tool: <strong style={{ color: CELL_COLORS[tool] }}>{CELL_LABELS[tool].toUpperCase()}</strong></span>
+          <span>Workspace Grid: {GRID_W}×{GRID_H}</span>
+        </div>
       </div>
 
-      <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>
-        Mode: <span style={{ color: '#ff0' }}>{drawModeLabels[drawMode]}</span> | Tool: <span style={{ color: CELL_COLORS[tool] }}>{CELL_LABELS[tool]}</span> | Grid: {GRID_W}×{GRID_H}
-      </div>
-
-      {/* Save dialog */}
+      {/* Modals & Dialogs */}
       {showSaveDialog && (
         <SaveModal
           saveValidation={saveValidation}
           saveName={saveName}
           setSaveName={setSaveName}
           onSave={handleSave}
-          onCancel={() => {
-            setShowSaveDialog(false);
-            setSaveName('');
-            setSaveValidation(null);
-          }}
+          onCancel={() => { setShowSaveDialog(false); setSaveName(''); setSaveValidation(null); }}
+          user={user}
+          onSubmitForApproval={handleSubmitForApproval}
         />
       )}
-
-      {/* Load dialog */}
       {showLoadDialog && (
         <LoadModal
           savedMaps={savedMaps}
@@ -708,14 +1267,8 @@ export default function Editor(): JSX.Element {
           onClose={() => setShowLoadDialog(false)}
         />
       )}
-
-      {/* Export dialog */}
-      {showExport && (
-        <ExportModal
-          exportCode={exportCode}
-          onClose={() => setShowExport(false)}
-        />
-      )}
+      {showExport && <ExportModal exportCode={exportCode} onClose={() => setShowExport(false)} />}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     </div>
   );
 }
