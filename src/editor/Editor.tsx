@@ -813,7 +813,7 @@ export default function Editor(): JSX.Element {
                     {cat.types.map(t => {
                       const count = counts[t] ?? 0;
                       const limit = LIMITS[t] ?? 999;
-                      const over = count >= limit;
+                      const over = t !== 'empty' && count >= limit;
                       return (
                         <button key={t} onClick={() => { setTool(t); setActiveTab('canvas'); }} style={{
                           background: tool === t ? CELL_COLORS[t] : '#222',
@@ -822,7 +822,7 @@ export default function Editor(): JSX.Element {
                           padding: '4px 8px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                           opacity: over && tool !== t ? 0.6 : 1,
                         }}>
-                          {CELL_LABELS[t]} <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}/{limit}</span>
+                          {CELL_LABELS[t]} {t !== 'empty' && <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}/{limit}</span>}
                         </button>
                       );
                     })}
@@ -1123,7 +1123,7 @@ export default function Editor(): JSX.Element {
                 {cat.types.map(t => {
                   const count = counts[t] ?? 0;
                   const limit = LIMITS[t] ?? 999;
-                  const over = count >= limit;
+                  const over = t !== 'empty' && count >= limit;
                   return (
                     <button key={t} onClick={() => setTool(t)} style={{
                       background: tool === t ? CELL_COLORS[t] : '#222',
@@ -1132,7 +1132,7 @@ export default function Editor(): JSX.Element {
                       padding: '2px 5px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                       opacity: over && tool !== t ? 0.6 : 1,
                     }}>
-                      {CELL_LABELS[t]} <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}</span>
+                      {CELL_LABELS[t]} {t !== 'empty' && <span style={{ fontSize: 8, color: over ? '#f44' : '#777' }}>{count}</span>}
                     </button>
                   );
                 })}
