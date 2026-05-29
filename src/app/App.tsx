@@ -143,7 +143,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         audioManager.playMusic();
       }
     });
-    document.body.requestPointerLock();
+    if (!navigator.webdriver) {
+      document.body.requestPointerLock?.();
+    }
   }, []);
 
   // Completion countdown timer removed in favor of Click to Continue interaction
@@ -595,7 +597,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               <button
                 onClick={() => {
                   setMenuOpen(false);
-                  document.body.requestPointerLock?.();
+                  if (!navigator.webdriver) {
+                    document.body.requestPointerLock?.();
+                  }
                 }}
                 style={{
                   padding: '12px 0',
