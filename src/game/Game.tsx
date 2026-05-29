@@ -7,10 +7,10 @@ import Enemies from "./Enemies";
 import Weapons from "./Weapons";
 import Pickups from "./Pickups";
 import Projectiles from "./Projectiles";
-import { audioManager } from "./Audio";
+import { audioManager } from "@/shared/audio/Audio";
 import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
 import type { DoorData } from "./Doors";
-import { createDoorTexture, createBarrelTexture } from "./Textures";
+import { createDoorTexture, createBarrelTexture } from "@/shared/Textures";
 import type {
   PlayerState,
   EnemyData,
@@ -34,7 +34,7 @@ import {
   explodeBarrelSplash,
 } from "./GameHelpers";
 import { useGameInputs } from "./useGameInputs";
-import { patchE2EState, registerE2EHandlers } from "./e2eBridge";
+import { patchE2EState, registerE2EHandlers } from "@/shared/e2eBridge";
 
 const COLLISION_MARGIN = 0.4;
 
@@ -283,7 +283,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     return getWalls();
   }, [customWallData]);
   const customBarrels: BarrelData[] = useMemo(() => {
-    if (levelData && levelData.barrels) {
+    if (levelData?.barrels) {
       return levelData.barrels.map((b: { id: number; x: number; z: number }) => ({
         id: b.id,
         position: [b.x + 0.5, 0.5, b.z + 0.5] as [number, number, number],
@@ -353,7 +353,7 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   // Weapon switching keydown listener
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       const player = playerRef.current;
       if (player.health <= 0 || !gameActiveRef.current || paused) return;
 

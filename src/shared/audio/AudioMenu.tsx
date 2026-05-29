@@ -7,13 +7,13 @@ interface AudioMenuProps {
   onExit?: () => void;
 }
 
-export default function AudioMenu({ onMenuOpen, onMenuClose, onExit }: AudioMenuProps) {
+export default function AudioMenu({ onMenuOpen, onMenuClose, onExit }: AudioMenuProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [musicVol, setMusicVol] = useState(audioManager.getMusicVolume());
   const [sfxVol, setSfxVol] = useState(audioManager.getSfxVolume());
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const toggleMenu = () => {
+  const toggleMenu = (): void => {
     const next = !open;
     setOpen(next);
     if (next) {
@@ -23,17 +23,17 @@ export default function AudioMenu({ onMenuOpen, onMenuClose, onExit }: AudioMenu
     }
   };
 
-  const closeMenu = () => {
+  const closeMenu = (): void => {
     setOpen(false);
     onMenuClose?.();
   };
 
-  const handleMusicChange = (v: number) => {
+  const handleMusicChange = (v: number): void => {
     setMusicVol(v);
     audioManager.setMusicVolume(v);
   };
 
-  const handleSfxChange = (v: number) => {
+  const handleSfxChange = (v: number): void => {
     setSfxVol(v);
     audioManager.setSfxVolume(v);
   };

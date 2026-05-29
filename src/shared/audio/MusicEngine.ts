@@ -41,18 +41,20 @@ export class MusicEngine {
   private scheduleAheadTime = 0.2; // schedule 200ms ahead (was 100ms, raised for perf)
   private fadeGain: GainNode | null = null;
 
-  private distortionCurve: Float32Array;
+  private distortionCurve: Float32Array<ArrayBuffer>;
   private noiseBuffer: AudioBuffer | null = null;
 
   private guitarPattern: SynthNote[] = [];
   private bassPattern: BassNote[] = [];
-  private drumPattern: Map<number, 'kick' | 'snare' | 'hat' | 'crash'> = new Map();
+  private guitarByStep = new Map<number, SynthNote[]>();
+  private bassByStep = new Map<number, BassNote[]>();
+  private drumPattern = new Map<number, 'kick' | 'snare' | 'hat' | 'crash'>();
 
   constructor() {
     this.distortionCurve = this.makeDistortionCurve(75);
   }
 
-  private makeDistortionCurve(amount: number): Float32Array {
+  private makeDistortionCurve(amount: number): Float32Array<ArrayBuffer> {
     const k = amount;
     const n = 44100;
     const curve = new Float32Array(n);
@@ -108,7 +110,7 @@ export class MusicEngine {
       { step: 12, note: 40, duration: 4, type: 'open' },
     ];
 
-    const addSegment = (barStart: number, transpose: number, riff: SynthNote[], riff2: SynthNote[]) => {
+    const addSegment = (barStart: number, transpose: number, riff: SynthNote[], riff2: SynthNote[]): void => {
       const sOff = barStart * 16;
       for (const n of riff) {
         this.guitarPattern.push({ step: sOff + n.step, note: n.note + transpose, duration: n.duration, type: n.type });
@@ -159,7 +161,7 @@ export class MusicEngine {
       this.drumPattern.set(off + 12, 'snare');
     }
     // Melody over bridge
-    const melodyNotes: [number, number, number][] = [
+    const melodyNotes: Array<[number, number, number]> = [
       [16, 59, 8], [16, 67, 8], [17, 64, 16],
       [18, 67, 8], [18, 66, 8], [19, 64, 8], [19, 62, 8],
       [20, 57, 8], [20, 60, 8], [21, 62, 16],
@@ -187,7 +189,7 @@ export class MusicEngine {
 
   private generateDarkness(): void {
     // Slow dark ambient — dissonant drones, sparse hits, deep bass
-    const drones: [number, number, number][] = [
+    const drones: Array<[number, number, number]> = [
       // [step, midiNote, duration_in_steps]
       [0, 24, 64],    // C1 drone
       [64, 25, 64],   // C#1 drone
@@ -203,7 +205,7 @@ export class MusicEngine {
       this.guitarPattern.push({ step, note: note + 12, duration: dur, type: 'clean' });
     }
     // Sparse dissonant chords
-    const chords: [number, number[]][] = [
+    const chords: Array<[number, number[]]> = [
       [16, [36, 39, 43]],    // Cm
       [80, [37, 40, 44]],    // C#m
       [144, [35, 39, 42]],   // Bm
@@ -233,7 +235,7 @@ export class MusicEngine {
   private generateRampage(): void {
     // Fast aggressive combat — blast beats, rapid palm mutes
     // E minor phrygian: E F G A B C D
-    const chugPattern = (startBar: number, root: number, bars: number) => {
+    const chugPattern = (startBar: number, root: number, bars: number): void => {
       for (let b = 0; b < bars; b++) {
         const off = (startBar + b) * 16;
         for (let s = 0; s < 16; s += 2) {
@@ -262,7 +264,8 @@ export class MusicEngine {
     for (let b = 0; b < 8; b++) {
       const off = (16 + b) * 16;
       const roots = [40, 40, 36, 36, 41, 41, 43, 43] as const;
-      const root = roots[b]!;
+      const root = roots[b];
+      if (root === undefined) continue;
       // Half-time feel: hits on 1 and 3
       this.guitarPattern.push({ step: off, note: root, duration: 4, type: 'open' });
       this.guitarPattern.push({ step: off + 8, note: root + 7, duration: 4, type: 'open' });
@@ -292,7 +295,7 @@ export class MusicEngine {
   private generateEerie(): void {
     // Creepy exploration — clean arpeggiated chords, ambient bass, minimal percussion
     // D minor: D E F G A Bb C
-    const chords: [number, number[]][] = [
+    const chords: Array<[number, number[]]> = [
       [0, [50, 53, 57]],    // Dm
       [64, [48, 52, 55]],   // C
       [128, [46, 50, 53]],  // Bb
@@ -308,13 +311,21 @@ export class MusicEngine {
       for (let rep = 0; rep < 4; rep++) {
         const off = startStep + rep * 16;
         for (let i = 0; i < notes.length; i++) {
-          this.guitarPattern.push({ step: off + i * 4, note: notes[i]!, duration: 6, type: 'clean' });
+          const note = notes[i];
+          if (note === undefined) continue;
+          this.guitarPattern.push({ step: off + i * 4, note, duration: 6, type: 'clean' });
         }
         // High melody note
-        this.guitarPattern.push({ step: off + 12, note: notes[notes.length - 1]! + 12, duration: 4, type: 'clean' });
+        const lastNote = notes.at(-1);
+        if (lastNote !== undefined) {
+          this.guitarPattern.push({ step: off + 12, note: lastNote + 12, duration: 4, type: 'clean' });
+        }
       }
       // Bass drone
-      this.bassPattern.push({ step: startStep, note: notes[0]! - 24, duration: 64 });
+      const bassRoot = notes[0];
+      if (bassRoot !== undefined) {
+        this.bassPattern.push({ step: startStep, note: bassRoot - 24, duration: 64 });
+      }
 
       // Very sparse percussion
       this.drumPattern.set(startStep, 'kick');
@@ -322,7 +333,7 @@ export class MusicEngine {
     }
 
     // Ambient high notes
-    const eerieHits: [number, number][] = [
+    const eerieHits: Array<[number, number]> = [
       [8, 74], [24, 71], [40, 69], [56, 67],
       [72, 74], [88, 72], [104, 69], [120, 67],
       [136, 71], [152, 69], [168, 67], [184, 66],
@@ -340,7 +351,7 @@ export class MusicEngine {
   private generateDoom(): void {
     // Heavy epic power chord march — E major, big chords, marching snare
     // E major: E F# G# A B C# D#
-    const powerChords: [number, number, number][] = [
+    const powerChords: Array<[number, number, number]> = [
       // [bar, root, duration_bars]
       [0, 40, 2],   // E
       [2, 45, 2],   // A
@@ -392,7 +403,7 @@ export class MusicEngine {
     }
 
     // Triumphant melody over the last section
-    const melody: [number, number, number][] = [
+    const melody: Array<[number, number, number]> = [
       [24 * 16, 64, 8],  // E4
       [24 * 16 + 8, 68, 8], // A4
       [25 * 16, 71, 16],    // B4
@@ -415,6 +426,21 @@ export class MusicEngine {
 
   // ===================== AUDIO PLAYBACK =====================
 
+  private buildStepIndex(): void {
+    this.guitarByStep.clear();
+    this.bassByStep.clear();
+    for (const n of this.guitarPattern) {
+      const list = this.guitarByStep.get(n.step);
+      if (list) list.push(n);
+      else this.guitarByStep.set(n.step, [n]);
+    }
+    for (const n of this.bassPattern) {
+      const list = this.bassByStep.get(n.step);
+      if (list) list.push(n);
+      else this.bassByStep.set(n.step, [n]);
+    }
+  }
+
   private generateTrack(style: TrackStyle): void {
     this.guitarPattern = [];
     this.bassPattern = [];
@@ -429,11 +455,12 @@ export class MusicEngine {
       case 'doom': this.generateDoom(); break;
       case 'classic': this.generateInferno(); break;  // Classic = Inferno pattern (same as original menu)
     }
+    this.buildStepIndex();
   }
 
   start(audioContext: AudioContext, destination: AudioNode, track?: TrackStyle): void {
     if (this.isPlaying) this.stop();
-    this.currentTrack = track || 'inferno';
+    this.currentTrack = track ?? 'inferno';
 
     this.audioContext = audioContext;
     this.generateTrack(this.currentTrack);
@@ -478,7 +505,8 @@ export class MusicEngine {
       this.fadeGain.gain.setValueAtTime(0, this.audioContext.currentTime);
       this.fadeGain.gain.linearRampToValueAtTime(0.7, this.audioContext.currentTime + 1.0);
       const dest = this.destination;
-      this.fadeGain.connect(dest!);
+      if (!dest) return;
+      this.fadeGain.connect(dest);
       this.destination = this.fadeGain;
       this.isPlaying = true;
       this.currentStep = 0;
@@ -520,17 +548,18 @@ export class MusicEngine {
       }
     }
 
-    // Guitar
-    for (const note of this.guitarPattern) {
-      if (note.step === step) {
-        this.playGuitarNote(note.note, time, note.duration * (60 / this.bpm / 4), note.type);
+    const stepDur = 60 / this.bpm / 4;
+    const guitarNotes = this.guitarByStep.get(step);
+    if (guitarNotes) {
+      for (const note of guitarNotes) {
+        this.playGuitarNote(note.note, time, note.duration * stepDur, note.type);
       }
     }
 
-    // Bass
-    for (const note of this.bassPattern) {
-      if (note.step === step) {
-        this.playBassNote(note.note, time, note.duration * (60 / this.bpm / 4));
+    const bassNotes = this.bassByStep.get(step);
+    if (bassNotes) {
+      for (const note of bassNotes) {
+        this.playBassNote(note.note, time, note.duration * stepDur);
       }
     }
   }
@@ -564,7 +593,7 @@ export class MusicEngine {
     } else {
       // Distorted tone: use WaveShaper for crunch
       const distNode = this.audioContext.createWaveShaper();
-      distNode.curve = this.distortionCurve as any;
+      distNode.curve = this.distortionCurve;
       distNode.oversample = '2x'; // 2x instead of 4x for better performance
 
       filter.type = 'lowpass';

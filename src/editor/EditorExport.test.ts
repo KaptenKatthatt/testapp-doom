@@ -8,11 +8,16 @@ function makeEmptyGrid(): CellData[][] {
   );
 }
 
+function setCell(grid: CellData[][], z: number, x: number, cell: CellData): void {
+  const row = grid[z];
+  if (row) row[x] = cell;
+}
+
 describe("gridToLevelData", () => {
   it("merges adjacent walls into rectangles", () => {
     const grid = makeEmptyGrid();
     for (let x = 0; x < 5; x++) {
-      grid[2]![x]! = { type: "wall" };
+      setCell(grid, 2, x, { type: "wall" });
     }
     const level = gridToLevelData(grid, [3, 3]);
     expect(level.walls).toHaveLength(1);
@@ -27,19 +32,19 @@ describe("gridToLevelData", () => {
 
   it("collects enemies and pickups from the grid", () => {
     const grid = makeEmptyGrid();
-    grid[10]![10]! = { type: "imp" };
-    grid[11]![11]! = { type: "health" };
+    setCell(grid, 10, 10, { type: "imp" });
+    setCell(grid, 11, 11, { type: "health" });
     const level = gridToLevelData(grid, [5, 5]);
     expect(level.enemies).toHaveLength(1);
-    expect(level.enemies[0]!.type).toBe("imp");
+    expect(level.enemies[0]?.type).toBe("imp");
     expect(level.pickups).toHaveLength(1);
-    expect(level.pickups[0]!.type).toBe("health");
+    expect(level.pickups[0]?.type).toBe("health");
   });
 
   it("marks half-height walls correctly", () => {
     const grid = makeEmptyGrid();
-    grid[4]![4]! = { type: "halfwall" };
+    setCell(grid, 4, 4, { type: "halfwall" });
     const level = gridToLevelData(grid, [2, 2]);
-    expect(level.walls[0]!.isHalfWall).toBe(true);
+    expect(level.walls[0]?.isHalfWall).toBe(true);
   });
 });

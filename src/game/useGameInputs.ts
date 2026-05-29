@@ -6,7 +6,7 @@ export function useGameInputs(
   useActionRef: React.MutableRefObject<boolean>,
   gameActiveRef: React.MutableRefObject<boolean>,
   playerRef: React.MutableRefObject<PlayerData>
-) {
+): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       keysRef.current[e.code] = true;

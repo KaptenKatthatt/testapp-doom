@@ -21,24 +21,26 @@ export class MenuSynth {
   private nextNoteTime = 0.0;
   private currentStep = 0;
   private bpm = 125;
-  private timerId: any = null;
+  private timerId: ReturnType<typeof setTimeout> | null = null;
 
-  private lookahead = 25.0; // ms between polls
-  private scheduleAheadTime = 0.1; // schedule 100ms in advance
+  private lookahead = 50.0; // ms between scheduler polls
+  private scheduleAheadTime = 0.2; // schedule 200ms ahead
   
-  private distortionCurve: Float32Array;
+  private distortionCurve: Float32Array<ArrayBuffer>;
   private noiseBuffer: AudioBuffer | null = null;
 
   // Patterns generated dynamically on construction (512 steps = ~61 seconds at 125 BPM)
   private guitarPattern: SynthNote[] = [];
   private bassPattern: BassNote[] = [];
+  private guitarByStep = new Map<number, SynthNote[]>();
+  private bassByStep = new Map<number, BassNote[]>();
 
   constructor() {
     this.distortionCurve = this.makeDistortionCurve(75);
     this.generateSong();
   }
 
-  private makeDistortionCurve(amount: number): Float32Array {
+  private makeDistortionCurve(amount: number): Float32Array<ArrayBuffer> {
     const k = amount;
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
@@ -52,7 +54,7 @@ export class MenuSynth {
 
   private createNoiseBuffer(): AudioBuffer {
     if (!this.audioContext) throw new Error("AudioContext not set");
-    const bufferSize = this.audioContext.sampleRate * 2; // 2 seconds of noise
+    const bufferSize = this.audioContext.sampleRate * 0.5;
     const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -62,7 +64,7 @@ export class MenuSynth {
   }
 
   // Generates a fully fleshed out metal track of 32 bars (~61.4s)
-  private generateSong() {
+  private generateSong(): void {
     const E_RIFF = [
       { step: 0, note: 40, duration: 1, type: 'mute' as const },  // E2
       { step: 1, note: 40, duration: 1, type: 'mute' as const },  // E2
@@ -88,7 +90,7 @@ export class MenuSynth {
       { step: 12, note: 40, duration: 4, type: 'open' as const }, // E2
     ];
 
-    const addRiffSegment = (barStart: number, transpose: number) => {
+    const addRiffSegment = (barStart: number, transpose: number): void => {
       const stepOffset = barStart * 16;
       
       // Bar 1 of Riff
@@ -207,67 +209,68 @@ export class MenuSynth {
     this.bassPattern.push({ step: endOffset + 24, note: 33, duration: 2 });
     this.bassPattern.push({ step: endOffset + 26, note: 34, duration: 2 });
     this.bassPattern.push({ step: endOffset + 28, note: 35, duration: 4 });
+    this.buildStepIndex();
   }
 
-  private playGuitarNote(midiNote: number, time: number, duration: number, type: 'mute' | 'open') {
+  private buildStepIndex(): void {
+    this.guitarByStep.clear();
+    this.bassByStep.clear();
+    for (const n of this.guitarPattern) {
+      const list = this.guitarByStep.get(n.step);
+      if (list) list.push(n);
+      else this.guitarByStep.set(n.step, [n]);
+    }
+    for (const n of this.bassPattern) {
+      const list = this.bassByStep.get(n.step);
+      if (list) list.push(n);
+      else this.bassByStep.set(n.step, [n]);
+    }
+  }
+
+  private playGuitarNote(midiNote: number, time: number, duration: number, type: 'mute' | 'open'): void {
     if (!this.audioContext || !this.destination) return;
 
-    const osc1 = this.audioContext.createOscillator();
-    const osc2 = this.audioContext.createOscillator();
+    const osc = this.audioContext.createOscillator();
     const distNode = this.audioContext.createWaveShaper();
     const cabinetFilter = this.audioContext.createBiquadFilter();
     const envelope = this.audioContext.createGain();
 
     const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
-    
-    // Detuned sawtooths for massive stereophonic distortion tone
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(freq, time);
-    osc1.detune.setValueAtTime(6, time);
 
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(freq, time);
-    osc2.detune.setValueAtTime(-6, time);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+    osc.detune.setValueAtTime(8, time);
 
-    // Apply amp distortion
-    distNode.curve = this.distortionCurve as any;
-    distNode.oversample = '4x';
+    distNode.curve = this.distortionCurve;
+    distNode.oversample = '2x';
 
-    // High cut to eliminate harsh buzz, simulating a real guitar speaker cab
     cabinetFilter.type = 'lowpass';
     cabinetFilter.frequency.setValueAtTime(1400, time);
-    cabinetFilter.Q.setValueAtTime(2.0, time);
+    cabinetFilter.Q.setValueAtTime(1.5, time);
 
-    // Amplitude envelope
     envelope.gain.setValueAtTime(0, time);
-    envelope.gain.linearRampToValueAtTime(0.24, time + 0.003); // super snappy attack
+    envelope.gain.linearRampToValueAtTime(0.22, time + 0.003);
 
     if (type === 'mute') {
-      // Palm muted chunk
       envelope.gain.exponentialRampToValueAtTime(0.015, time + 0.1);
       envelope.gain.setValueAtTime(0.015, time + duration - 0.01);
       envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     } else {
-      // Open ringout
       envelope.gain.exponentialRampToValueAtTime(0.18, time + 0.25);
       envelope.gain.setValueAtTime(0.18, time + duration - 0.02);
       envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     }
 
-    // Node routing
-    osc1.connect(distNode);
-    osc2.connect(distNode);
+    osc.connect(distNode);
     distNode.connect(cabinetFilter);
     cabinetFilter.connect(envelope);
     envelope.connect(this.destination);
 
-    osc1.start(time);
-    osc2.start(time);
-    osc1.stop(time + duration);
-    osc2.stop(time + duration);
+    osc.start(time);
+    osc.stop(time + duration + 0.05);
   }
 
-  private playBassNote(midiNote: number, time: number, duration: number) {
+  private playBassNote(midiNote: number, time: number, duration: number): void {
     if (!this.audioContext || !this.destination) return;
 
     const subOsc = this.audioContext.createOscillator();
@@ -310,7 +313,7 @@ export class MenuSynth {
     gritOsc.stop(time + duration);
   }
 
-  private playKick(time: number) {
+  private playKick(time: number): void {
     if (!this.audioContext || !this.destination) return;
 
     const osc = this.audioContext.createOscillator();
@@ -332,7 +335,7 @@ export class MenuSynth {
     osc.stop(time + 0.12);
   }
 
-  private playSnare(time: number) {
+  private playSnare(time: number): void {
     if (!this.audioContext || !this.destination || !this.noiseBuffer) return;
 
     // Snappy noise component
@@ -374,7 +377,7 @@ export class MenuSynth {
     bodyOsc.stop(time + 0.09);
   }
 
-  private playHihat(time: number, isOpen = false) {
+  private playHihat(time: number, isOpen = false): void {
     if (!this.audioContext || !this.destination || !this.noiseBuffer) return;
 
     const noiseSource = this.audioContext.createBufferSource();
@@ -399,7 +402,7 @@ export class MenuSynth {
     noiseSource.stop(time + duration + 0.01);
   }
 
-  private playCrash(time: number) {
+  private playCrash(time: number): void {
     if (!this.audioContext || !this.destination || !this.noiseBuffer) return;
 
     const noiseSource = this.audioContext.createBufferSource();
@@ -422,7 +425,7 @@ export class MenuSynth {
     noiseSource.stop(time + 1.5);
   }
 
-  private scheduleDrums(step: number, time: number) {
+  private scheduleDrums(step: number, time: number): void {
     const isIntro = step < 128;
     const isTransposed = step >= 128 && step < 192;
     const isRiff2 = step >= 192 && step < 256;
@@ -485,29 +488,31 @@ export class MenuSynth {
     }
   }
 
-  private scheduleNextStep(step: number, time: number) {
+  private scheduleNextStep(step: number, time: number): void {
     const secondsPerBeat = 60.0 / this.bpm;
     const stepDuration = secondsPerBeat / 4; // sixteenth notes
 
     // Schedule drums dynamically
     this.scheduleDrums(step, time);
 
-    // Schedule guitar notes (supports polyphony/chords!)
-    const guitarNotes = this.guitarPattern.filter(g => g.step === step);
-    for (const g of guitarNotes) {
-      const dur = g.duration * stepDuration;
-      this.playGuitarNote(g.note, time, dur, g.type);
+    const guitarNotes = this.guitarByStep.get(step);
+    if (guitarNotes) {
+      for (const g of guitarNotes) {
+        const dur = g.duration * stepDuration;
+        this.playGuitarNote(g.note, time, dur, g.type);
+      }
     }
 
-    // Schedule bass notes
-    const bassNotes = this.bassPattern.filter(b => b.step === step);
-    for (const b of bassNotes) {
-      const dur = b.duration * stepDuration;
-      this.playBassNote(b.note, time, dur);
+    const bassNotes = this.bassByStep.get(step);
+    if (bassNotes) {
+      for (const b of bassNotes) {
+        const dur = b.duration * stepDuration;
+        this.playBassNote(b.note, time, dur);
+      }
     }
   }
 
-  private scheduler() {
+  private scheduler(): void {
     if (!this.audioContext || !this.isPlaying) return;
 
     while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
@@ -518,7 +523,7 @@ export class MenuSynth {
     this.timerId = setTimeout(() => this.scheduler(), this.lookahead);
   }
 
-  private advanceStep() {
+  private advanceStep(): void {
     const secondsPerBeat = 60.0 / this.bpm;
     const stepDuration = secondsPerBeat / 4;
     this.nextNoteTime += stepDuration;
@@ -526,16 +531,14 @@ export class MenuSynth {
     this.currentStep = (this.currentStep + 1) % 512; // loop 512 steps
   }
 
-  start(audioContext: AudioContext, destination: AudioNode) {
+  start(audioContext: AudioContext, destination: AudioNode): void {
     if (this.isPlaying) return;
 
     this.audioContext = audioContext;
     this.destination = destination;
     this.isPlaying = true;
 
-    if (!this.noiseBuffer) {
-      this.noiseBuffer = this.createNoiseBuffer();
-    }
+    this.noiseBuffer ??= this.createNoiseBuffer();
 
     this.currentStep = 0;
     this.nextNoteTime = this.audioContext.currentTime + 0.05;
@@ -543,7 +546,7 @@ export class MenuSynth {
     this.scheduler();
   }
 
-  stop() {
+  stop(): void {
     this.isPlaying = false;
     if (this.timerId) {
       clearTimeout(this.timerId);

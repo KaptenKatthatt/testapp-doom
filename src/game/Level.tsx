@@ -10,7 +10,7 @@ import {
   createBarrelTexture,
   createBloodTexture,
   createLavaTexture,
-} from "./Textures";
+} from "@/shared/Textures";
 import { LevelLights } from "./LevelLights";
 import { LevelDecorations } from "./LevelDecorations";
 

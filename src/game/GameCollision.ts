@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import type * as THREE from "three";
 import { getDoorCollisionBox } from "./Doors";
 import type { DoorData } from "./Doors";
 import type { BarrelData } from "./Level";

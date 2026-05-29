@@ -1,8 +1,9 @@
-import { CellData, GRID_W, GRID_H, ENTITY_TYPES, PICKUP_TYPES } from './EditorTypes';
+import type { CellData} from './EditorTypes';
+import { GRID_W, GRID_H, ENTITY_TYPES, PICKUP_TYPES } from './EditorTypes';
 
 function getCell(grid: CellData[][], x: number, z: number): CellData {
   if (x < 0 || x >= GRID_W || z < 0 || z >= GRID_H) return { type: 'wall' };
-  return grid[z]![x]!;
+  return grid[z]?.[x] ?? { type: 'wall' };
 }
 
 export interface ValidationResult {
@@ -28,17 +29,17 @@ export function runValidation(grid: CellData[][], playerPos: [number, number] | 
   }
   if (enemyCount === 0) errors.push('❌ No enemies placed');
 
-  let visited: Set<string> = new Set();
+  let visited = new Set<string>();
   if (playerPos) {
     visited = new Set<string>();
-    const queue: [number, number][] = [[playerPos[0], playerPos[1]]];
+    const queue: Array<[number, number]> = [[playerPos[0], playerPos[1]]];
     visited.add(`${playerPos[0]},${playerPos[1]}`);
 
     while (queue.length > 0) {
-      const [cx, cz] = queue.shift()!;
-      for (const dir of [[1,0],[-1,0],[0,1],[0,-1]]) {
-        const dx = dir[0]!;
-        const dz = dir[1]!;
+      const item = queue.shift();
+      if (!item) break;
+      const [cx, cz] = item;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as Array<[number, number]>) {
         const nx = cx + dx;
         const nz = cz + dz;
         const key = `${nx},${nz}`;

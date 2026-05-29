@@ -1,6 +1,6 @@
 export type TrackStyle = 'inferno' | 'darkness' | 'rampage' | 'eerie' | 'doom' | 'classic';
 
-export const TRACK_OPTIONS: { value: TrackStyle; label: string; emoji: string }[] = [
+export const TRACK_OPTIONS: Array<{ value: TrackStyle; label: string; emoji: string }> = [
   { value: 'inferno', label: 'Inferno', emoji: '🔥' },
   { value: 'darkness', label: 'Darkness', emoji: '🌑' },
   { value: 'rampage', label: 'Rampage', emoji: '⚡' },
@@ -74,7 +74,7 @@ export const LIMITS: Record<string, number> = {
 };
 
 // Categories for the tool selector
-export const CELL_CATEGORIES: { label: string; types: CellType[] }[] = [
+export const CELL_CATEGORIES: Array<{ label: string; types: CellType[] }> = [
   { label: '🏗️ Structure', types: ['empty', 'wall', 'door'] },
   { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman'] },
   { label: '🎒 Pickups', types: ['health', 'ammo', 'shotgun'] },

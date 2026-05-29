@@ -3,7 +3,7 @@
 // Secret walls stay open forever once opened
 // Regular doors auto-close after a timer
 
-import { audioManager } from "./Audio";
+import { audioManager } from "@/shared/audio/Audio";
 
 export interface DoorData {
   id: number;

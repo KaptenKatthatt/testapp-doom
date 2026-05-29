@@ -1,4 +1,4 @@
-import type { CellType } from "./EditorTypes";
+import type { CellType } from "@/editor/EditorTypes";
 
 // E1M1 Entryway - converted from the hardcoded WALL_DATA in Level.tsx
 // This is the original default map that players see when they start the game.

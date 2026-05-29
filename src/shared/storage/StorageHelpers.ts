@@ -1,4 +1,4 @@
-import { CellType, CellData, TrackStyle } from './EditorTypes';
+import type { CellType, CellData, TrackStyle } from '@/editor/EditorTypes';
 import { db } from './firebase';
 import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy } from 'firebase/firestore';
 
@@ -31,6 +31,102 @@ export interface SavedMapListItem {
   validated: boolean;
   musicTrack?: TrackStyle;
   cloudSaved?: boolean;
+}
+
+interface FirestoreMapRecord {
+  name: string;
+  gridJson?: string;
+  grid?: CellType[][];
+  playerPos: [number, number] | null;
+  timestamp: number;
+  validated?: boolean;
+  musicTrack?: TrackStyle;
+}
+
+function isTrackStyle(value: unknown): value is TrackStyle {
+  return value === 'inferno'
+    || value === 'darkness'
+    || value === 'rampage'
+    || value === 'eerie'
+    || value === 'doom'
+    || value === 'classic';
+}
+
+function isPlayerPos(value: unknown): value is [number, number] | null {
+  if (value === null) return true;
+  if (!Array.isArray(value) || value.length !== 2) return false;
+  return typeof value[0] === 'number' && typeof value[1] === 'number';
+}
+
+function isCellTypeGrid(value: unknown): value is CellType[][] {
+  if (!Array.isArray(value)) return false;
+  return value.every((row: unknown) =>
+    Array.isArray(row) && row.every((cell: unknown) => typeof cell === 'string')
+  );
+}
+
+function readFirestoreMapRecord(value: unknown): FirestoreMapRecord | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const name = record.name;
+  const timestamp = record.timestamp;
+  if (typeof name !== 'string' || typeof timestamp !== 'number') return null;
+  if (!isPlayerPos(record.playerPos)) return null;
+
+  const parsed: FirestoreMapRecord = {
+    name,
+    timestamp,
+    playerPos: record.playerPos,
+  };
+
+  const gridJson = record.gridJson;
+  if (typeof gridJson === 'string') {
+    parsed.gridJson = gridJson;
+  }
+
+  const grid = record.grid;
+  if (isCellTypeGrid(grid)) {
+    parsed.grid = grid;
+  }
+
+  const validated = record.validated;
+  if (typeof validated === 'boolean') {
+    parsed.validated = validated;
+  }
+
+  const musicTrack = record.musicTrack;
+  if (isTrackStyle(musicTrack)) {
+    parsed.musicTrack = musicTrack;
+  }
+
+  return parsed;
+}
+
+function mapRecordToLoadedMap(
+  data: FirestoreMapRecord
+): { grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } {
+  let gridTypes: CellType[][] = [];
+  if (data.gridJson) {
+    const parsed: unknown = JSON.parse(data.gridJson);
+    if (isCellTypeGrid(parsed)) {
+      gridTypes = parsed;
+    }
+  } else if (data.grid) {
+    gridTypes = data.grid;
+  }
+
+  return {
+    grid: gridTypes.map(row => row.map((t: CellType) => ({ type: t }))),
+    playerPos: data.playerPos,
+    ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+  };
+}
+
+function isSystemMapName(name: string): boolean {
+  return name.includes('__playing__')
+    || name.includes('__autosache__')
+    || name.includes('__autosave__')
+    || name.includes('__e1m1__');
 }
 
 /**
@@ -83,7 +179,7 @@ function syncMapToCloud(
     .then(() => {
       console.log(`Successfully synced map "${name}" (as "${cloudId}") with Firebase Cloud Firestore.`);
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error(`Failed to sync map "${name}" to Cloud Firestore:`, error);
     });
 }
@@ -133,22 +229,12 @@ export async function loadMapFromStorage(
       const mapDocRef = doc(db, 'maps', cloudId);
       const docSnap = await withFirestoreTimeout(getDoc(mapDocRef));
       if (docSnap.exists()) {
-        const data = docSnap.data();
-
-        let gridTypes: CellType[][] = [];
-        if (data.gridJson) {
-          gridTypes = JSON.parse(data.gridJson);
-        } else if (data.grid) {
-          gridTypes = data.grid;
+        const data = readFirestoreMapRecord(docSnap.data());
+        if (data) {
+          return mapRecordToLoadedMap(data);
         }
-
-        return {
-          grid: gridTypes.map(row => row.map((t: CellType) => ({ type: t }))),
-          playerPos: data.playerPos,
-          ...(data.musicTrack ? { musicTrack: data.musicTrack as TrackStyle } : {}),
-        };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Failed to retrieve map "${name}" (as "${cloudId}") from Cloud Firestore, falling back to local storage:`, error);
     }
   }
@@ -162,13 +248,13 @@ export async function loadMapFromStorage(
  */
 export async function listSavedMaps(
   includeSystemMaps = false
-): Promise<Array<SavedMapListItem>> {
+): Promise<SavedMapListItem[]> {
   const mapsMap = new Map<string, SavedMapListItem>();
 
   // 1. Fetch local maps from localStorage
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(MAP_PREFIX)) {
+    if (key?.startsWith(MAP_PREFIX)) {
       if (!includeSystemMaps && (key.includes('__playing__') || key.includes('__autosache__') || key.includes('__autosave__') || key.includes('__e1m1__'))) {
         continue;
       }
@@ -195,21 +281,22 @@ export async function listSavedMaps(
       const snapshot = await withFirestoreTimeout(getDocs(mapsQuery));
       snapshot.forEach(docSnap => {
         if (docSnap.exists()) {
-          const data = docSnap.data();
+          const data = readFirestoreMapRecord(docSnap.data());
+          if (!data) return;
           // Skip if it is a system map that shouldn't be listed publicly
-          if (!includeSystemMaps && (data.name.includes('__playing__') || data.name.includes('__autosache__') || data.name.includes('__autosave__') || data.name.includes('__e1m1__'))) {
+          if (!includeSystemMaps && isSystemMapName(data.name)) {
             return;
           }
           mapsMap.set(data.name, {
             name: data.name,
             timestamp: data.timestamp,
             validated: !!data.validated,
-            ...(data.musicTrack ? { musicTrack: data.musicTrack as TrackStyle } : {}),
+            ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
             cloudSaved: true
           });
         }
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to fetch maps from Cloud Firestore:", error);
     }
   }
@@ -235,7 +322,7 @@ export async function deleteMapFromStorage(name: string): Promise<void> {
       .then(() => {
         console.log(`Successfully deleted map "${name}" (as "${cloudId}") from Cloud Firestore.`);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error(`Failed to delete map "${name}" from Cloud Firestore:`, error);
       });
   }
@@ -245,7 +332,7 @@ export async function deleteMapFromStorage(name: string): Promise<void> {
  * Autosaves the map state locally. Keeping this fully synchronous in localStorage prevents
  * network hammering on Firebase (e.g. during frequent fast debounced editor updates).
  */
-export function autosave(grid: CellData[][], playerPos: [number, number] | null) {
+export function autosave(grid: CellData[][], playerPos: [number, number] | null): void {
   const data: SavedMap = {
     name: '__autosache__',
     grid: grid.map(row => row.map(c => c.type)),
