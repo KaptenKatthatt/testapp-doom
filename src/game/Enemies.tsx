@@ -20,8 +20,13 @@ const ENEMY_CONFIG: Record<EnemyType, {
     attackRange: 2.5, attackCooldown: 1.2, attackDamage: 2,
   },
   zombieman: {
-    bodyW: 0.9, bodyH: 2.8, bodyD: 0.7,
+    bodyW: 0.9, bodyH: 3.2, bodyD: 0.7,
     headSize: 0.55, color: 0x99aa77, speed: 1.0,
+    attackRange: 12, attackCooldown: 2.5, attackDamage: 2,
+  },
+  ratman: {
+    bodyW: 0.9, bodyH: 2.8, bodyD: 0.7,
+    headSize: 0.55, color: 0xccaa44, speed: 1.0,
     attackRange: 12, attackCooldown: 2.5, attackDamage: 2,
   },
   mancubus: {
@@ -420,7 +425,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const eyeColor = isDemon ? "#ff0044" : "#ff4400";
   const healthPct = enemy.health / enemy.maxHealth;
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
-  const isSpriteEnemy = type === "mancubus" || type === "zombieman" || type === "cacodemon";
+  const isSpriteEnemy = type === "mancubus" || type === "ratman" || type === "cacodemon";
 
   const mancubusTexture = useMemo(() => getMancubusBaseTexture().clone(), []);
   const ratmanTexture = useMemo(() => getRatmanBaseTexture().clone(), []);
@@ -483,7 +488,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (type === "zombieman") {
+    if (type === "ratman") {
       const diff = getCameraDiff(
         state.camera.position.x,
         state.camera.position.z,
@@ -578,7 +583,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
     );
   }
 
-  if (type === "zombieman") {
+  if (type === "ratman") {
     return (
       <group position={[position[0], 0, position[2]]}>
         <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
@@ -671,7 +676,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         </mesh>
       </group>
       <HealthBar healthPct={healthPct} y={config.bodyH + 1.0} />
-      <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH} color={type === "demon" ? "#ff0044" : "#ff6600"} />
+      <EnemyLight lightRef={lightRef} position={position} bodyH={config.bodyH} color={type === "demon" ? "#ff0044" : type === "zombieman" ? "#88ff88" : "#ff6600"} />
     </group>
   );
 }
@@ -705,7 +710,7 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
-    if (enemy.type === "zombieman") {
+    if (enemy.type === "ratman") {
       const rowData = RATMAN_ROWS[7] ?? RATMAN_ROWS[0];
       if (!rowData) return;
       const deathFrame = Math.min(5, Math.floor(elapsed / 0.12));
@@ -742,7 +747,7 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
     );
   }
 
-  if (enemy.type === "zombieman") {
+  if (enemy.type === "ratman") {
     return (
       <group position={[position[0], 0, position[2]]}>
         <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>

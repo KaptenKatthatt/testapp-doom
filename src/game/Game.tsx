@@ -101,6 +101,7 @@ const INITIAL_ENEMIES: EnemyData[] = [
   { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [18, 0, 34] as [number, number, number], hasAlerted: false },
   { id: 11, position: [28, 0, 20], type: "mancubus", health: 150, maxHealth: 150, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [28, 0, 20] as [number, number, number], hasAlerted: false },
   { id: 12, position: [20, 0, 24], type: "cacodemon", health: 100, maxHealth: 100, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 24] as [number, number, number], hasAlerted: false },
+  { id: 13, position: [32, 0, 30], type: "ratman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [32, 0, 30] as [number, number, number], hasAlerted: false },
 ];
 
 const INITIAL_PICKUPS: PickupData[] = [
@@ -169,8 +170,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
   const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
-    const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : e.type === 'mancubus' ? 150 : e.type === 'cacodemon' ? 100 : 35;
-    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as "imp" | "demon" | "zombieman" | "mancubus" | "cacodemon", health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
+    const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : e.type === 'mancubus' ? 150 : e.type === 'cacodemon' ? 100 : e.type === 'ratman' ? 35 : 35;
+    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as "imp" | "demon" | "zombieman" | "ratman" | "mancubus" | "cacodemon", health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
   }) : INITIAL_ENEMIES;
   const customPickups: PickupData[] = levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS;
   const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
