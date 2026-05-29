@@ -99,9 +99,6 @@ const INITIAL_ENEMIES: EnemyData[] = [
   { id: 8, position: [10, 0, 26], type: "imp", health: 45, maxHealth: 45, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [10, 0, 26] as [number, number, number], hasAlerted: false },
   { id: 9, position: [34, 0, 14], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [34, 0, 14] as [number, number, number], hasAlerted: false },
   { id: 10, position: [18, 0, 34], type: "zombieman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [18, 0, 34] as [number, number, number], hasAlerted: false },
-  { id: 11, position: [28, 0, 20], type: "mancubus", health: 150, maxHealth: 150, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [28, 0, 20] as [number, number, number], hasAlerted: false },
-  { id: 12, position: [20, 0, 24], type: "cacodemon", health: 100, maxHealth: 100, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [20, 0, 24] as [number, number, number], hasAlerted: false },
-  { id: 13, position: [32, 0, 30], type: "ratman", health: 35, maxHealth: 35, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [32, 0, 30] as [number, number, number], hasAlerted: false },
 ];
 
 const INITIAL_PICKUPS: PickupData[] = [

@@ -57,6 +57,16 @@ interface SpriteRow {
 
 const textureCache = new Map<string, THREE.Texture>();
 
+function isCyanKey(r: number, g: number, b: number): boolean {
+  return (r < 120 && g > 150 && b > 150) || (g > r + 15 && b > r + 15);
+}
+
+function isNeutralGrayKey(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max < 115 && max - min < 12;
+}
+
 function createChromaKeyTexture(src: string): THREE.Texture {
   const cached = textureCache.get(src);
   if (cached) return cached;
@@ -77,7 +87,43 @@ function createChromaKeyTexture(src: string): THREE.Texture {
         const r = data[i] ?? 0;
         const g = data[i + 1] ?? 0;
         const b = data[i + 2] ?? 0;
-        if ((r < 120 && g > 150 && b > 150) || (g > r + 15 && b > r + 15)) {
+        if (isCyanKey(r, g, b)) {
+          data[i + 3] = 0;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
+      texture.needsUpdate = true;
+    }
+  };
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  textureCache.set(src, texture);
+  return texture;
+}
+
+function createCacodemonTexture(): THREE.Texture {
+  const src = "/cacodemon.png";
+  const cached = textureCache.get(src);
+  if (cached) return cached;
+
+  const texture = new THREE.Texture();
+  const img = new Image();
+  img.src = src;
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i] ?? 0;
+        const g = data[i + 1] ?? 0;
+        const b = data[i + 2] ?? 0;
+        if (isCyanKey(r, g, b) || isNeutralGrayKey(r, g, b)) {
           data[i + 3] = 0;
         }
       }
@@ -101,7 +147,7 @@ function getRatmanBaseTexture(): THREE.Texture {
 }
 
 function getCacodemonBaseTexture(): THREE.Texture {
-  return createChromaKeyTexture("/cacodemon.png");
+  return createCacodemonTexture();
 }
 
 function applyUniformGridUV(
