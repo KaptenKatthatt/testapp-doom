@@ -9,7 +9,7 @@ import {
   autosave,
   loadAutosave,
 } from "./StorageHelpers";
-import type { CellData } from "./EditorTypes";
+import type { CellData } from "@/editor/EditorTypes";
 
 vi.mock("./firebase", () => ({ db: null }));
 
@@ -17,6 +17,11 @@ function makeGrid(): CellData[][] {
   return Array.from({ length: 50 }, () =>
     Array.from({ length: 50 }, () => ({ type: "empty" as const }))
   );
+}
+
+function setCell(grid: CellData[][], z: number, x: number, cell: CellData): void {
+  const row = grid[z];
+  if (row) row[x] = cell;
 }
 
 describe("getFirestoreDocId", () => {
@@ -41,27 +46,27 @@ describe("localStorage map storage", () => {
 
   it("saveMapToStorage writes to localStorage immediately", async () => {
     const grid = makeGrid();
-    grid[3]![3]! = { type: "player" };
+    setCell(grid, 3, 3, { type: "player" });
     await saveMapToStorage("TestMap", grid, [3, 3], true);
 
     const raw = localStorage.getItem(MAP_PREFIX + "TestMap");
     expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw!) as { name: string; validated: boolean };
+    const parsed = JSON.parse(raw ?? "") as { name: string; validated: boolean };
     expect(parsed.name).toBe("TestMap");
     expect(parsed.validated).toBe(true);
   });
 
   it("loadMapFromStorage round-trips grid and player position", async () => {
     const grid = makeGrid();
-    grid[5]![5]! = { type: "wall" };
-    grid[4]![4]! = { type: "player" };
+    setCell(grid, 5, 5, { type: "wall" });
+    setCell(grid, 4, 4, { type: "player" });
     await saveMapToStorage("RoundTrip", grid, [4, 4], false);
 
     const loaded = await loadMapFromStorage("RoundTrip");
     expect(loaded).not.toBeNull();
-    expect(loaded!.playerPos).toEqual([4, 4]);
-    expect(loaded!.grid[5]![5]!.type).toBe("wall");
-    expect(loaded!.grid[4]![4]!.type).toBe("player");
+    expect(loaded?.playerPos).toEqual([4, 4]);
+    expect(loaded?.grid[5]?.[5]?.type).toBe("wall");
+    expect(loaded?.grid[4]?.[4]?.type).toBe("player");
   });
 
   it("listSavedMaps excludes system maps by default", async () => {
@@ -83,11 +88,11 @@ describe("localStorage map storage", () => {
 
   it("autosave and loadAutosave round-trip", () => {
     const grid = makeGrid();
-    grid[1]![1]! = { type: "wall" };
+    setCell(grid, 1, 1, { type: "wall" });
     autosave(grid, [1, 1]);
     const loaded = loadAutosave();
     expect(loaded).not.toBeNull();
-    expect(loaded!.playerPos).toEqual([1, 1]);
-    expect(loaded!.grid[1]![1]!.type).toBe("wall");
+    expect(loaded?.playerPos).toEqual([1, 1]);
+    expect(loaded?.grid[1]?.[1]?.type).toBe("wall");
   });
 });

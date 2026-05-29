@@ -49,11 +49,11 @@ export function SaveModal({
   setSaveName,
   onSave,
   onCancel,
-}: SaveModalProps) {
+}: SaveModalProps): React.JSX.Element {
   return (
     <div style={overlayStyle}>
       <div style={dialogStyle}>
-        {saveValidation && saveValidation.errors.length === 0 ? (
+        {saveValidation?.errors.length === 0 ? (
           <h3 style={{ color: '#0f0', marginTop: 0 }}>✅ Map Validated!</h3>
         ) : (
           <h3 style={{ color: '#f00', marginTop: 0 }}>⚠️ Validation Issues</h3>
@@ -113,7 +113,7 @@ export function LoadModal({
   onLoadMap,
   onDeleteMap,
   onClose,
-}: LoadModalProps) {
+}: LoadModalProps): React.JSX.Element {
   return (
     <div style={overlayStyle}>
       <div style={dialogStyle}>
@@ -174,7 +174,7 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
-export function ExportModal({ exportCode, onClose }: ExportModalProps) {
+export function ExportModal({ exportCode, onClose }: ExportModalProps): React.JSX.Element {
   return (
     <div style={overlayStyle}>
       <div style={dialogStyle}>

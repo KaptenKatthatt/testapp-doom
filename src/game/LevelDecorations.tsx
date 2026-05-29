@@ -1,5 +1,5 @@
 import React from "react";
-import * as THREE from "three";
+import type * as THREE from "three";
 
 interface LevelDecorationsProps {
   readonly textures: {

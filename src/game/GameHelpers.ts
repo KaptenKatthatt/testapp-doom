@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { EnemyData, ProjectileData, PickupData, WallBox } from "./types";
-import { audioManager } from "./Audio";
+import { audioManager } from "@/shared/audio/Audio";
 import type { PlayerData } from "./Game";
 import type { BarrelData } from "./Level";
 
@@ -365,7 +365,7 @@ export function handlePlayerMovementHelper(
   checkCollision: (pos: THREE.Vector3, radius?: number) => boolean,
   checkEnemyCollision: (pos: THREE.Vector3, enemies: EnemyData[]) => boolean,
   enemies: EnemyData[]
-) {
+): void {
   const speed = 8;
   _v3a.set(-Math.sin(player.rotation), 0, -Math.cos(player.rotation)); // forward
   _v3b.set(Math.cos(player.rotation), 0, -Math.sin(player.rotation)); // right
@@ -553,7 +553,7 @@ export function handlePlayerShootingHelper(
   }
 
   // Helper to spawn a projectile bullet
-  function spawnBullet(speed: number, color: string) {
+  function spawnBullet(speed: number, color: string): void {
     const camDir = _v3d; // reuse pre-allocated vector
     camera.getWorldDirection(camDir);
     const bulletDir: [number, number, number] = [camDir.x, camDir.y, camDir.z];
@@ -575,7 +575,7 @@ export function handlePlayerShootingHelper(
   }
 
   // Helper to apply raycasted bullet hitscan damage
-  function applyDamage(baseDamage: number) {
+  function applyDamage(baseDamage: number): void {
     let closestTarget: { type: 'enemy'; e: EnemyData } | { type: 'barrel'; b: BarrelData } | null = null;
     let closestDist = Infinity;
     let closestDamage = 0;
@@ -625,7 +625,7 @@ export function handlePlayerShootingHelper(
     }
 
     // 2. Check barrels
-    if (barrelsRef && barrelsRef.current) {
+    if (barrelsRef?.current) {
       for (const b of barrelsRef.current) {
         if (!b.alive) continue;
         const bPos = new THREE.Vector3(b.position[0], 0.5, b.position[2]);

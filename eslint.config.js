@@ -6,7 +6,7 @@ export default tseslint.config(
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
   {
-    ignores: ["dist/**", "node_modules/**", "e2e/**", "playwright.config.ts"],
+    ignores: ["dist/**", "node_modules/**", "e2e/**", "playwright.config.ts", "**/*.cjs", "scripts/**"],
   },
   {
     files: ["**/*.ts", "**/*.tsx"],

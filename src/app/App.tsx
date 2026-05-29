@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import MainMenu from "./MainMenu";
+import MainMenu from "@/game/MainMenu";
 import { Canvas } from "@react-three/fiber";
-import Game from "./Game";
-import HUD from "./HUD";
-import MobileControls from "./MobileControls";
-import { audioManager } from "./Audio";
-import type { PlayerState } from "./types";
-import type { LevelData } from "./main";
-import { gridToLevelData } from "./EditorExport";
-import { E1M1_GRID } from "./E1M1Grid";
-import { listSavedMaps, loadMapFromStorage } from "./StorageHelpers";
-import type { TrackStyle } from "./EditorTypes";
-import { patchE2EState } from "./e2eBridge";
-
-import { type CellType } from "./EditorTypes";
-import { formatTime, calcScore } from "./gameStats";
+import Game from "@/game/Game";
+import HUD from "@/game/HUD";
+import MobileControls from "@/game/MobileControls";
+import { audioManager } from "@/shared/audio/Audio";
+import type { PlayerState } from "@/game/types";
+import type { LevelData } from "@/shared/levelData";
+import { gridToLevelData } from "@/editor/EditorExport";
+import { E1M1_GRID } from "@/game/levels/E1M1Grid";
+import { listSavedMaps, loadMapFromStorage } from "@/shared/storage/StorageHelpers";
+import type { TrackStyle } from "@/editor/EditorTypes";
+import { patchE2EState } from "@/shared/e2eBridge";
+import { type CellType } from "@/editor/EditorTypes";
+import { formatTime, calcScore } from "@/game/gameStats";
 
 interface AppProps {
   levelData?: LevelData | null;
@@ -79,7 +78,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   // If we have levelData from the editor, use it; otherwise load saved map or E1M1 asynchronously
   useEffect(() => {
     let active = true;
-    const load = async () => {
+    const load = async (): Promise<void> => {
       if (selectedLevel === '__custom__' && levelData) {
         if (active) setActiveLevelData(levelData);
         return;
@@ -88,7 +87,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         const mapName = selectedLevel.slice(6);
         const data = await loadMapFromStorage(mapName);
         if (data && active) {
-          setActiveLevelData(gridToLevelData(data.grid, data.playerPos || [2, 2], data.musicTrack));
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 2], data.musicTrack));
         } else if (active) {
           setActiveLevelData(null);
         }
@@ -98,7 +97,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       if (selectedLevel === '__default__') {
         const data = await loadMapFromStorage('__e1m1__');
         if (data && active) {
-          setActiveLevelData(gridToLevelData(data.grid, data.playerPos || [2, 3], data.musicTrack));
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 3], data.musicTrack));
         } else if (active) {
           const grid = E1M1_GRID.map(row => row.map((t: CellType) => ({ type: t })));
           setActiveLevelData(gridToLevelData(grid, [2, 3] as [number, number], 'classic'));

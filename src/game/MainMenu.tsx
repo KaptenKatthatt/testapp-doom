@@ -1,6 +1,6 @@
 import React from 'react';
-import type { LevelData } from './main';
-import { audioManager } from './Audio';
+import type { LevelData } from '@/shared/levelData';
+import { audioManager } from '@/shared/audio/Audio';
 
 interface SavedMap {
   name: string;
@@ -22,6 +22,20 @@ interface MainMenuProps {
   listSavedMaps: () => Promise<SavedMap[]>;
 }
 
+type MainMenuItem = 'start' | 'maps' | 'editor';
+
+type MapModalItem =
+  | { kind: 'level'; id: string; label: string }
+  | { kind: 'back' };
+
+const MAIN_MENU_ITEMS: MainMenuItem[] = ['start', 'maps', 'editor'];
+
+const MAIN_MENU_LABELS: Record<MainMenuItem, string> = {
+  start: '► START GAME',
+  maps: '► CUSTOM MAPS',
+  editor: '► LEVEL EDITOR',
+};
+
 export default function MainMenu({
   selectedLevel,
   setSelectedLevel,
@@ -34,54 +48,161 @@ export default function MainMenu({
   listSavedMaps
 }: MainMenuProps): React.JSX.Element {
   const [musicActive, setMusicActive] = React.useState(false);
+  const [menuIndex, setMenuIndex] = React.useState(0);
+  const [modalIndex, setModalIndex] = React.useState(0);
+  const musicStartingRef = React.useRef(false);
+
+  const validatedMaps = React.useMemo(
+    () => savedMaps.filter((m) => m.validated),
+    [savedMaps]
+  );
+
+  const mapModalItems = React.useMemo((): MapModalItem[] => {
+    const items: MapModalItem[] = [
+      { kind: 'level', id: '__default__', label: '► E1M1 - ENTRYWAY' },
+    ];
+    if (levelData) {
+      items.push({ kind: 'level', id: '__custom__', label: '► CUSTOM LEVEL' });
+    }
+    for (const m of validatedMaps) {
+      items.push({ kind: 'level', id: `saved:${m.name}`, label: `► ${m.name.toUpperCase()}` });
+    }
+    items.push({ kind: 'back' });
+    return items;
+  }, [levelData, validatedMaps]);
+
+  const openMapModal = React.useCallback((): void => {
+    listSavedMaps().then((maps) => {
+      setSavedMaps(maps);
+      setShowMapModal(true);
+    });
+  }, [listSavedMaps, setSavedMaps, setShowMapModal]);
 
   React.useEffect(() => {
+    if (!showMapModal) return;
+    const idx = mapModalItems.findIndex(
+      (item) => item.kind === 'level' && item.id === selectedLevel
+    );
+    setModalIndex(idx >= 0 ? idx : 0);
+  }, [showMapModal, mapModalItems, selectedLevel]);
+
+  const activateMainMenuItem = React.useCallback((item: MainMenuItem): void => {
+    if (item === 'start') handleStart();
+    else if (item === 'maps') openMapModal();
+    else window.location.hash = '#editor';
+  }, [handleStart, openMapModal]);
+
+  const activateMapModalItem = React.useCallback((item: MapModalItem): void => {
+    if (item.kind === 'back') {
+      setShowMapModal(false);
+      return;
+    }
+    setSelectedLevel(item.id);
+    setShowMapModal(false);
+  }, [setSelectedLevel, setShowMapModal]);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      const key = e.key.toLowerCase();
+
+      if (showMapModal) {
+        if (key === 'w' || key === 'arrowup') {
+          e.preventDefault();
+          setModalIndex((i) => Math.max(0, i - 1));
+        } else if (key === 'a' || key === 's' || key === 'arrowdown') {
+          e.preventDefault();
+          setModalIndex((i) => Math.min(mapModalItems.length - 1, i + 1));
+        } else if (key === 'enter') {
+          e.preventDefault();
+          const item = mapModalItems[modalIndex];
+          if (item) activateMapModalItem(item);
+        } else if (key === 'escape') {
+          e.preventDefault();
+          setShowMapModal(false);
+        }
+        return;
+      }
+
+      if (key === 'w' || key === 'arrowup') {
+        e.preventDefault();
+        setMenuIndex((i) => Math.max(0, i - 1));
+      } else if (key === 'a' || key === 's' || key === 'arrowdown') {
+        e.preventDefault();
+        setMenuIndex((i) => Math.min(MAIN_MENU_ITEMS.length - 1, i + 1));
+      } else if (key === 'enter') {
+        e.preventDefault();
+        const item = MAIN_MENU_ITEMS[menuIndex];
+        if (item) activateMainMenuItem(item);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showMapModal, menuIndex, modalIndex, mapModalItems, activateMainMenuItem, activateMapModalItem, setShowMapModal]);
+
+  React.useEffect(() => {
+    let disposed = false;
+
+    const startAudio = (): Promise<boolean> => {
+      if (disposed || musicStartingRef.current) {
+        return Promise.resolve(audioManager.isMenuMusicPlaying());
+      }
+      musicStartingRef.current = true;
+      return audioManager.init()
+        .then(() => audioManager.resume())
+        .then(() => {
+          if (disposed) return false;
+          if (!audioManager.isMenuMusicPlaying()) {
+            audioManager.playMenuMusic();
+          }
+          const playing = audioManager.isMenuMusicPlaying();
+          setMusicActive(playing);
+          return playing;
+        })
+        .catch((err: unknown) => {
+          console.log("Autoplay blocked, waiting for user interaction.", err);
+          return false;
+        })
+        .finally(() => {
+          musicStartingRef.current = false;
+        });
+    };
+
+    const removeGestureListeners = (): void => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+    };
+
+    const onGesture = (): void => {
+      if (audioManager.isMenuMusicPlaying()) {
+        setMusicActive(true);
+        removeGestureListeners();
+        return;
+      }
+      void startAudio().then((playing) => {
+        if (playing) removeGestureListeners();
+      });
+    };
+
     if (audioManager.isLoaded() && audioManager.isMenuMusicPlaying()) {
       setMusicActive(true);
       return;
     }
 
-    // Try auto-playing
-    const startAudio = () => {
-      audioManager.init().then(() => {
-        audioManager.resume();
-        audioManager.playMenuMusic();
-        setMusicActive(true);
-      }).catch((err) => {
-        console.log("Autoplay blocked, waiting for user interaction.", err);
-      });
-    };
-
-    startAudio();
-
-    // Fallback: start on any screen interaction
-    const handleInteraction = () => {
-      if (!audioManager.isMenuMusicPlaying()) {
-        startAudio();
+    void startAudio().then((playing) => {
+      if (!playing) {
+        window.addEventListener('pointerdown', onGesture, { passive: true });
+        window.addEventListener('keydown', onGesture);
       }
-      cleanup();
+    });
+
+    return () => {
+      disposed = true;
+      removeGestureListeners();
     };
-
-    const cleanup = () => {
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('keydown', handleInteraction);
-      window.removeEventListener('mousedown', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-      window.removeEventListener('pointerdown', handleInteraction);
-      window.removeEventListener('mousemove', handleInteraction);
-    };
-
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('keydown', handleInteraction);
-    window.addEventListener('mousedown', handleInteraction);
-    window.addEventListener('touchstart', handleInteraction);
-    window.addEventListener('pointerdown', handleInteraction);
-    window.addEventListener('mousemove', handleInteraction);
-
-    return cleanup;
   }, []);
 
-  const toggleMusic = (e: React.MouseEvent) => {
+  const toggleMusic = (e: React.MouseEvent): void => {
     e.stopPropagation();
     audioManager.init().then(() => {
       audioManager.resume();
@@ -110,19 +231,6 @@ export default function MainMenu({
         cursor: "pointer",
         overflow: "hidden",
       }}
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'OPTION') return;
-
-        // Auto-play menu music on click if not playing
-        if (!audioManager.isMenuMusicPlaying()) {
-          audioManager.init().then(() => {
-            audioManager.resume();
-            audioManager.playMenuMusic();
-            setMusicActive(true);
-          });
-        }
-      }}
     >
       <h1 style={{ fontSize: "72px", margin: "0 0 8px", textShadow: "0 0 30px #f00, 0 0 60px #a00", fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "8px" }}>
         DOOM
@@ -135,59 +243,50 @@ export default function MainMenu({
           {selectedLevel === '__custom__' ? '▶ CUSTOM LEVEL' : selectedLevel?.startsWith('saved:') ? `▶ ${selectedLevel.slice(6).toUpperCase()}` : '▶ E1M1 - ENTRYWAY'}
         </p>
 
-        {/* Start Game */}
-        <button
-          onClick={(e) => { e.stopPropagation(); handleStart(); }}
-          style={{
-            background: 'none', border: 'none', color: '#ff0', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
-            cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
-            textShadow: '0 0 10px rgba(255,255,0,0.5)', transition: 'all 0.1s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.textShadow = '0 0 20px #ff0'; e.currentTarget.style.transform = 'scale(1.05)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#ff0'; e.currentTarget.style.textShadow = '0 0 10px rgba(255,255,0,0.5)'; e.currentTarget.style.transform = 'scale(1)'; }}
-        >
-          ► START GAME
-        </button>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            listSavedMaps().then(maps => {
-              setSavedMaps(maps);
-              setShowMapModal(true);
-            });
-          }}
-          style={{
-            background: 'none', border: 'none', color: '#c00', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
-            cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
-            transition: 'all 0.1s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#f44'; e.currentTarget.style.textShadow = '0 0 20px #f00'; e.currentTarget.style.transform = 'scale(1.05)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#c00'; e.currentTarget.style.textShadow = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
-        >
-          ► CUSTOM MAPS
-        </button>
-
-        {/* Level Editor */}
-        <a
-          href="#editor"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'none', border: 'none', color: '#c00', fontSize: '24px', fontFamily: '"DooM", Impact, sans-serif',
-            cursor: 'pointer', padding: '6px 16px', textAlign: 'left', width: '100%', letterSpacing: '3px',
-            textDecoration: 'none', display: 'block', transition: 'all 0.1s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#f44'; e.currentTarget.style.textShadow = '0 0 20px #f00'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#c00'; e.currentTarget.style.textShadow = 'none'; }}
-        >
-          ► LEVEL EDITOR
-        </a>
+        {MAIN_MENU_ITEMS.map((item, index) => {
+          const selected = menuIndex === index;
+          const isStart = item === 'start';
+          const baseColor = isStart ? '#ff0' : '#c00';
+          const hoverColor = isStart ? '#fff' : '#f44';
+          const Tag = item === 'editor' ? 'a' : 'button';
+          return (
+            <Tag
+              key={item}
+              href={item === 'editor' ? '#editor' : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuIndex(index);
+                activateMainMenuItem(item);
+              }}
+              onMouseEnter={() => setMenuIndex(index)}
+              style={{
+                background: selected ? 'rgba(80, 0, 0, 0.35)' : 'none',
+                border: 'none',
+                color: selected ? hoverColor : baseColor,
+                fontSize: '24px',
+                fontFamily: '"DooM", Impact, sans-serif',
+                cursor: 'pointer',
+                padding: '6px 16px',
+                textAlign: 'left',
+                width: '100%',
+                letterSpacing: '3px',
+                textDecoration: 'none',
+                display: 'block',
+                textShadow: selected ? (isStart ? '0 0 20px #ff0' : '0 0 20px #f00') : (isStart ? '0 0 10px rgba(255,255,0,0.5)' : 'none'),
+                transform: selected ? 'scale(1.05)' : 'scale(1)',
+                transition: 'all 0.1s',
+              }}
+            >
+              {MAIN_MENU_LABELS[item]}
+            </Tag>
+          );
+        })}
 
 
       </div>
 
       <p style={{ fontSize: "11px", color: "#444", marginTop: "24px", fontFamily: 'monospace' }}>
-        WASD · MOUSE · CLICK TO SHOOT · E TO OPEN DOORS
+        CONTROLS: MOUSE + WASD · CLICK TO SHOOT · E DOORS
       </p>
 
       {/* Custom Map Modal */}
@@ -206,94 +305,76 @@ export default function MainMenu({
           }}>
             <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px", fontSize: "28px" }}>SELECT MAP</h2>
 
-            {/* Default level option */}
-            <div
-              onClick={() => { setSelectedLevel('__default__'); setShowMapModal(false); }}
-              style={{
-                padding: "10px 12px", margin: "2px 0", background: selectedLevel === '__default__' ? '#331100' : 'transparent',
-                border: selectedLevel === '__default__' ? '1px solid #f80' : '1px solid transparent',
-                cursor: "pointer", color: selectedLevel === '__default__' ? '#ff0' : '#ccc', fontSize: "18px",
-                fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
-                transition: 'all 0.1s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = selectedLevel === '__default__' ? '#ff0' : '#ccc'; e.currentTarget.style.background = selectedLevel === '__default__' ? '#331100' : 'transparent'; }}
-            >
-              ► E1M1 - ENTRYWAY
-            </div>
-
-            {/* Editor level if available */}
-            {levelData && (
-              <div
-                onClick={() => { setSelectedLevel('__custom__'); setShowMapModal(false); }}
-                style={{
-                  padding: "10px 12px", margin: "2px 0", background: selectedLevel === '__custom__' ? '#0a2a0a' : 'transparent',
-                  border: selectedLevel === '__custom__' ? '1px solid #0f0' : '1px solid transparent',
-                  cursor: "pointer", color: selectedLevel === '__custom__' ? '#0f0' : '#0a0', fontSize: "18px",
-                  fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
-                  transition: 'all 0.1s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#0f0'; e.currentTarget.style.background = '#0a2a0a'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = selectedLevel === '__custom__' ? '#0f0' : '#0a0'; e.currentTarget.style.background = selectedLevel === '__custom__' ? '#0a2a0a' : 'transparent'; }}
-              >
-                ► CUSTOM LEVEL
-              </div>
-            )}
-
-            {/* Saved maps */}
-            {savedMaps.filter(m => m.validated).length === 0 && !levelData && (
+            {validatedMaps.length === 0 && !levelData && (
               <p style={{ color: "#555", fontSize: "13px", marginTop: "12px", fontFamily: 'monospace' }}>
-                No validated maps yet.<br/>Create one in the Level Editor!
+                No validated maps yet.<br />Create one in the Level Editor!
               </p>
             )}
-            {savedMaps.filter(m => m.validated).map(m => (
-              <div
-                key={m.name}
-                onClick={() => { setSelectedLevel(`saved:${m.name}`); setShowMapModal(false); }}
-                style={{
-                  padding: "10px 12px", margin: "2px 0", background: selectedLevel === `saved:${m.name}` ? '#331100' : 'transparent',
-                  border: selectedLevel === `saved:${m.name}` ? '1px solid #f80' : '1px solid transparent',
-                  cursor: "pointer", color: selectedLevel === `saved:${m.name}` ? '#ff0' : '#aaa', fontSize: "18px",
-                  fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  transition: 'all 0.1s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#331100'; }}
-                onMouseLeave={(e) => { const sel = selectedLevel === `saved:${m.name}`; e.currentTarget.style.color = sel ? '#ff0' : '#aaa'; e.currentTarget.style.background = sel ? '#331100' : 'transparent'; }}
-              >
-                <span>► {m.name.toUpperCase()}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    localStorage.setItem('doom-load-map', m.name);
-                    setShowMapModal(false);
-                    window.location.hash = '#editor';
+            {mapModalItems.map((item, index) => {
+              const selected = modalIndex === index;
+              if (item.kind === 'back') {
+                return (
+                  <button
+                    key="back"
+                    onClick={() => activateMapModalItem(item)}
+                    onMouseEnter={() => setModalIndex(index)}
+                    style={{
+                      marginTop: "16px", padding: "8px 16px", width: '100%',
+                      background: selected ? '#c00' : 'none', color: selected ? '#fff' : '#c00',
+                      border: "1px solid #c00", cursor: "pointer", fontFamily: '"DooM", Impact, sans-serif',
+                      fontSize: "18px", letterSpacing: "2px", transition: 'all 0.1s',
+                    }}
+                  >
+                    ► BACK
+                  </button>
+                );
+              }
+              const isCustom = item.id === '__custom__';
+              const isCurrentLevel = selectedLevel === item.id;
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    setModalIndex(index);
+                    activateMapModalItem(item);
                   }}
-                  style={{ background: "none", color: "#ff8800", border: "1px solid #ff8800", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
-                  title="Edit Map"
+                  onMouseEnter={() => setModalIndex(index)}
+                  style={{
+                    padding: "10px 12px", margin: "2px 0",
+                    background: selected ? (isCustom ? '#0a2a0a' : '#331100') : 'transparent',
+                    border: selected || isCurrentLevel ? `1px solid ${isCustom ? '#0f0' : '#f80'}` : '1px solid transparent',
+                    cursor: "pointer",
+                    color: selected ? (isCustom ? '#0f0' : '#fff') : (isCurrentLevel ? (isCustom ? '#0f0' : '#ff0') : (isCustom ? '#0a0' : '#ccc')),
+                    fontSize: "18px",
+                    fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    transition: 'all 0.1s',
+                  }}
                 >
-                  ✏️
-                </button>
-              </div>
-            ))}
+                  <span>{item.label}</span>
+                  {item.id.startsWith('saved:') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        localStorage.setItem('doom-load-map', item.id.slice(6));
+                        setShowMapModal(false);
+                        window.location.hash = '#editor';
+                      }}
+                      style={{ background: "none", color: "#ff8800", border: "1px solid #ff8800", padding: "2px 6px", cursor: "pointer", fontSize: "12px", fontFamily: 'monospace' }}
+                      title="Edit Map"
+                    >
+                      ✏️
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             {savedMaps.filter(m => !m.validated).length > 0 && (
               <div style={{ color: '#660', fontSize: '12px', marginTop: 8, fontFamily: 'monospace', borderTop: '1px solid #333', paddingTop: 8 }}>
                 ⚠️ {savedMaps.filter(m => !m.validated).length} map(s) not validated (finish & validate in editor)
               </div>
             )}
 
-            <button
-              onClick={() => setShowMapModal(false)}
-              style={{
-                marginTop: "16px", padding: "8px 16px", background: "none", color: "#c00",
-                border: "1px solid #c00", cursor: "pointer", fontFamily: '"DooM", Impact, sans-serif',
-                fontSize: "18px", letterSpacing: "2px", transition: 'all 0.1s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#c00'; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#c00'; }}
-            >
-              ► BACK
-            </button>
           </div>
         </div>
       )}

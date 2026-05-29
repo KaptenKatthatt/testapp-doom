@@ -153,7 +153,7 @@ export default function Weapons({
     const gunGroup = gunGroupRef.current;
     if (gunGroup) {
       // Offset calculation depending on selected weapon to make them look beautifully placed
-      let offset = new THREE.Vector3();
+      const offset = new THREE.Vector3();
       let rotX = 0, rotY = 0, rotZ = 0;
 
       if (currentWeapon === "revolver") {

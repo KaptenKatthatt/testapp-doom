@@ -1,11 +1,12 @@
 // AudioManager — handles all game audio (sound effects + music)
 // Uses Web Audio API for low-latency playback
 import { MenuSynth } from "./MenuSynth";
-import { MusicEngine, TrackStyle } from "./MusicEngine";
+import type { TrackStyle } from "./MusicEngine";
+import { MusicEngine } from "./MusicEngine";
 
 class AudioManager {
   private audioContext: AudioContext | null = null;
-  private buffers: Map<string, AudioBuffer> = new Map();
+  private buffers = new Map<string, AudioBuffer>();
   private musicBuffer: AudioBuffer | null = null;
   private musicSource: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
@@ -80,6 +81,9 @@ class AudioManager {
     ];
 
     // Load OGG files (prefer OGG over WAV)
+    const ctx = this.audioContext;
+    if (!ctx) return;
+
     const promises = sounds.map(async ({ name, file }) => {
       try {
         const response = await fetch(`/sounds/${file}.ogg`);
@@ -88,12 +92,12 @@ class AudioManager {
           const wavResponse = await fetch(`/sounds/${file}.wav`);
           if (!wavResponse.ok) return;
           const arrayBuffer = await wavResponse.arrayBuffer();
-          const audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
           this.buffers.set(name, audioBuffer);
           return;
         }
         const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
         this.buffers.set(name, audioBuffer);
       } catch (e) {
         // Sound not found, skip silently
@@ -171,9 +175,7 @@ class AudioManager {
     // Stop standard level music if playing
     this.stopMusic();
 
-    if (!this.menuSynth) {
-      this.menuSynth = new MenuSynth();
-    }
+    this.menuSynth ??= new MenuSynth();
 
     this.menuSynth.start(this.audioContext, this.musicGain);
     this.menuMusicPlaying = true;
@@ -193,10 +195,11 @@ class AudioManager {
   }
 
   // Cache for loaded music buffers
-  private trackBuffers: Map<TrackStyle, AudioBuffer> = new Map();
+  private trackBuffers = new Map<TrackStyle, AudioBuffer>();
 
   private async loadTrackBuffer(track: TrackStyle): Promise<AudioBuffer | null> {
-    if (this.trackBuffers.has(track)) return this.trackBuffers.get(track)!;
+    const cached = this.trackBuffers.get(track);
+    if (cached) return cached;
     if (!this.audioContext) return null;
     try {
       const response = await fetch(`/audio/${track}.ogg`);
@@ -228,9 +231,7 @@ class AudioManager {
       this.musicPlaying = true;
     } else {
       // Fallback to procedural synth
-      if (!this.musicEngine) {
-        this.musicEngine = new MusicEngine();
-      }
+      this.musicEngine ??= new MusicEngine();
       this.musicEngine.start(this.audioContext, this.musicGain, track);
     }
   }

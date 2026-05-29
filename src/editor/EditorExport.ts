@@ -1,12 +1,27 @@
-import { CellData, GRID_W, GRID_H, ENTITY_TYPES, PICKUP_TYPES } from './EditorTypes';
+import type { CellData} from './EditorTypes';
+import { GRID_W, GRID_H, ENTITY_TYPES, PICKUP_TYPES } from './EditorTypes';
 
 function getCell(grid: CellData[][], x: number, z: number): CellData {
   if (x < 0 || x >= GRID_W || z < 0 || z >= GRID_H) return { type: 'wall' };
-  return grid[z]![x]!;
+  return grid[z]?.[x] ?? { type: 'wall' };
+}
+
+export interface ExportedLevelData {
+  walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; isHalfWall?: boolean; color?: string }>;
+  enemies: Array<{ id: number; x: number; z: number; type: string }>;
+  pickups: Array<{ id: number; x: number; z: number; type: string }>;
+  barrels: Array<{ id: number; x: number; z: number }>;
+  specialFloors: Array<{ x: number; z: number; type: 'lava' | 'slime' }>;
+  playerStart: [number, number];
+  musicTrack?: string | undefined;
 }
 
 // Export grid-to-level-data converter for use by the game and export
-export function gridToLevelData(grid: CellData[][], playerPos: [number, number] | null, musicTrack?: string) {
+export function gridToLevelData(
+  grid: CellData[][],
+  playerPos: [number, number] | null,
+  musicTrack?: string,
+): ExportedLevelData {
   const visited = new Set<string>();
   const walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; isHalfWall?: boolean; color?: string }> = [];
 

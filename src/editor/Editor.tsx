@@ -1,9 +1,13 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { PRESETS, PresetMap } from './EditorPresets';
-import {
+import { useState, useRef, useCallback, useEffect, useMemo, type JSX } from 'react';
+import { PRESETS } from './EditorPresets';
+import type { PresetMap } from './EditorPresets';
+import type {
   CellType,
   DrawMode,
   CellData,
+  TrackStyle as TrackStyleType,
+} from './EditorTypes';
+import {
   CELL_SIZE,
   GRID_W,
   GRID_H,
@@ -12,19 +16,19 @@ import {
   CELL_CATEGORIES,
   LIMITS,
   TRACK_OPTIONS,
-  TrackStyle as TrackStyleType,
 } from './EditorTypes';
+import type {
+  SavedMapListItem} from '@/shared/storage/StorageHelpers';
 import {
   saveMapToStorage,
   loadMapFromStorage,
   listSavedMaps,
   deleteMapFromStorage,
   autosave,
-  loadAutosave,
-  SavedMapListItem,
-} from './StorageHelpers';
-import { MusicEngine } from './MusicEngine';
-import { audioManager } from './Audio';
+  loadAutosave
+} from '@/shared/storage/StorageHelpers';
+import { MusicEngine } from '@/shared/audio/MusicEngine';
+import { audioManager } from '@/shared/audio/Audio';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
@@ -46,8 +50,8 @@ function cloneGrid(grid: CellData[][]): CellData[][] {
 }
 
 // Bresenham's line algorithm
-function bresenhamLine(x0: number, y0: number, x1: number, y1: number): [number, number][] {
-  const points: [number, number][] = [];
+function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Array<[number, number]> {
+  const points: Array<[number, number]> = [];
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1;
@@ -65,7 +69,7 @@ function bresenhamLine(x0: number, y0: number, x1: number, y1: number): [number,
 }
 
 
-export default function Editor() {
+export default function Editor(): JSX.Element {
   const [grid, setGrid] = useState<CellData[][]>(makeGrid);
   const [undoStack, setUndoStack] = useState<CellData[][][]>([]);
   const [tool, setTool] = useState<CellType>('wall');
@@ -73,7 +77,7 @@ export default function Editor() {
   const [isDragging, setIsDragging] = useState(false);
   const [lineStart, setLineStart] = useState<[number, number] | null>(null);
   const [rectStart, setRectStart] = useState<[number, number] | null>(null);
-  const [previewCells, setPreviewCells] = useState<[number, number][]>([]);
+  const [previewCells, setPreviewCells] = useState<Array<[number, number]>>([]);
   const [showExport, setShowExport] = useState(false);
   const [reachableCells, setReachableCells] = useState<Set<string> | null>(null);
   const [exportCode, setExportCode] = useState('');
@@ -89,12 +93,12 @@ export default function Editor() {
     const c: Record<string, number> = {};
     for (const row of grid) {
       for (const cell of row) {
-        c[cell.type] = (c[cell.type] || 0) + 1;
+        c[cell.type] = (c[cell.type] ?? 0) + 1;
       }
     }
     return c;
   }, [grid]);
-  const [savedMaps, setSavedMaps] = useState<Array<SavedMapListItem>>([]);
+  const [savedMaps, setSavedMaps] = useState<SavedMapListItem[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playerPos, setPlayerPos] = useState<[number, number] | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -214,7 +218,8 @@ export default function Editor() {
   const handleUndo = useCallback(() => {
     setUndoStack(stack => {
       if (stack.length === 0) return stack;
-      const prev = stack[stack.length - 1]!;
+      const prev = stack.at(-1);
+      if (!prev) return stack;
       setGrid(prev);
       return stack.slice(0, -1);
     });
@@ -222,7 +227,7 @@ export default function Editor() {
 
   // Undo keyboard shortcut (Ctrl+Z)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); handleUndo(); }
     };
     window.addEventListener('keydown', onKey);
@@ -230,7 +235,7 @@ export default function Editor() {
   }, [handleUndo]);
 
 
-  const paintCells = useCallback((cells: [number, number][], cellType: CellType) => {
+  const paintCells = useCallback((cells: Array<[number, number]>, cellType: CellType) => {
     // Check limits before painting
     if (cellType !== 'empty' && cellType !== 'wall' && cellType !== 'lava' && cellType !== 'slime') {
       const currentCount = grid.flat().filter(c => c.type === cellType).length;
@@ -247,8 +252,9 @@ export default function Editor() {
           // Remove existing player
           for (let rz = 0; rz < GRID_H; rz++) {
             for (let rx = 0; rx < GRID_W; rx++) {
-              if (next[rz]?.[rx]?.type === 'player') {
-                next[rz]![rx]!.type = 'empty';
+              const playerCell = next[rz]?.[rx];
+              if (playerCell?.type === 'player') {
+                playerCell.type = 'empty';
               }
             }
           }
@@ -257,7 +263,8 @@ export default function Editor() {
         const cell = next[z]?.[x];
         if (cell) cell.type = cellType;
       }
-      scheduleAutosave(next, cellType === 'player' ? [cells[0]![0], cells[0]![1]] : playerPos);
+      const firstCell = cells[0];
+      scheduleAutosave(next, cellType === 'player' && firstCell ? [firstCell[0], firstCell[1]] : playerPos);
       return next;
     });
     setReachableCells(null);
@@ -274,8 +281,10 @@ export default function Editor() {
     let clientX: number, clientY: number;
     if ('touches' in e) {
       if (e.touches.length === 0) return null;
-      clientX = e.touches[0]!.clientX;
-      clientY = e.touches[0]!.clientY;
+      const touch = e.touches[0];
+      if (!touch) return null;
+      clientX = touch.clientX;
+      clientY = touch.clientY;
     } else {
       clientX = e.clientX;
       clientY = e.clientY;
@@ -290,7 +299,7 @@ export default function Editor() {
     return [cx, cz];
   };
 
-  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     const pos = getGridPos(e);
@@ -311,7 +320,7 @@ export default function Editor() {
     }
   };
 
-  const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerMove = (e: React.MouseEvent | React.TouchEvent): void => {
     if (drawMode === 'paint' && isDragging) {
       e.preventDefault();
       const pos = getGridPos(e);
@@ -327,7 +336,7 @@ export default function Editor() {
     } else if ((drawMode === 'rect' || drawMode === 'hollowRect') && rectStart) {
       const pos = getGridPos(e);
       if (pos) {
-        const cells: [number, number][] = [];
+        const cells: Array<[number, number]> = [];
         const x1 = Math.min(rectStart[0], pos[0]);
         const x2 = Math.max(rectStart[0], pos[0]);
         const z1 = Math.min(rectStart[1], pos[1]);
@@ -351,7 +360,7 @@ export default function Editor() {
     }
   };
 
-  const handlePointerUp = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerUp = (e: React.MouseEvent | React.TouchEvent): void => {
     if (drawMode === 'paint') {
       setIsDragging(false);
       return;
@@ -362,14 +371,14 @@ export default function Editor() {
     const pos = getGridPos(e as React.MouseEvent | React.TouchEvent);
 
     if (drawMode === 'line' && lineStart) {
-      const end = pos || lineStart;
+      const end = pos ?? lineStart;
       const cells = bresenhamLine(lineStart[0], lineStart[1], end[0], end[1]);
       paintCells(cells, tool);
       setLineStart(null);
       setPreviewCells([]);
     } else if ((drawMode === 'rect' || drawMode === 'hollowRect') && rectStart) {
-      const end = pos || rectStart;
-      const cells: [number, number][] = [];
+      const end = pos ?? rectStart;
+      const cells: Array<[number, number]> = [];
       const x1 = Math.min(rectStart[0], end[0]);
       const x2 = Math.max(rectStart[0], end[0]);
       const z1 = Math.min(rectStart[1], end[1]);
@@ -393,23 +402,23 @@ export default function Editor() {
     }
   };
 
-  const exportLevel = () => {
+  const exportLevel = (): void => {
     const code = buildExportCode(grid, playerPos);
     setExportCode(code);
     setShowExport(true);
   };
 
-  const clearGrid = () => {
+  const clearGrid = (): void => {
     if (confirm('Clear the entire map?')) {
       updateGrid(makeGrid(), null);
     }
   };
 
-  const loadPreset = (preset: PresetMap) => {
+  const loadPreset = (preset: PresetMap): void => {
     updateGrid(cloneGrid(preset.grid), preset.playerPos);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
@@ -418,13 +427,13 @@ export default function Editor() {
     setSaveName('');
   };
 
-  const handleLoad = async () => {
+  const handleLoad = async (): Promise<void> => {
     const maps = await listSavedMaps();
     setSavedMaps(maps);
     setShowLoadDialog(true);
   };
 
-  const handleLoadMap = async (name: string, track?: TrackStyleType) => {
+  const handleLoadMap = async (name: string, track?: TrackStyleType): Promise<void> => {
     const data = await loadMapFromStorage(name);
     if (data) {
       updateGrid(data.grid, data.playerPos);
@@ -434,7 +443,7 @@ export default function Editor() {
     }
   };
 
-  const handleDeleteMap = async (name: string) => {
+  const handleDeleteMap = async (name: string): Promise<void> => {
     if (confirm(`Delete map "${name}"?`)) {
       await deleteMapFromStorage(name);
       const maps = await listSavedMaps();
@@ -446,7 +455,7 @@ export default function Editor() {
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  const stopMusicPreview = () => {
+  const stopMusicPreview = (): void => {
     if (musicEngineRef.current) musicEngineRef.current.stop();
     if (musicSourceRef.current) {
       try { musicSourceRef.current.stop(); } catch { /* already stopped */ }
@@ -454,7 +463,7 @@ export default function Editor() {
     }
   };
 
-  const toggleMusicPreview = async () => {
+  const toggleMusicPreview = async (): Promise<void> => {
     if (musicPlaying) {
       // Stop
       stopMusicPreview();
@@ -463,7 +472,7 @@ export default function Editor() {
       // Stop menu music first
       audioManager.stopMenuMusic();
       // Play
-      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      audioCtxRef.current ??= new AudioContext();
       const ctx = audioCtxRef.current;
       if (ctx.state === 'suspended') await ctx.resume();
       const gain = ctx.createGain();
@@ -511,7 +520,7 @@ export default function Editor() {
     };
   }, [musicTrack]);
 
-  const handlePlayMap = async () => {
+  const handlePlayMap = async (): Promise<void> => {
     // Save current map and level data so the game can load it
     const ld = gridToLevelData(grid, playerPos, musicTrack);
     localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
@@ -521,7 +530,7 @@ export default function Editor() {
     window.location.hash = '';
   };
 
-  const validate = () => {
+  const validate = (): void => {
     const result = runValidation(grid, playerPos);
     if (result.reachableCells) {
       setReachableCells(result.reachableCells);
@@ -539,7 +548,7 @@ export default function Editor() {
   const drawModeLabels: Record<DrawMode, string> = { paint: '🖌️ Paint', line: '📏 Line', rect: '⬜ Rect', hollowRect: '🔲 Hollow' };
 
   return (
-    <div style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
+    <div className="editor" style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', justifyContent: 'center' }}><h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
         <button onClick={() => { window.location.hash = String(); }} style={{ position: "absolute", top: 4, right: 0, color: "#c00", fontSize: 20, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }} title="Exit to menu">✕</button>
       </div>
@@ -561,9 +570,9 @@ export default function Editor() {
       {/* Entity counters */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap', fontFamily: 'monospace', fontSize: 11 }}>
         {CELL_CATEGORIES.filter(cat => cat.types[0] !== 'empty').map(cat => {
-          const total = cat.types.reduce((sum, t) => sum + (counts[t] || 0), 0);
+          const total = cat.types.reduce((sum, t) => sum + (counts[t] ?? 0), 0);
           if (total === 0) return null;
-          const overLimit = cat.types.some(t => (counts[t] || 0) > (LIMITS[t] || 999));
+          const overLimit = cat.types.some(t => (counts[t] ?? 0) > (LIMITS[t] ?? 999));
           return (
             <span key={cat.label} style={{ color: overLimit ? '#ff4444' : '#aaa', background: overLimit ? '#440000' : '#1a1a1a', padding: '2px 6px', borderRadius: 3, border: overLimit ? '1px solid #f44' : '1px solid #333' }}>
               {cat.label}: {total}
@@ -578,7 +587,7 @@ export default function Editor() {
           <div style={{ fontSize: 10, color: '#666', marginBottom: 2, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1 }}>{cat.label}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
             {cat.types.map(t => {
-              const count = counts[t] || 0;
+              const count = counts[t] ?? 0;
               const limit = LIMITS[t] ?? 999;
               const over = count >= limit;
               return (

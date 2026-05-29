@@ -1,0 +1,17 @@
+---
+description: Run quality checks and fix all errors before committing
+alwaysApply: true
+---
+
+# Pre-commit quality gate
+
+Before creating any git commit, the agent MUST:
+
+1. Run `npm run check` (lint + typecheck + type-coverage).
+2. Fix **all** reported errors — do not commit with known failures.
+3. Re-run `npm run check` until it exits cleanly.
+4. Only then stage files and run `git commit`.
+
+If the user asks to commit while checks fail, fix the failures first or explain what still blocks the commit.
+
+The repository enforces this via Husky: `.husky/pre-commit` runs `npm run check` and rejects the commit on failure.
