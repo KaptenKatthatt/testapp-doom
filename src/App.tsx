@@ -11,6 +11,7 @@ import { gridToLevelData } from "./EditorExport";
 import { E1M1_GRID } from "./E1M1Grid";
 import { listSavedMaps, loadMapFromStorage } from "./StorageHelpers";
 import type { TrackStyle } from "./EditorTypes";
+import { patchE2EState } from "./e2eBridge";
 
 import { type CellType } from "./EditorTypes";
 import { formatTime, calcScore } from "./gameStats";
@@ -68,6 +69,10 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    patchE2EState({ missionComplete });
+  }, [missionComplete]);
 
   const [activeLevelData, setActiveLevelData] = useState<LevelData | null>(null);
 

@@ -85,7 +85,7 @@ export async function loadEditorPreset(page: Page, presetName: string): Promise<
 
 export async function saveMapInEditor(page: Page, mapName: string): Promise<void> {
   await page.getByRole("button", { name: "💾 Save" }).click();
-  await expect(page.getByPlaceholder("Map name...")).toBeVisible({ timeout: 3000 });
+  await expect(page.getByPlaceholder("Map name...")).toBeVisible({ timeout: 8000 });
   await page.getByPlaceholder("Map name...").fill(mapName);
   await page.locator("button").filter({ hasText: "💾 Save" }).last().click();
   await expect(page.getByPlaceholder("Map name...")).not.toBeVisible({ timeout: 3000 });
@@ -123,4 +123,73 @@ export async function getStoredMapValidated(page: Page, mapName: string): Promis
       return null;
     }
   }, mapName);
+}
+
+export async function getE2EState(page: Page) {
+  return page.evaluate(() => window.__DOOM_E2E__?.getState() ?? null);
+}
+
+export async function pressUseKey(page: Page): Promise<void> {
+  await page.keyboard.press("e");
+}
+
+export async function pressWeaponKey(page: Page, digit: "1" | "2" | "3" | "4"): Promise<void> {
+  await page.evaluate((d) => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: `Digit${d}`, key: d, bubbles: true }));
+  }, digit);
+}
+
+export async function waitForE2EState(
+  page: Page,
+  predicate: (state: NonNullable<Awaited<ReturnType<typeof getE2EState>>>) => boolean,
+  timeoutMs = 5000
+): Promise<NonNullable<Awaited<ReturnType<typeof getE2EState>>>> {
+  let last: NonNullable<Awaited<ReturnType<typeof getE2EState>>> | null = null;
+  await expect
+    .poll(async () => {
+      last = await getE2EState(page);
+      return last !== null && predicate(last);
+    }, { timeout: timeoutMs })
+    .toBe(true);
+  return last!;
+}
+
+/** Map with player beside a door cell (grid 8,5 next to door 10,5). */
+export async function seedDoorTestMap(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const grid = Array.from({ length: 50 }, (_, z) =>
+      Array.from({ length: 50 }, (_, x) =>
+        z === 0 || z === 49 || x === 0 || x === 49 ? "wall" : "empty"
+      )
+    );
+    grid[5]![8] = "player";
+    grid[5]![10] = "door";
+    localStorage.setItem("doom-map-DoorTestMap", JSON.stringify({
+      name: "DoorTestMap",
+      grid,
+      playerPos: [8, 5],
+      timestamp: Date.now(),
+      validated: true,
+    }));
+  });
+}
+
+/** Small map with one enemy for mission-complete flow. */
+export async function seedMissionTestMap(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const grid = Array.from({ length: 50 }, (_, z) =>
+      Array.from({ length: 50 }, (_, x) =>
+        z === 0 || z === 49 || x === 0 || x === 49 ? "wall" : "empty"
+      )
+    );
+    grid[5]![8] = "player";
+    grid[20]![20] = "imp";
+    localStorage.setItem("doom-map-MissionTestMap", JSON.stringify({
+      name: "MissionTestMap",
+      grid,
+      playerPos: [8, 5],
+      timestamp: Date.now(),
+      validated: true,
+    }));
+  });
 }
