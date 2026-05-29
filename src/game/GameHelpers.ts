@@ -11,29 +11,43 @@ const _v3c = new THREE.Vector3();
 const _v3d = new THREE.Vector3();
 
 const PROJECTILE_SPEED = 12;
+const MONSTER_ALERT_COOLDOWN_SEC = 2.5;
+let lastMonsterAlertTime = -Infinity;
 
 const ENEMY_SPEEDS: Record<string, number> = {
   imp: 3.0,
   demon: 5.0,
   zombieman: 2.5,
+  ratman: 2.5,
+  mancubus: 1.6,
+  cacodemon: 3.5,
 };
 
 const ENEMY_ATTACK_RANGES: Record<string, number> = {
   imp: 25,
   demon: 2.5,
   zombieman: 30,
+  ratman: 30,
+  mancubus: 20,
+  cacodemon: 25,
 };
 
 const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   imp: 1.5,
   demon: 0.8,
   zombieman: 2.5,
+  ratman: 2.5,
+  mancubus: 3.5,
+  cacodemon: 2.0,
 };
 
 const PROJECTILE_COLORS: Record<string, string> = {
   imp: "#ff6600",
   demon: "#ff0044",
   zombieman: "#88ff44",
+  ratman: "#ccaa44",
+  mancubus: "#ffaa00",
+  cacodemon: "#00ffff",
 };
 
 /** Helper to update all projectiles in the game */
@@ -86,7 +100,7 @@ export function updateProjectilesHelper(
           player.health = Math.max(0, player.health - 2);
           player.timesHit++;
           player.damageFlash = 1;
-          audioManager.play('player_hurt');
+          audioManager.play('player_pain');
           if (player.health <= 0) {
             setGameActive(false);
             onGameOver();
@@ -112,6 +126,7 @@ export function updateEnemyAIHelper(
 ): { updatedEnemies: EnemyData[]; spawnedProjectiles: ProjectileData[] } {
   const spawnedProjectiles: ProjectileData[] = [];
   let nextId = startProjectileId;
+  let anyNewlyAlerted = false;
 
   const updatedEnemies = enemies.map((e: EnemyData): EnemyData => {
     if (!e.alive) {
@@ -150,10 +165,8 @@ export function updateEnemyAIHelper(
 
     const alerted = e.hasAlerted || canSeePlayer;
 
-    // Alert sound when enemy first sees the player (scaled down to 0.02 volume)
     if (canSeePlayer && !e.hasAlerted) {
-      const alertSounds: Record<string, string> = { imp: 'imp_alert', demon: 'demon_alert', zombieman: 'zombie_alert' };
-      audioManager.play(alertSounds[e.type] ?? 'zombie_alert', 0.02);
+      anyNewlyAlerted = true;
     }
 
     if (!alerted) {
@@ -264,6 +277,11 @@ export function updateEnemyAIHelper(
     };
   });
 
+  if (anyNewlyAlerted && now - lastMonsterAlertTime >= MONSTER_ALERT_COOLDOWN_SEC) {
+    audioManager.play('monster_alert');
+    lastMonsterAlertTime = now;
+  }
+
   return { updatedEnemies, spawnedProjectiles };
 }
 
@@ -311,7 +329,7 @@ export function checkSlimeDamageHelper(
       player.health = nextHealth;
       player.timesHit++;
       player.damageFlash = 1.0;
-      audioManager.play('player_hurt');
+      audioManager.play('player_pain');
 
       if (nextHealth <= 0) {
         setGameActive(false);
@@ -455,18 +473,8 @@ export function handlePlayerShootingHelper(
       return;
     }
 
-    if (player.bullets <= 0) {
-      if (!player.hasPlayedEmptyClick) {
-        audioManager.play('noway');
-        player.hasPlayedEmptyClick = true;
-      }
-      player.shooting = false;
-      return;
-    }
-
     if (now - player.lastShot > 0.3) {
       player.revolverChamber--;
-      player.bullets--;
       player.lastShot = now;
       player.shotsFired++;
       audioManager.play('pistol');
@@ -525,17 +533,8 @@ export function handlePlayerShootingHelper(
       return;
     }
 
-    if (player.bullets <= 0) {
-      if (!player.hasPlayedEmptyClick) {
-        audioManager.play('noway');
-        player.hasPlayedEmptyClick = true;
-      }
-      return;
-    }
-
     if (now - player.lastShot > 0.1) {
       player.machinegunMag--;
-      player.bullets--;
       player.lastShot = now;
       player.shotsFired++;
       audioManager.play('pistol');
@@ -676,10 +675,11 @@ export function handlePlayerShootingHelper(
           if (e.id !== targetEnemy.id) return e;
           const newHealth = e.health - closestDamage;
           if (newHealth <= 0) {
-            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
             audioManager.play(deathSounds[e.type] ?? 'imp_death');
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
+          audioManager.play('demon_attack');
           return { ...e, health: newHealth, hitFlash: 1 };
         });
         enemiesRef.current = updated;
@@ -723,7 +723,7 @@ export function explodeBarrelSplash(
       player.health = Math.max(0, player.health - dmg);
       player.timesHit++;
       player.damageFlash = 1.0;
-      audioManager.play('player_hurt');
+      audioManager.play('player_pain');
       if (player.health <= 0) {
         setGameActive(false);
         onGameOver();
@@ -742,7 +742,7 @@ export function explodeBarrelSplash(
         const dmg = baseDmg * (1 - dist / maxRadius);
         const nextHP = Math.max(0, e.health - dmg);
         if (nextHP <= 0) {
-          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death' };
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
           audioManager.play(deathSounds[e.type] ?? 'imp_death');
           return { ...e, health: 0, alive: false, hitFlash: 0 };
         }

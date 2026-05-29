@@ -20,6 +20,17 @@ export const INITIAL_DOORS: DoorData[] = [
   // E1M1 doors will be defined when rebuilding the level
 ];
 
+/** Returns true if the player is near a closed door that can be opened with USE */
+export function hasUsableDoorNearby(doors: DoorData[], playerPos: [number, number, number]): boolean {
+  for (const door of doors) {
+    if (door.state !== 'closed') continue;
+    const dx = playerPos[0] - door.position[0];
+    const dz = playerPos[2] - door.position[2];
+    if (Math.sqrt(dx * dx + dz * dz) < door.triggerDistance) return true;
+  }
+  return false;
+}
+
 export function updateDoor(door: DoorData, dt: number, playerPos: [number, number, number], useAction: boolean): DoorData {
   let state = door.state;
   let timer = door.timer + dt;

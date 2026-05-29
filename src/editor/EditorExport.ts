@@ -1,5 +1,7 @@
 import type { CellData} from './EditorTypes';
 import { GRID_W, GRID_H, ENTITY_TYPES, PICKUP_TYPES } from './EditorTypes';
+import { ENEMY_MAX_HEALTH } from '@/game/types';
+import type { EnemyType } from '@/game/types';
 
 function getCell(grid: CellData[][], x: number, z: number): CellData {
   if (x < 0 || x >= GRID_W || z < 0 || z >= GRID_H) return { type: 'wall' };
@@ -119,7 +121,7 @@ export function buildExportCode(grid: CellData[][], playerPos: [number, number] 
 
   code += `// Enemies\n`;
   for (const e of levelData.enemies) {
-    const hp = e.type === 'imp' ? 45 : e.type === 'demon' ? 80 : 35;
+    const hp = ENEMY_MAX_HEALTH[e.type as EnemyType] ?? 35;
     code += `{ id: ${e.id}, position: [${e.x}, 0, ${e.z}], type: "${e.type}", health: ${hp}, maxHealth: ${hp}, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [${e.x}, 0, ${e.z}] as [number, number, number], hasAlerted: false },\n`;
   }
   code += `\n`;
