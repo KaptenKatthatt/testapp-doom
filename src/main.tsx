@@ -3,6 +3,9 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import Editor from "./Editor";
+import { initE2EBridge } from "./e2eBridge";
+
+initE2EBridge();
 
 export interface LevelData {
   walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean }>;

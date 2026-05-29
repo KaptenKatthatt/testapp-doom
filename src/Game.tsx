@@ -34,6 +34,7 @@ import {
   explodeBarrelSplash,
 } from "./GameHelpers";
 import { useGameInputs } from "./useGameInputs";
+import { patchE2EState, registerE2EHandlers } from "./e2eBridge";
 
 const COLLISION_MARGIN = 0.4;
 
@@ -333,6 +334,23 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
   // Input handlers encapsulated in custom hook
   useGameInputs(keysRef, useActionRef, gameActiveRef, playerRef);
 
+  useEffect(() => {
+    registerE2EHandlers({
+      teleportPlayer: (x, z) => {
+        playerRef.current.position.set(x, 1.7, z);
+      },
+      defeatAllEnemies: () => {
+        const updated = enemiesRef.current.map((e) => ({ ...e, alive: false, health: 0 }));
+        enemiesRef.current = updated;
+        setEnemies(updated);
+      },
+      unlockShotgun: () => {
+        playerRef.current.unlockedShotgun = true;
+        playerRef.current.shells = 10;
+      },
+    });
+  }, []);
+
   // Weapon switching keydown listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -555,8 +573,8 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
       prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
     );
 
-    // Exit Switch interaction — only for default level (no custom levelData)
-    if (!levelData) {
+    // Exit Switch interaction — E1M1 exit pad at fixed coordinates
+    {
     const switchX = 16;
     const switchZ = 36.35;
     const sdx = player.position.x - switchX;
@@ -682,6 +700,14 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     );
 
     handlePlayerState();
+
+    patchE2EState({
+      currentWeapon: player.currentWeapon,
+      unlockedShotgun: player.unlockedShotgun,
+      doors: doors.map((d) => ({ id: d.id, state: d.state })),
+      totalEnemies: enemiesRef.current.length,
+      aliveEnemies: enemiesRef.current.filter((e) => e.alive).length,
+    });
   });
 
   return (
