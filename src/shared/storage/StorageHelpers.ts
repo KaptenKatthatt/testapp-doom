@@ -1,6 +1,6 @@
 import type { CellType, CellData, TrackStyle } from '@/editor/EditorTypes';
-import { db } from './firebase';
-import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy, updateDoc, where } from 'firebase/firestore';
 
 export const AUTOSAVE_KEY = 'doom-editor-autosave';
 export const MAP_PREFIX = 'doom-map-';
@@ -21,26 +21,44 @@ export interface SavedMap {
   grid: CellType[][];
   playerPos: [number, number] | null;
   timestamp: number;
-  validated?: boolean;
+  validated?: boolean | undefined;
   musicTrack?: TrackStyle | undefined;
+  
+  // Auth and Lifecycle properties (Issue #50)
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined;
+  ownerId?: string | undefined;
+  ownerName?: string | undefined;
+  reviewNotes?: string | undefined;
 }
 
 export interface SavedMapListItem {
   name: string;
   timestamp: number;
   validated: boolean;
-  musicTrack?: TrackStyle;
-  cloudSaved?: boolean;
+  musicTrack?: TrackStyle | undefined;
+  cloudSaved?: boolean | undefined;
+  
+  // Auth and Lifecycle properties (Issue #50)
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined;
+  ownerId?: string | undefined;
+  ownerName?: string | undefined;
+  reviewNotes?: string | undefined;
 }
 
 interface FirestoreMapRecord {
   name: string;
-  gridJson?: string;
-  grid?: CellType[][];
+  gridJson?: string | undefined;
+  grid?: CellType[][] | undefined;
   playerPos: [number, number] | null;
   timestamp: number;
-  validated?: boolean;
-  musicTrack?: TrackStyle;
+  validated?: boolean | undefined;
+  musicTrack?: TrackStyle | undefined;
+  
+  // Auth and Lifecycle properties (Issue #50)
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  ownerId: string;
+  ownerName?: string | undefined;
+  reviewNotes?: string | undefined;
 }
 
 function isTrackStyle(value: unknown): value is TrackStyle {
@@ -73,10 +91,19 @@ function readFirestoreMapRecord(value: unknown): FirestoreMapRecord | null {
   if (typeof name !== 'string' || typeof timestamp !== 'number') return null;
   if (!isPlayerPos(record.playerPos)) return null;
 
+  const status = typeof record.status === 'string' ? record.status : 'draft';
+  const ownerId = typeof record.ownerId === 'string' ? record.ownerId : 'legacy';
+  const ownerName = typeof record.ownerName === 'string' ? record.ownerName : undefined;
+  const reviewNotes = typeof record.reviewNotes === 'string' ? record.reviewNotes : undefined;
+
   const parsed: FirestoreMapRecord = {
     name,
     timestamp,
     playerPos: record.playerPos,
+    status: status as 'draft' | 'pending' | 'approved' | 'rejected',
+    ownerId,
+    ownerName,
+    reviewNotes,
   };
 
   const gridJson = record.gridJson;
@@ -104,7 +131,15 @@ function readFirestoreMapRecord(value: unknown): FirestoreMapRecord | null {
 
 function mapRecordToLoadedMap(
   data: FirestoreMapRecord
-): { grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } {
+): { 
+  grid: CellData[][], 
+  playerPos: [number, number] | null, 
+  musicTrack?: TrackStyle | undefined,
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined,
+  ownerId?: string | undefined,
+  ownerName?: string | undefined,
+  reviewNotes?: string | undefined
+} {
   let gridTypes: CellType[][] = [];
   if (data.gridJson) {
     const parsed: unknown = JSON.parse(data.gridJson);
@@ -119,6 +154,10 @@ function mapRecordToLoadedMap(
     grid: gridTypes.map(row => row.map((t: CellType) => ({ type: t }))),
     playerPos: data.playerPos,
     ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+    status: data.status,
+    ownerId: data.ownerId,
+    ownerName: data.ownerName,
+    reviewNotes: data.reviewNotes,
   };
 }
 
@@ -143,7 +182,14 @@ export function getFirestoreDocId(name: string): string | null {
 
 function loadMapFromLocalStorage(
   name: string
-): { grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } | null {
+): { 
+  grid: CellData[][], 
+  playerPos: [number, number] | null, 
+  musicTrack?: TrackStyle | undefined, 
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined, 
+  ownerId?: string | undefined, 
+  ownerName?: string | undefined 
+} | null {
   const raw = localStorage.getItem(MAP_PREFIX + name);
   if (!raw) return null;
   try {
@@ -152,6 +198,9 @@ function loadMapFromLocalStorage(
       grid: data.grid.map(row => row.map((t: CellType) => ({ type: t }))),
       playerPos: data.playerPos,
       ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+      status: data.status,
+      ownerId: data.ownerId,
+      ownerName: data.ownerName,
     };
   } catch {
     return null;
@@ -167,6 +216,12 @@ function syncMapToCloud(
 ): void {
   if (!db) return;
   const mapDocRef = doc(db, 'maps', cloudId);
+  const currentUser = auth?.currentUser;
+
+  const status = localData.status ?? 'draft';
+  const ownerId = localData.ownerId ?? currentUser?.uid ?? 'anonymous';
+  const ownerName = localData.ownerName ?? currentUser?.displayName ?? currentUser?.email ?? 'Anonymous';
+
   const firestoreData = {
     name,
     gridJson: JSON.stringify(localData.grid),
@@ -174,7 +229,14 @@ function syncMapToCloud(
     timestamp: localData.timestamp,
     validated,
     ...(musicTrack ? { musicTrack } : {}),
+    
+    // Auth and Lifecycle additions
+    status,
+    ownerId,
+    ownerName,
+    ...(localData.reviewNotes ? { reviewNotes: localData.reviewNotes } : {}),
   };
+
   void withFirestoreTimeout(setDoc(mapDocRef, firestoreData))
     .then(() => {
       console.log(`Successfully synced map "${name}" (as "${cloudId}") with Firebase Cloud Firestore.`);
@@ -185,17 +247,37 @@ function syncMapToCloud(
 }
 
 /**
- * Saves a map to localStorage, and if Firebase Firestore is connected, uploads it to the database as well.
- * We sanitize the reserved '__e1m1__' ID to 'system_e1m1' for Firestore, and bypass Firestore for other '__' system maps.
- * We also serialize the 2D grid array as a JSON string to bypass Firestore's nested array limitation.
+ * Saves a map to localStorage, and if Firebase Firestore is connected and the user is logged in,
+ * uploads it to the cloud database as well.
  */
 export async function saveMapToStorage(
   name: string,
   grid: CellData[][],
   playerPos: [number, number] | null,
   validated: boolean,
-  musicTrack?: TrackStyle
+  musicTrack?: TrackStyle,
+  status: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft'
 ): Promise<void> {
+  const currentUser = auth?.currentUser;
+
+  let currentOwnerId = currentUser?.uid ?? 'anonymous';
+  let currentOwnerName = currentUser?.displayName ?? currentUser?.email ?? 'Anonymous';
+  let currentStatus = status;
+
+  // Preserve existing ownership/status details if we are updating a local copy
+  const existingRaw = localStorage.getItem(MAP_PREFIX + name);
+  if (existingRaw) {
+    try {
+      const parsed = JSON.parse(existingRaw) as SavedMap;
+      if (parsed.ownerId) currentOwnerId = parsed.ownerId;
+      if (parsed.ownerName) currentOwnerName = parsed.ownerName;
+      // Do not downgrade status to draft on minor edits unless explicitly intended
+      if (parsed.status && status === 'draft') {
+        currentStatus = parsed.status;
+      }
+    } catch { /* skip */ }
+  }
+
   const localData: SavedMap = {
     name,
     grid: grid.map(row => row.map(c => c.type)),
@@ -203,14 +285,17 @@ export async function saveMapToStorage(
     timestamp: Date.now(),
     validated,
     ...(musicTrack ? { musicTrack } : {}),
+    status: currentStatus,
+    ownerId: currentOwnerId,
+    ownerName: currentOwnerName,
   };
 
   // 1. Always save to localStorage immediately for fast offline access
   localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
 
-  // 2. Cloud sync runs in the background so Save/Play never blocks on network
+  // 2. Cloud sync runs in the background if logged in (per user instruction)
   const cloudId = getFirestoreDocId(name);
-  if (cloudId) {
+  if (cloudId && currentUser) {
     syncMapToCloud(cloudId, name, localData, validated, musicTrack);
   }
 }
@@ -221,8 +306,14 @@ export async function saveMapToStorage(
  */
 export async function loadMapFromStorage(
   name: string
-): Promise<{ grid: CellData[][], playerPos: [number, number] | null, musicTrack?: TrackStyle } | null> {
-  // Try to load from Cloud Firestore first (if supported)
+): Promise<{ 
+  grid: CellData[][], 
+  playerPos: [number, number] | null, 
+  musicTrack?: TrackStyle | undefined, 
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined, 
+  ownerId?: string | undefined, 
+  ownerName?: string | undefined 
+} | null> {
   const cloudId = getFirestoreDocId(name);
   if (db && cloudId) {
     try {
@@ -243,13 +334,128 @@ export async function loadMapFromStorage(
 }
 
 /**
+ * Submits a custom map for publishing approval (sets status to 'pending' in cloud and local).
+ */
+export async function submitMapForApproval(name: string): Promise<void> {
+  const currentUser = auth?.currentUser;
+  if (!currentUser) throw new Error("Must be logged in to submit maps");
+
+  const localRaw = localStorage.getItem(MAP_PREFIX + name);
+  if (!localRaw) throw new Error("Map not found locally");
+  
+  const localData = JSON.parse(localRaw) as SavedMap;
+  localData.status = 'pending';
+  localData.ownerId = currentUser.uid;
+  localData.ownerName = currentUser.displayName ?? currentUser.email ?? 'Anonymous';
+  localData.timestamp = Date.now();
+  
+  // Save locally
+  localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
+
+  // Save/Update in Firestore
+  const cloudId = getFirestoreDocId(name);
+  if (cloudId && db) {
+    const mapDocRef = doc(db, 'maps', cloudId);
+    const firestoreData = {
+      name,
+      gridJson: JSON.stringify(localData.grid),
+      playerPos: localData.playerPos,
+      timestamp: localData.timestamp,
+      validated: !!localData.validated,
+      ...(localData.musicTrack ? { musicTrack: localData.musicTrack } : {}),
+      status: 'pending',
+      ownerId: currentUser.uid,
+      ownerName: localData.ownerName,
+    };
+    await withFirestoreTimeout(setDoc(mapDocRef, firestoreData));
+  }
+}
+
+/**
+ * Fetches all pending maps (Admin only, enforced by rules).
+ */
+export async function listPendingMaps(): Promise<SavedMapListItem[]> {
+  const pendingList: SavedMapListItem[] = [];
+  if (!db) return pendingList;
+  try {
+    const mapsRef = collection(db, 'maps');
+    const q = query(mapsRef, where('status', '==', 'pending'), orderBy('timestamp', 'desc'));
+    const snapshot = await withFirestoreTimeout(getDocs(q));
+    
+    snapshot.forEach(docSnap => {
+      if (docSnap.exists()) {
+        const data = readFirestoreMapRecord(docSnap.data());
+        if (!data) return;
+        pendingList.push({
+          name: data.name,
+          timestamp: data.timestamp,
+          validated: !!data.validated,
+          ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+          status: data.status,
+          ownerId: data.ownerId,
+          ownerName: data.ownerName,
+          cloudSaved: true,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Failed to fetch pending maps:", error);
+  }
+  return pendingList;
+}
+
+/**
+ * Reviews a community map (appproves or rejects) and updates Firestore (Admin only).
+ */
+export async function reviewMap(
+  name: string,
+  status: 'approved' | 'rejected',
+  notes?: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore not initialized");
+  const cloudId = getFirestoreDocId(name);
+  if (!cloudId) throw new Error("Invalid map name for review");
+
+  const mapDocRef = doc(db, 'maps', cloudId);
+  const updateData: Record<string, unknown> = {
+    status,
+    reviewedAt: Date.now(),
+  };
+  if (notes !== undefined) {
+    updateData.reviewNotes = notes;
+  }
+
+  // Update in Firestore
+  await withFirestoreTimeout(updateDoc(mapDocRef, updateData));
+  console.log(`Successfully reviewed map "${name}" to status "${status}"`);
+
+  // Update local storage too if it exists locally
+  const localRaw = localStorage.getItem(MAP_PREFIX + name);
+  if (localRaw) {
+    try {
+      const localData = JSON.parse(localRaw) as SavedMap;
+      localData.status = status;
+      if (notes !== undefined) {
+        localData.reviewNotes = notes;
+      }
+      localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
+    } catch { /* skip */ }
+  }
+}
+
+/**
  * Lists all saved maps, combining local maps (from localStorage) and cloud maps (from Cloud Firestore).
  * Maps that exist on the cloud are flagged with `cloudSaved: true` and take precedence if duplicates exist.
+ * - Non-logged-in users see local maps plus APPROVED community maps.
+ * - Ordinary logged-in users see all local maps, APPROVED community maps, plus their own drafts/pending maps.
+ * - Jonas (Admin) sees ALL maps in the database.
  */
 export async function listSavedMaps(
   includeSystemMaps = false
 ): Promise<SavedMapListItem[]> {
   const mapsMap = new Map<string, SavedMapListItem>();
+  const currentUser = auth?.currentUser;
+  const isAdmin = currentUser?.email === 'jonas.olson@gmail.com';
 
   // 1. Fetch local maps from localStorage
   for (let i = 0; i < localStorage.length; i++) {
@@ -267,6 +473,9 @@ export async function listSavedMaps(
             timestamp: data.timestamp,
             validated: !!data.validated,
             ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+            status: data.status ?? 'draft',
+            ownerId: data.ownerId ?? 'anonymous',
+            ownerName: data.ownerName ?? 'Anonymous',
             cloudSaved: false
           });
         }
@@ -277,23 +486,37 @@ export async function listSavedMaps(
   // 2. Fetch cloud maps from Firebase Cloud Firestore
   if (db) {
     try {
+      // Fetch maps ordered by timestamp
       const mapsQuery = query(collection(db, 'maps'), orderBy('timestamp', 'desc'));
       const snapshot = await withFirestoreTimeout(getDocs(mapsQuery));
+      
       snapshot.forEach(docSnap => {
         if (docSnap.exists()) {
           const data = readFirestoreMapRecord(docSnap.data());
           if (!data) return;
-          // Skip if it is a system map that shouldn't be listed publicly
+          // Skip if it is a system map
           if (!includeSystemMaps && isSystemMapName(data.name)) {
             return;
           }
-          mapsMap.set(data.name, {
-            name: data.name,
-            timestamp: data.timestamp,
-            validated: !!data.validated,
-            ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
-            cloudSaved: true
-          });
+          
+          // Visibility check
+          const isVisible = data.status === 'approved' || 
+                            isAdmin || 
+                            data.ownerId === currentUser?.uid;
+
+          if (isVisible) {
+            mapsMap.set(data.name, {
+              name: data.name,
+              timestamp: data.timestamp,
+              validated: !!data.validated,
+              ...(data.musicTrack ? { musicTrack: data.musicTrack } : {}),
+              status: data.status,
+              ownerId: data.ownerId,
+              ownerName: data.ownerName,
+              cloudSaved: true,
+              ...(data.reviewNotes ? { reviewNotes: data.reviewNotes } : {})
+            });
+          }
         }
       });
     } catch (error: unknown) {

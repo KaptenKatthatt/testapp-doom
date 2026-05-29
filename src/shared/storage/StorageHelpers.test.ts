@@ -11,7 +11,7 @@ import {
 } from "./StorageHelpers";
 import type { CellData } from "@/editor/EditorTypes";
 
-vi.mock("./firebase", () => ({ db: null }));
+vi.mock("./firebase", () => ({ db: null, auth: null }));
 
 function makeGrid(): CellData[][] {
   return Array.from({ length: 50 }, () =>

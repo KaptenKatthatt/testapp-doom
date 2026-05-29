@@ -2,12 +2,16 @@ import React from 'react';
 import type { LevelData } from '@/shared/levelData';
 import { audioManager } from '@/shared/audio/Audio';
 
-interface SavedMap {
+export interface SavedMap {
   name: string;
   timestamp: number;
   validated: boolean;
-  musicTrack?: string;
-  cloudSaved?: boolean;
+  musicTrack?: string | undefined;
+  cloudSaved?: boolean | undefined;
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined;
+  ownerId?: string | undefined;
+  ownerName?: string | undefined;
+  reviewNotes?: string | undefined;
 }
 
 interface MainMenuProps {
@@ -25,7 +29,7 @@ interface MainMenuProps {
 type MainMenuItem = 'start' | 'maps' | 'editor';
 
 type MapModalItem =
-  | { kind: 'level'; id: string; label: string }
+  | { kind: 'level'; id: string; label: string; status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined; ownerName?: string | undefined; cloudSaved?: boolean | undefined; reviewNotes?: string | undefined }
   | { kind: 'back' };
 
 const MAIN_MENU_ITEMS: MainMenuItem[] = ['start', 'maps', 'editor'];
@@ -52,11 +56,6 @@ export default function MainMenu({
   const [modalIndex, setModalIndex] = React.useState(0);
   const musicStartingRef = React.useRef(false);
 
-  const validatedMaps = React.useMemo(
-    () => savedMaps.filter((m) => m.validated),
-    [savedMaps]
-  );
-
   const mapModalItems = React.useMemo((): MapModalItem[] => {
     const items: MapModalItem[] = [
       { kind: 'level', id: '__default__', label: '► E1M1 - ENTRYWAY' },
@@ -64,12 +63,22 @@ export default function MainMenu({
     if (levelData) {
       items.push({ kind: 'level', id: '__custom__', label: '► CUSTOM LEVEL' });
     }
-    for (const m of validatedMaps) {
-      items.push({ kind: 'level', id: `saved:${m.name}`, label: `► ${m.name.toUpperCase()}` });
+    for (const m of savedMaps) {
+      if (m.validated || m.status === 'approved' || m.status === 'pending' || m.status === 'rejected') {
+        items.push({
+          kind: 'level',
+          id: `saved:${m.name}`,
+          label: `► ${m.name.toUpperCase()}`,
+          status: m.status,
+          ownerName: m.ownerName,
+          cloudSaved: m.cloudSaved,
+          reviewNotes: m.reviewNotes,
+        });
+      }
     }
     items.push({ kind: 'back' });
     return items;
-  }, [levelData, validatedMaps]);
+  }, [levelData, savedMaps]);
 
   const openMapModal = React.useCallback((): void => {
     listSavedMaps().then((maps) => {
@@ -305,7 +314,7 @@ export default function MainMenu({
           }}>
             <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px", fontSize: "28px" }}>SELECT MAP</h2>
 
-            {validatedMaps.length === 0 && !levelData && (
+            {savedMaps.filter(m => m.validated || m.status === 'approved' || m.status === 'pending' || m.status === 'rejected').length === 0 && !levelData && (
               <p style={{ color: "#555", fontSize: "13px", marginTop: "12px", fontFamily: 'monospace' }}>
                 No validated maps yet.<br />Create one in the Level Editor!
               </p>
@@ -345,13 +354,48 @@ export default function MainMenu({
                     border: selected || isCurrentLevel ? `1px solid ${isCustom ? '#0f0' : '#f80'}` : '1px solid transparent',
                     cursor: "pointer",
                     color: selected ? (isCustom ? '#0f0' : '#fff') : (isCurrentLevel ? (isCustom ? '#0f0' : '#ff0') : (isCustom ? '#0a0' : '#ccc')),
-                    fontSize: "18px",
-                    fontFamily: '"DooM", Impact, sans-serif', letterSpacing: "2px",
+                    fontSize: "16px",
+                    fontFamily: 'monospace',
+                    letterSpacing: "1px",
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                     transition: 'all 0.1s',
                   }}
                 >
-                  <span>{item.label}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: '"DooM", Impact, sans-serif', letterSpacing: '2px', fontSize: '18px' }}>{item.label}</span>
+                      
+                      {/* UAC Map Lifecycle Status Badges */}
+                      {item.kind === 'level' && item.status && (
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 'bold',
+                          padding: '1px 5px',
+                          borderRadius: 3,
+                          textTransform: 'uppercase',
+                          background: item.status === 'approved' ? '#040' : item.status === 'pending' ? '#440' : item.status === 'rejected' ? '#400' : '#222',
+                          border: item.status === 'approved' ? '1px solid #0f0' : item.status === 'pending' ? '1px solid #ff0' : item.status === 'rejected' ? '1px solid #f44' : '1px solid #555',
+                          color: item.status === 'approved' ? '#0f0' : item.status === 'pending' ? '#ff0' : item.status === 'rejected' ? '#f44' : '#ccc',
+                        }}>
+                          {item.status}
+                        </span>
+                      )}
+                      
+                      {/* Cloud Sync indicator */}
+                      {item.kind === 'level' && item.cloudSaved && (
+                        <span style={{ fontSize: 10 }} title="Cloud Sync Active">☁️</span>
+                      )}
+                    </div>
+                    
+                    {/* Owner Details */}
+                    {item.kind === 'level' && item.ownerName && (
+                      <span style={{ fontSize: 10, color: '#666', fontFamily: 'monospace' }}>
+                        BY: {item.ownerName.toUpperCase()}
+                        {item.reviewNotes && <span style={{ color: '#ff6666', marginLeft: 8 }}>⚠️ FEEDBACK: {item.reviewNotes}</span>}
+                      </span>
+                    )}
+                  </div>
+                  
                   {item.id.startsWith('saved:') && (
                     <button
                       onClick={(e) => {

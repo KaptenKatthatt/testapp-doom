@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo, type JSX } from 'react';
-import { PRESETS } from './EditorPresets';
 import type { PresetMap } from './EditorPresets';
+import { FALLBACK_PRESETS } from './EditorPresets';
 import type {
   CellType,
   DrawMode,
@@ -25,13 +25,21 @@ import {
   listSavedMaps,
   deleteMapFromStorage,
   autosave,
-  loadAutosave
+  loadAutosave,
+  submitMapForApproval,
+  listPendingMaps,
+  reviewMap
 } from '@/shared/storage/StorageHelpers';
 import { MusicEngine } from '@/shared/audio/MusicEngine';
 import { audioManager } from '@/shared/audio/Audio';
 import { runValidation } from './EditorValidation';
 import { gridToLevelData, buildExportCode } from './EditorExport';
 import { SaveModal, LoadModal, ExportModal } from './EditorModals';
+
+import { auth } from '@/shared/storage/firebase';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { loadPresetsFromCloud, savePresetToCloud, lazyMigratePresets } from '@/shared/storage/PresetStorage';
+import AuthModal from './AuthModal';
 
 export { gridToLevelData }; // Re-export for compatibility
 export type { CellType, DrawMode, CellData }; // Re-export for any external files
@@ -88,6 +96,15 @@ export default function Editor(): JSX.Element {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
 
+  // Auth and Preset Storage additions
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [presets, setPresets] = useState<PresetMap[]>(FALLBACK_PRESETS);
+  const [presetsLoading, setPresetsLoading] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [pendingMaps, setPendingMaps] = useState<SavedMapListItem[]>([]);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
   // Count entities on the grid
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -111,6 +128,37 @@ export default function Editor(): JSX.Element {
     }, 1000);
   }, []);
 
+  // Subscribe to Firebase Auth and set up admin features
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser?.email === 'jonas.olson@gmail.com') {
+        // Lazy migrate presets on admin login
+        void lazyMigratePresets();
+        // Load pending reviews
+        void listPendingMaps().then(setPendingMaps);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Fetch presets from cloud on mount
+  useEffect(() => {
+    setPresetsLoading(true);
+    loadPresetsFromCloud().then((loaded) => {
+      if (loaded && loaded.length > 0) {
+        setPresets(loaded);
+      } else {
+        setPresets(FALLBACK_PRESETS);
+      }
+      setPresetsLoading(false);
+    }).catch((err: unknown) => {
+      console.error(err);
+      setPresetsLoading(false);
+    });
+  }, []);
+
   // Check for autosave on mount — restore silently if available
   useEffect(() => {
     // Check if E1M1 should be loaded (flag set by main menu button)
@@ -118,10 +166,11 @@ export default function Editor(): JSX.Element {
     const loadMapName = localStorage.getItem('doom-load-map');
     if (loadE1m1) {
       localStorage.removeItem('doom-load-e1m1');
-      const e1m1 = PRESETS.find(p => p.name === 'E1M1 Entryway');
+      const e1m1 = presets.find(p => p.id === 'e1m1') ?? FALLBACK_PRESETS.find(p => p.id === 'e1m1');
       if (e1m1) {
         setGrid(cloneGrid(e1m1.grid));
         setPlayerPos(e1m1.playerPos);
+        setSelectedPresetId('e1m1');
       }
     } else if (loadMapName) {
       localStorage.removeItem('doom-load-map');
@@ -142,7 +191,7 @@ export default function Editor(): JSX.Element {
         }
       }
     }
-  }, []);
+  }, [presets]);
 
   // Update grid + autosave helper
   const updateGrid = useCallback((newGrid: CellData[][], newPlayerPos?: [number, number] | null) => {
@@ -416,15 +465,76 @@ export default function Editor(): JSX.Element {
 
   const loadPreset = (preset: PresetMap): void => {
     updateGrid(cloneGrid(preset.grid), preset.playerPos);
+    setSelectedPresetId(preset.id);
+    if (preset.musicTrack) setMusicTrack(preset.musicTrack);
   };
 
   const handleSave = async (): Promise<void> => {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
-    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack);
+    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack, 'draft');
     setShowSaveDialog(false);
     setSaveName('');
+  };
+
+  const handleSubmitForApproval = async (): Promise<void> => {
+    const name = saveName.trim();
+    if (!name) {
+      alert("Please enter a map name first");
+      return;
+    }
+    try {
+      await submitMapForApproval(name);
+      alert(`✅ Map "${name}" has been submitted successfully for publishing! Status is now pending review.`);
+      setShowSaveDialog(false);
+      setSaveName('');
+    } catch (err: unknown) {
+      const errorObject = err as Error;
+      alert(`❌ Failed to submit map: ${errorObject.message ?? String(err)}`);
+    }
+  };
+
+  const handleSavePreset = async (): Promise<void> => {
+    if (!selectedPresetId) return;
+    const preset = presets.find(p => p.id === selectedPresetId) ?? FALLBACK_PRESETS.find(p => p.id === selectedPresetId);
+    if (!preset) return;
+
+    if (confirm(`Are you sure you want to permanently update the official preset "${preset.name}" for ALL players?`)) {
+      try {
+        const updatedPreset = {
+          id: selectedPresetId,
+          name: preset.name,
+          description: preset.description,
+          grid: grid,
+          playerPos: playerPos ?? [2, 3],
+          musicTrack: musicTrack,
+        };
+        await savePresetToCloud(updatedPreset, user?.uid);
+        alert(`✅ Preset "${preset.name}" has been updated successfully in the cloud database!`);
+        
+        // Reload presets list
+        const loaded = await loadPresetsFromCloud();
+        if (loaded) setPresets(loaded);
+      } catch (err: unknown) {
+        const errorObject = err as Error;
+        alert(`❌ Failed to save preset to cloud: ${errorObject.message ?? String(err)}`);
+      }
+    }
+  };
+
+  const handleReviewMap = async (mapName: string, action: 'approved' | 'rejected', notes?: string): Promise<void> => {
+    try {
+      await reviewMap(mapName, action, notes);
+      alert(`✅ Map "${mapName}" reviewed successfully: ${action.toUpperCase()}`);
+      
+      // Reload pending reviews list
+      const pending = await listPendingMaps();
+      setPendingMaps(pending);
+    } catch (err: unknown) {
+      const errorObject = err as Error;
+      alert(`❌ Failed to review map: ${errorObject.message ?? String(err)}`);
+    }
   };
 
   const handleLoad = async (): Promise<void> => {
@@ -549,6 +659,59 @@ export default function Editor(): JSX.Element {
 
   return (
     <div className="editor" style={{ background: '#111', color: '#fff', fontFamily: 'monospace', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10 }}>
+      {/* UAC Auth & Database Control Bar */}
+      <div style={{ display: 'flex', width: '100%', maxWidth: '800px', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 16px', background: 'rgba(20, 10, 10, 0.6)', border: '2px solid #311', borderRadius: 4, fontSize: 12, boxShadow: '0 0 15px rgba(255, 0, 0, 0.1)' }}>
+        <div>
+          {user ? (
+            <span>Welcome, <strong style={{ color: '#ffcc00' }}>{user.displayName ?? user.email}</strong> {user.email === 'jonas.olson@gmail.com' && <span style={{ color: '#ff3333', background: '#330000', padding: '2px 6px', borderRadius: 3, border: '1px solid #f33', fontSize: 10, marginLeft: 6, fontWeight: 'bold' }}>ADMIN</span>}</span>
+          ) : (
+            <span style={{ color: '#888' }}>Offline/Local mode active. Login to submit maps or publish.</span>
+          )}
+        </div>
+        <div>
+          {user ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {user.email === 'jonas.olson@gmail.com' && (
+                <button onClick={() => { setShowAdminPanel(!showAdminPanel); }} style={{ ...btnStyle, background: showAdminPanel ? '#c00' : '#444', border: '1px solid #f66', padding: '3px 8px', fontSize: 11 }}>
+                  🛡️ {showAdminPanel ? 'Close Reviews' : 'Pending Reviews'} ({pendingMaps.length})
+                </button>
+              )}
+              <button onClick={() => { if (confirm('Log out?') && auth) signOut(auth); }} style={{ ...btnStyle, padding: '3px 8px', fontSize: 11 }}>Log Out</button>
+            </div>
+          ) : (
+            <button onClick={() => setShowAuthModal(true)} style={{ ...btnStyle, background: '#c00', border: '1px solid #f66', padding: '4px 12px', fontSize: 11, fontWeight: 'bold' }}>🔑 LOG IN / SIGN UP</button>
+          )}
+        </div>
+      </div>
+
+      {/* Admin Review Panel */}
+      {showAdminPanel && user?.email === 'jonas.olson@gmail.com' && (
+        <div style={{ width: '100%', maxWidth: '800px', background: '#1c0d0d', border: '2px solid #c00', borderRadius: 6, padding: 16, marginBottom: 12, boxSizing: 'border-box' }}>
+          <h3 style={{ color: '#ff4444', marginTop: 0, borderBottom: '1px solid #c00', paddingBottom: 6 }}>🛡️ Admin Review Panel — Pending Maps ({pendingMaps.length})</h3>
+          {pendingMaps.length === 0 ? (
+            <p style={{ color: '#888', fontSize: 12 }}>No pending maps in review queue.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '200px', overflowY: 'auto' }}>
+              {pendingMaps.map(m => (
+                <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111', padding: '8px 12px', borderRadius: 4, border: '1px solid #333' }}>
+                  <div>
+                    <strong style={{ color: '#ffcc00' }}>{m.name}</strong> <span style={{ color: '#888', fontSize: 10 }}>by {m.ownerName}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button onClick={() => handleLoadMap(m.name)} style={{ ...btnStyle, padding: '3px 6px', fontSize: 11, background: '#222', border: '1px solid #888' }}>🔍 Load</button>
+                    <button onClick={() => handleReviewMap(m.name, 'approved')} style={{ ...btnStyle, padding: '3px 6px', fontSize: 11, background: '#040', border: '1px solid #0f0', color: '#0f0' }}>👍 Approve</button>
+                    <button onClick={() => {
+                      const notes = prompt("Enter rejection reason:");
+                      if (notes !== null) handleReviewMap(m.name, 'rejected', notes);
+                    }} style={{ ...btnStyle, padding: '3px 6px', fontSize: 11, background: '#400', border: '1px solid #f33', color: '#f55' }}>👎 Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', justifyContent: 'center' }}><h1 style={{ color: '#c00', margin: '8px 0' }}>🏴‍☠️ DOOM LEVEL EDITOR</h1>
         <button onClick={() => { window.location.hash = String(); }} style={{ position: "absolute", top: 4, right: 0, color: "#c00", fontSize: 20, background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }} title="Exit to menu">✕</button>
       </div>
@@ -607,15 +770,31 @@ export default function Editor(): JSX.Element {
       ))}
 
       {/* Preset selector */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: '#888', lineHeight: '24px' }}>Presets:</span>
-        {PRESETS.map(p => (
-          <button key={p.name} onClick={() => { if (confirm(`Load "${p.name}" preset? This will replace current map.`)) loadPreset(p); }}
-            title={p.description}
-            style={{ background: '#222', border: '1px solid #555', color: '#ccc', padding: '2px 8px', cursor: 'pointer', fontSize: 11, borderRadius: 3, fontFamily: 'monospace' }}>
-            {p.name}
+        {presetsLoading ? (
+          <span style={{ fontSize: 11, color: '#888' }}>Laddar presets...</span>
+        ) : (
+          presets.map(p => (
+            <button key={p.id} onClick={() => { if (confirm(`Load "${p.name}" preset? This will replace current map.`)) loadPreset(p); }}
+              title={p.description}
+              style={{
+                background: selectedPresetId === p.id ? '#500' : '#222',
+                border: selectedPresetId === p.id ? '1px solid #ff4444' : '1px solid #555',
+                color: selectedPresetId === p.id ? '#ff4444' : '#ccc',
+                padding: '2px 8px', cursor: 'pointer', fontSize: 11, borderRadius: 3, fontFamily: 'monospace'
+              }}>
+              {p.name} {p.version ? `v${p.version}` : ''}
+            </button>
+          ))
+        )}
+        
+        {/* Admin Preset Save Button */}
+        {user?.email === 'jonas.olson@gmail.com' && selectedPresetId && (
+          <button onClick={handleSavePreset} style={{ ...btnStyle, background: '#c00', border: '1px solid #fff', padding: '3px 8px', fontSize: 10, marginLeft: 10, fontWeight: 'bold' }}>
+            💾 SAVE TO PRESET COLLECTION
           </button>
-        ))}
+        )}
       </div>
 
       <canvas ref={canvasRef} width={GRID_W * CELL_SIZE} height={GRID_H * CELL_SIZE}
@@ -644,7 +823,7 @@ export default function Editor(): JSX.Element {
         <button onClick={exportLevel} style={btnStyle}>📋 Export</button>
         <button onClick={clearGrid} style={btnStyle}>🗑️ Clear</button>
         <button onClick={async () => {
-          await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack);
+          await saveMapToStorage('__e1m1__', grid, playerPos, true, musicTrack, 'draft');
           alert('✅ Saved as E1M1! This replaces the default map when you play E1M1 from the main menu.');
         }} style={{ ...btnStyle, background: '#553300', border: '1px solid #c80' }}>🏴‍☠️ Save as E1M1</button>
         <button onClick={handlePlayMap} style={{ ...btnStyle, background: '#050', border: '1px solid #0a0' }}>🎮 Play This Map</button>
@@ -696,6 +875,8 @@ export default function Editor(): JSX.Element {
             setSaveName('');
             setSaveValidation(null);
           }}
+          user={user}
+          onSubmitForApproval={handleSubmitForApproval}
         />
       )}
 
@@ -714,6 +895,13 @@ export default function Editor(): JSX.Element {
         <ExportModal
           exportCode={exportCode}
           onClose={() => setShowExport(false)}
+        />
+      )}
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
         />
       )}
     </div>

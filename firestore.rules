@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(doc) {
+      return isAuthenticated() && request.auth.uid == doc.ownerId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true || 
+        request.auth.token.email == "jonas.olson@gmail.com"
+      );
+    }
+
+    // Security rules for community levels
+    match /maps/{mapId} {
+      // Anyone can view approved levels. Owners and admins can view drafts/pending/rejected ones.
+      allow read: if resource == null || resource.data.status == 'approved' || isOwner(resource) || isAdmin();
+      
+      // Users must be authenticated to create a map, and must set themselves as the owner
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      
+      // Owners can only update their maps while they are in 'draft' status; Admins can update any map status
+      allow update: if (isOwner(resource) && resource.data.status == 'draft') || isAdmin();
+      
+      // Only admins can delete maps from the cloud database
+      allow delete: if isAdmin();
+    }
+
+    // Security rules for official level presets (E1M1, Tight, etc.)
+    match /presets/{presetId} {
+      // Anyone can read preset maps
+      allow read: if true;
+      
+      // Only administrators can edit/create/delete official presets
+      allow write: if isAdmin();
+    }
+  }
+}

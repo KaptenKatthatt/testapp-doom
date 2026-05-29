@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import MainMenu from "@/game/MainMenu";
+import MainMenu, { type SavedMap } from "@/game/MainMenu";
 import { Canvas } from "@react-three/fiber";
 import Game from "@/game/Game";
 import HUD from "@/game/HUD";
@@ -49,7 +49,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const [missionComplete, setMissionComplete] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [gameKey, setGameKey] = useState(0);
-  const [savedMaps, setSavedMaps] = useState<Array<{ name: string; timestamp: number; validated: boolean; musicTrack?: string }>>([]);
+  const [savedMaps, setSavedMaps] = useState<SavedMap[]>([]);
   const [showMapModal, setShowMapModal] = useState(false);
   const mobileMoveRef = useRef<[number, number]>([0, 0]);
   const mobileLookRef = useRef(0);
