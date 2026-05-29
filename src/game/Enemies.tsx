@@ -70,6 +70,22 @@ function getMancubusBaseTexture(): THREE.Texture {
   return texture;
 }
 
+const MANCUBUS_ROWS = [
+  { startY: 26, endY: 87, height: 62 },   // Row 0: Walk 1
+  { startY: 108, endY: 172, height: 65 }, // Row 1: Walk 2
+  { startY: 198, endY: 259, height: 62 }, // Row 2: Walk 3
+  { startY: 286, endY: 350, height: 65 }, // Row 3: Walk 4
+  { startY: 365, endY: 427, height: 63 }, // Row 4: Firing 1
+  { startY: 441, endY: 501, height: 61 }, // Row 5: Firing 2
+  { startY: 512, endY: 573, height: 62 }, // Row 6: Firing 3
+  { startY: 588, endY: 647, height: 60 }, // Row 7: Pain
+  { startY: 665, endY: 723, height: 59 }, // Row 8: Death A
+  { startY: 736, endY: 792, height: 57 }, // Row 9: Death B
+  { startY: 803, endY: 860, height: 58 }, // Row 10: Death C
+  { startY: 870, endY: 937, height: 68 }, // Row 11: Death D
+  { startY: 968, endY: 1010, height: 43 } // Row 12: Corpse (flat pile of gore)
+];
+
 export default function Enemies({ enemies }: { readonly enemies: EnemyData[] }): React.JSX.Element {
   return (
     <group>
@@ -84,6 +100,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const meshRef = useRef<Group>(null);
   const glowRef = useRef<Mesh>(null);
   const lightRef = useRef<THREE.PointLight>(null);
+  const spriteRef = useRef<THREE.Sprite>(null);
   const { position, type, hitFlash, rotation } = enemy;
   const config = ENEMY_CONFIG[type];
   const isDemon = type === "demon";
@@ -148,26 +165,39 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         col = 4;
       }
 
-      const isMirrored = diff < 0;
+      const isMirrored = diff < 0 && col > 0 && col < 4;
 
       let row = 0;
       if (hitFlash > 0.1) {
-        row = 10;
+        row = 7; // Pain (Row 7)
       } else if (state.clock.getElapsedTime() - enemy.lastAttack < 0.6) {
         const elapsed = state.clock.getElapsedTime() - enemy.lastAttack;
         const fireFrame = Math.floor(elapsed / 0.2) % 3;
-        row = 7 + fireFrame;
+        row = 4 + fireFrame; // Firing (Rows 4, 5, 6)
       } else {
-        const walkCycle = Math.floor(state.clock.getElapsedTime() * 7) % 7;
-        row = walkCycle;
+        const walkFrame = Math.floor(state.clock.getElapsedTime() * 6) % 4;
+        row = walkFrame; // Walking (Rows 0, 1, 2, 3)
       }
 
-      if (isMirrored && col > 0 && col < 4) {
-        instancedTexture.repeat.set(-1 / 5, 1 / 14);
-        instancedTexture.offset.set((col + 1) / 5, (13 - row) / 14);
-      } else {
-        instancedTexture.repeat.set(1 / 5, 1 / 14);
-        instancedTexture.offset.set(col / 5, (13 - row) / 14);
+      const rowData = MANCUBUS_ROWS[row] ?? MANCUBUS_ROWS[0];
+      if (!rowData) return;
+      const H = rowData.height;
+      const endY = rowData.endY;
+
+      const repeatY = H / 1024;
+      const offsetY = (1024 - endY - 1) / 1024;
+
+      const repeatX = isMirrored ? -1 / 5 : 1 / 5;
+      const offsetX = isMirrored ? (col + 1) / 5 : col / 5;
+
+      instancedTexture.repeat.set(repeatX, repeatY);
+      instancedTexture.offset.set(offsetX, offsetY);
+
+      if (spriteRef.current) {
+        const scaleY = config.bodyH * (H / 65);
+        const posY = scaleY / 2;
+        spriteRef.current.scale.set(config.bodyW * 2.2, scaleY, 1);
+        spriteRef.current.position.set(0, posY, 0);
       }
     }
 
@@ -330,22 +360,43 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const [deathTime] = useState(() => performance.now() / 1000);
   const baseTexture = getMancubusBaseTexture();
   const corpseTexture = useMemo(() => baseTexture.clone(), [baseTexture]);
+  const spriteRef = useRef<THREE.Sprite>(null);
 
   useFrame(() => {
     if (enemy.type === "mancubus") {
       const elapsed = (performance.now() / 1000) - deathTime;
-      let row = 11;
+      let row = 8;
       let col = 0;
-      if (elapsed < 0.2) {
-        row = 11;
+      if (elapsed < 0.1) {
+        row = 8;
+      } else if (elapsed < 0.2) {
+        row = 9;
+      } else if (elapsed < 0.3) {
+        row = 10;
       } else if (elapsed < 0.4) {
-        row = 12;
+        row = 11;
       } else {
-        row = 13;
+        row = 12;
         col = 0;
       }
-      corpseTexture.repeat.set(1 / 5, 1 / 14);
-      corpseTexture.offset.set(col / 5, (13 - row) / 14);
+
+      const rowData = MANCUBUS_ROWS[row] ?? MANCUBUS_ROWS[12];
+      if (!rowData) return;
+      const H = rowData.height;
+      const endY = rowData.endY;
+
+      const repeatY = H / 1024;
+      const offsetY = (1024 - endY - 1) / 1024;
+
+      corpseTexture.repeat.set(1 / 5, repeatY);
+      corpseTexture.offset.set(col / 5, offsetY);
+
+      if (spriteRef.current) {
+        const scaleY = config.bodyH * (H / 65);
+        const posY = scaleY / 2;
+        spriteRef.current.scale.set(config.bodyW * 2.2, scaleY, 1);
+        spriteRef.current.position.set(0, posY, 0);
+      }
     }
   });
 
@@ -353,7 +404,7 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
     return (
       <group position={[position[0], 0, position[2]]}>
         {/* Mancubus Corpse Billboard Sprite */}
-        <sprite position={[0, config.bodyH / 2, 0]} scale={[config.bodyW * 2.2, config.bodyH * 1.1, 1]}>
+        <sprite ref={spriteRef} position={[0, config.bodyH / 2, 0]} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
           <spriteMaterial
             map={corpseTexture}
             transparent
