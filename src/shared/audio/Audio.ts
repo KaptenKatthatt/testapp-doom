@@ -59,10 +59,11 @@ class AudioManager {
       { name: 'zombie_alert', file: 'dsposit1' },
       { name: 'zombie_death', file: 'dspodth1' },
       { name: 'pistol', file: 'dspistol' },
-      // Demon
+      // Demon / monster
       { name: 'demon_alert', file: 'dssgtsit' },
       { name: 'demon_attack', file: 'dssgtatk' },
       { name: 'demon_death', file: 'dssgtdth' },
+      { name: 'monster_alert', file: 'dssgtdth' },
       // Pickups
       { name: 'item_pickup', file: 'dsitemup' },
       { name: 'powerup', file: 'dsgetpow' },

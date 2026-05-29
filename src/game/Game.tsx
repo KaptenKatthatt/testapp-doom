@@ -8,7 +8,7 @@ import Weapons from "./Weapons";
 import Pickups from "./Pickups";
 import Projectiles from "./Projectiles";
 import { audioManager } from "@/shared/audio/Audio";
-import { updateDoor, getDoorVisual, getDoorCollisionBox, INITIAL_DOORS } from "./Doors";
+import { updateDoor, getDoorVisual, getDoorCollisionBox, hasUsableDoorNearby, INITIAL_DOORS } from "./Doors";
 import type { DoorData } from "./Doors";
 import { createDoorTexture, createBarrelTexture } from "@/shared/Textures";
 import type {
@@ -575,27 +575,30 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     // Update doors
     const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
     const useAct = useActionRef ? useActionRef.current : false;
-    setDoors((prev: DoorData[]): DoorData[] =>
-      prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
-    );
 
     // Exit Switch interaction — E1M1 exit pad at fixed coordinates
-    {
     const switchX = 16;
     const switchZ = 36.35;
     const sdx = player.position.x - switchX;
     const sdz = player.position.z - switchZ;
     const distToSwitch = Math.sqrt(sdx * sdx + sdz * sdz);
-    if (useAct && distToSwitch < 2.2) {
-      if (!missionCompleteRef.current) {
-        missionCompleteRef.current = true;
-        gameActiveRef.current = false;
-        player.endTime = now;
-        audioManager.play('switch');
-        handlePlayerState();
-        onMissionComplete();
-      }
+    const exitUsable = distToSwitch < 2.2 && !missionCompleteRef.current;
+
+    if (useAct && !hasUsableDoorNearby(doorsRef.current, playerPos) && !exitUsable) {
+      audioManager.play('noway');
     }
+
+    setDoors((prev: DoorData[]): DoorData[] =>
+      prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
+    );
+
+    if (useAct && exitUsable) {
+      missionCompleteRef.current = true;
+      gameActiveRef.current = false;
+      player.endTime = now;
+      audioManager.play('switch');
+      handlePlayerState();
+      onMissionComplete();
     }
 
     // Reset use action after processing
