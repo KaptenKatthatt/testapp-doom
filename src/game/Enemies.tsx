@@ -49,12 +49,13 @@ function getMancubusBaseTexture(): THREE.Texture {
       ctx.drawImage(img, 0, 0);
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
-      // Chroma key out the bright cyan background (0, 255, 255)
+      // Chroma key out the bright cyan background and its anti-aliased blended edges
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i] ?? 0;
         const g = data[i + 1] ?? 0;
         const b = data[i + 2] ?? 0;
-        if (r < 50 && g > 200 && b > 200) {
+        // Key out anything that is biased towards cyan (green and blue significantly higher than red)
+        if ((r < 120 && g > 150 && b > 150) || (g > r + 15 && b > r + 15)) {
           data[i + 3] = 0; // set alpha to transparent
         }
       }
