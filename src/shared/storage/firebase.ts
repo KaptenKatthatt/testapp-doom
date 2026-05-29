@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseOptions } from "firebase/app";
 import type { Firestore } from "firebase/firestore";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import type { Auth } from "firebase/auth";
 import { getAuth } from "firebase/auth";
 
@@ -30,7 +30,11 @@ if (apiKey && projectId && appId) {
     // Initialize Firebase
     const existingApps = getApps();
     const app = existingApps[0] ?? initializeApp(firebaseConfig);
-    db = getFirestore(app);
+    
+    // Enable long polling to prevent timeouts in networks/browsers that block gRPC/WebSockets
+    db = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    });
     auth = getAuth(app);
     console.log("Firebase Cloud Firestore & Auth initialized successfully!");
   } catch (error: unknown) {
