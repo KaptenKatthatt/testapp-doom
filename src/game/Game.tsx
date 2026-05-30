@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import Level, { getWalls, getBarrels } from "./Level";
+import type { LevelLightingData } from "@/shared/storage/StorageHelpers";
 import type { BarrelData } from "./Level";
 import Enemies from "./Enemies";
 import Weapons from "./Weapons";
@@ -59,6 +60,10 @@ interface GameProps {
   readonly useActionRef: React.MutableRefObject<boolean>;
   readonly levelData?: CustomLevelData | null;
   readonly paused?: boolean;
+  readonly customLighting?: LevelLightingData | null;
+  readonly editorModeActive?: boolean;
+  readonly selectedLightId?: string | null;
+  readonly onSelectLight?: (id: string | null) => void;
 }
 
 export interface PlayerData {
@@ -165,7 +170,21 @@ function findSafeSpawn(startX: number, startZ: number, walls: WallBox[]): THREE.
 }
 
 
-export default function Game({ onPlayerState, onGameOver, onMissionComplete, mobileMoveRef, mobileLookRef, mobilePitchRef, useActionRef, levelData, paused }: GameProps): React.JSX.Element {
+export default function Game({
+  onPlayerState,
+  onGameOver,
+  onMissionComplete,
+  mobileMoveRef,
+  mobileLookRef,
+  mobilePitchRef,
+  useActionRef,
+  levelData,
+  paused,
+  customLighting = null,
+  editorModeActive = false,
+  selectedLightId = null,
+  onSelectLight,
+}: GameProps): React.JSX.Element {
   const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
   const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
@@ -353,6 +372,19 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     });
   }, []);
 
+  // Listen to get-player-position events for the lighting editor spawner
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const customEvent = e as CustomEvent<{ callback: (pos: [number, number, number]) => void }>;
+      if (playerRef.current) {
+        const pos = playerRef.current.position;
+        customEvent.detail.callback([pos.x, pos.y, pos.z]);
+      }
+    };
+    window.addEventListener("get-player-position", handler);
+    return () => window.removeEventListener("get-player-position", handler);
+  }, []);
+
   // Weapon switching keydown listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -463,34 +495,49 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
         mobileMoveRef.current,
         mobileLookRef.current,
         mobilePitchRef.current,
-        checkCollision,
-        checkEnemyCollision,
+        editorModeActive ? () => false : checkCollision,
+        editorModeActive ? () => false : checkEnemyCollision,
         enemiesRef.current
       );
+
+      // Support vertical flying and height adjustments in lighting editor mode
+      if (editorModeActive) {
+        if (keys["KeyE"] || keys["Space"]) {
+          player.position.y += dt * 5; // Fly up
+        }
+        if (keys["KeyQ"] || keys["ShiftLeft"]) {
+          player.position.y = Math.max(0.2, player.position.y - dt * 5); // Fly down
+        }
+      } else {
+        // Enforce normal player height when not in editor mode
+        player.position.y = 1.7;
+      }
     }
 
     // Contact damage: if player is very close to any alive enemy, take damage
-    const contactRadius = 1.0;
-    for (const e of enemiesRef.current) {
-      if (!e.alive) continue;
-      const cdx = player.position.x - e.position[0];
-      const cdz = player.position.z - e.position[2];
-      if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
-        // Only damage if no wall between player and enemy
-        if (!hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z)) continue;
-        if (now - player.lastContactDmg > 0.5) {
-          player.lastContactDmg = now;
-          player.health = Math.max(0, player.health - 2);
-          player.timesHit++;
-          player.damageFlash = 1;
-          audioManager.play('player_pain');
-          if (player.health <= 0) {
-            gameActiveRef.current = false;
-            onGameOver();
-            audioManager.play('player_death');
+    if (!editorModeActive) {
+      const contactRadius = 1.0;
+      for (const e of enemiesRef.current) {
+        if (!e.alive) continue;
+        const cdx = player.position.x - e.position[0];
+        const cdz = player.position.z - e.position[2];
+        if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
+          // Only damage if no wall between player and enemy
+          if (!hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z)) continue;
+          if (now - player.lastContactDmg > 0.5) {
+            player.lastContactDmg = now;
+            player.health = Math.max(0, player.health - 2);
+            player.timesHit++;
+            player.damageFlash = 1;
+            audioManager.play('player_pain');
+            if (player.health <= 0) {
+              gameActiveRef.current = false;
+              onGameOver();
+              audioManager.play('player_death');
+            }
           }
+          break;
         }
-        break;
       }
     }
 
@@ -511,70 +558,72 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     camera.lookAt(_lookTarget);
     camera.updateMatrixWorld(true);
 
-    // Shooting
-    handlePlayerShootingHelper(
-      player,
-      now,
-      camera,
-      projectilesRef,
-      projectileIdRef,
-      walls,
-      enemiesRef,
-      setEnemies,
-      barrelsRef,
-      setBarrels
-    );
-    const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
-      dt,
-      now,
-      player,
-      enemiesRef.current,
-      checkCollision,
-      hasLineOfSight,
-      projectileIdRef.current
-    );
-    projectileIdRef.current += spawnedProjectiles.length;
-    projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
-    enemiesRef.current = updatedEnemies;
-    setEnemies(updatedEnemies);
+    // Shooting & AI Updates (Only run if not in lighting editor mode!)
+    if (!editorModeActive) {
+      handlePlayerShootingHelper(
+        player,
+        now,
+        camera,
+        projectilesRef,
+        projectileIdRef,
+        walls,
+        enemiesRef,
+        setEnemies,
+        barrelsRef,
+        setBarrels
+      );
+      const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
+        dt,
+        now,
+        player,
+        enemiesRef.current,
+        checkCollision,
+        hasLineOfSight,
+        projectileIdRef.current
+      );
+      projectileIdRef.current += spawnedProjectiles.length;
+      projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
+      enemiesRef.current = updatedEnemies;
+      setEnemies(updatedEnemies);
 
-    // Update projectiles
-    projectilesRef.current = updateProjectilesHelper(
-      dt,
-      projectilesRef.current,
-      player,
-      enemiesRef.current,
-      checkWallHit,
-      onGameOver,
-      (active) => { gameActiveRef.current = active; }
-    );
-    setProjectiles([...projectilesRef.current]);
+      // Update projectiles
+      projectilesRef.current = updateProjectilesHelper(
+        dt,
+        projectilesRef.current,
+        player,
+        enemiesRef.current,
+        checkWallHit,
+        onGameOver,
+        (active) => { gameActiveRef.current = active; }
+      );
+      setProjectiles([...projectilesRef.current]);
 
-    // Pickup collection
-    const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
-      player.position,
-      pickups,
-      player.health
-    );
-    setPickups(updatedPickups);
-    if (healthBonus > 0) { 
-      player.health = Math.min(100, player.health + healthBonus); 
-      audioManager.play('item_pickup'); 
-    }
-    if (ammoBonus > 0 && !shotgunPickup) {
-      player.bullets += 24;
-      audioManager.play('item_pickup');
-    }
-    if (shotgunPickup) {
-      player.shells += 8;
-      player.unlockedShotgun = true;
-      player.currentWeapon = "shotgun"; // Auto switch to newly found weapon!
-      audioManager.play('weapon_pickup');
+      // Pickup collection
+      const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
+        player.position,
+        pickups,
+        player.health
+      );
+      setPickups(updatedPickups);
+      if (healthBonus > 0) { 
+        player.health = Math.min(100, player.health + healthBonus); 
+        audioManager.play('item_pickup'); 
+      }
+      if (ammoBonus > 0 && !shotgunPickup) {
+        player.bullets += 24;
+        audioManager.play('item_pickup');
+      }
+      if (shotgunPickup) {
+        player.shells += 8;
+        player.unlockedShotgun = true;
+        player.currentWeapon = "shotgun"; // Auto switch to newly found weapon!
+        audioManager.play('weapon_pickup');
+      }
     }
 
     // Update doors
     const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
-    const useAct = useActionRef ? useActionRef.current : false;
+    const useAct = editorModeActive ? false : (useActionRef ? useActionRef.current : false);
 
     // Exit Switch interaction — E1M1 exit pad at fixed coordinates
     const switchX = 16;
@@ -700,13 +749,15 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
     }
 
     // Nukage/slime damage — standing in custom lava or slime zones
-    player.health = checkSlimeDamageHelper(
-      now,
-      player,
-      onGameOver,
-      (active) => { gameActiveRef.current = active; },
-      specialFloors
-    );
+    if (!editorModeActive) {
+      player.health = checkSlimeDamageHelper(
+        now,
+        player,
+        onGameOver,
+        (active) => { gameActiveRef.current = active; },
+        specialFloors
+      );
+    }
 
     handlePlayerState();
 
@@ -721,7 +772,14 @@ export default function Game({ onPlayerState, onGameOver, onMissionComplete, mob
 
   return (
     <>
-      <Level customWalls={customWallData} specialFloors={specialFloors} />
+      <Level
+        customWalls={customWallData}
+        specialFloors={specialFloors}
+        customLighting={customLighting}
+        editorModeActive={editorModeActive}
+        selectedLightId={selectedLightId}
+        onSelectLight={onSelectLight}
+      />
       {/* Doors */}
       {doors.map((door: DoorData) => {
         const visual = getDoorVisual(door);

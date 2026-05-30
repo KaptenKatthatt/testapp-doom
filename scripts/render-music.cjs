@@ -12,7 +12,7 @@ const TOTAL_STEPS = 512;
 const TRACK_CONFIG = {
   inferno:  { bpm: 125, name: 'Inferno' },
   darkness: { bpm: 70,  name: 'Darkness' },
-  rampage:  { bpm: 155, name: 'Rampage' },
+  rampage:  { bpm: 135, name: 'Rampage' },
   eerie:    { bpm: 88,  name: 'Eerie' },
   doom:     { bpm: 108, name: 'Doom' },
 };
@@ -404,54 +404,197 @@ function generateRampage() {
   const bassPattern = [];
   const drumPattern = new Map();
 
-  const chugPattern = (startBar, root, bars) => {
+  // Helper to add Riff A (Crushing Drop-D Groove)
+  const addRiffA = (startBar, bars) => {
     for (let b = 0; b < bars; b++) {
       const off = (startBar + b) * 16;
+      
+      // Catchy syncopated guitar chugs:
+      const chugSteps = [0, 2, 3, 6, 8, 10, 11];
+      for (const s of chugSteps) {
+        guitarPattern.push({ step: off + s, note: 38, duration: 1, type: 'mute' });
+        bassPattern.push({ step: off + s, note: 26, duration: 1 });
+      }
+      // Heavy open power chord on step 14 (D5 = 38 & 45)
+      guitarPattern.push({ step: off + 14, note: 38, duration: 2, type: 'open' });
+      guitarPattern.push({ step: off + 14, note: 45, duration: 2, type: 'open' });
+      bassPattern.push({ step: off + 14, note: 26, duration: 2 });
+      
+      // Massive rolling double-kick drum pattern
+      const kickSteps = [0, 3, 6, 8, 11, 14];
+      for (const k of kickSteps) drumPattern.set(off + k, 'kick');
+      
+      // Snare on 4, 12
+      drumPattern.set(off + 4, 'snare');
+      drumPattern.set(off + 12, 'snare');
+      
+      // Hats on even steps for constant drive
+      for (let s = 0; s < 16; s += 2) {
+        if (!drumPattern.has(off + s)) {
+          drumPattern.set(off + s, 'hat');
+        }
+      }
+    }
+  };
+
+  // Helper to add Riff B (Sinister Phrygian assault)
+  const addRiffB = (startBar, bars) => {
+    for (let b = 0; b < bars; b++) {
+      const off = (startBar + b) * 16;
+      
+      // Determine moving root based on which bar we are in
+      let root = 38; // D2
+      if (b % 4 === 1) root = 39; // Eb2
+      else if (b % 4 === 2) root = 43; // G2
+      else if (b % 4 === 3) root = b % 8 === 7 ? 45 : 46; // A2 or Bb2
+      
+      // Driving chugs on moving roots
       for (let s = 0; s < 16; s += 2) {
         guitarPattern.push({ step: off + s, note: root, duration: 1, type: 'mute' });
         bassPattern.push({ step: off + s, note: root - 12, duration: 1 });
       }
+      
+      // Accented open hits at 6 and 14
       guitarPattern.push({ step: off + 6, note: root + 7, duration: 2, type: 'open' });
       guitarPattern.push({ step: off + 14, note: root + 5, duration: 2, type: 'open' });
+      
+      // Drum beat: kick every 2, snare on 4 and 12
       for (let s = 0; s < 16; s += 2) drumPattern.set(off + s, 'kick');
-      for (let s = 4; s < 16; s += 4) drumPattern.set(off + s, 'snare');
+      drumPattern.set(off + 4, 'snare');
+      drumPattern.set(off + 12, 'snare');
       for (let s = 1; s < 16; s += 2) drumPattern.set(off + s, 'hat');
+      
+      // Crash cymbal at the beginning of each 4-bar block
+      if (b % 4 === 0) {
+        drumPattern.set(off, 'crash');
+      }
     }
   };
 
-  chugPattern(0, 40, 4);
-  chugPattern(4, 43, 4);
-  chugPattern(8, 41, 4);
-  chugPattern(12, 43, 4);
+  // 1. Section A: Intro / Crushing Groove (bars 0-7)
+  addRiffA(0, 8);
 
-  // Breakdown bars 16-23
-  const roots = [40, 40, 36, 36, 41, 41, 43, 43];
-  for (let b = 0; b < 8; b++) {
-    const off = (16 + b) * 16;
-    const root = roots[b];
-    guitarPattern.push({ step: off, note: root, duration: 4, type: 'open' });
-    guitarPattern.push({ step: off + 8, note: root + 7, duration: 4, type: 'open' });
-    bassPattern.push({ step: off, note: root - 12, duration: 8 });
-    bassPattern.push({ step: off + 8, note: root - 12, duration: 8 });
-    drumPattern.set(off, 'kick');
+  // 2. Section B: Sinister Phrygian Assault (bars 8-15)
+  addRiffB(8, 8);
+
+  // 3. Section C: Melodic Gothic Bridge (bars 16-23)
+  const chords = [
+    { bar: 16, note: 38, bass: 26 }, // D5 power chord
+    { bar: 18, note: 34, bass: 22 }, // Bb5 power chord
+    { bar: 20, note: 36, bass: 24 }, // C5 power chord
+    { bar: 22, note: 32, bass: 20 }, // G#5 power chord
+  ];
+  for (const c of chords) {
+    const off = c.bar * 16;
+    
+    // Massive slow power chords held for 2 bars (32 steps)
+    guitarPattern.push({ step: off, note: c.note, duration: 32, type: 'open' });
+    guitarPattern.push({ step: off, note: c.note + 7, duration: 32, type: 'open' });
+    
+    // Bass deep root drone
+    bassPattern.push({ step: off, note: c.bass, duration: 32 });
+    
+    // Heavy palm-muted chugs ticking underneath the sustained chords
+    for (let s = 0; s < 32; s += 4) {
+      guitarPattern.push({ step: off + s, note: c.note, duration: 2, type: 'mute' });
+    }
+    
+    // Half-time slow stomping drums
+    for (let b = 0; b < 2; b++) {
+      const boff = off + b * 16;
+      drumPattern.set(boff, 'kick');
+      drumPattern.set(boff + 8, 'kick');
+      drumPattern.set(boff + 4, 'snare');
+      drumPattern.set(boff + 12, 'snare');
+      for (let s = 2; s < 16; s += 2) drumPattern.set(boff + s, 'hat');
+    }
+  }
+  
+  // Soaring high-pitched lead guitar melody over bridge
+  const melody = [
+    [16, 62, 8],  // D4
+    [16, 65, 8],  // F4
+    [17, 69, 16], // A4
+    [18, 67, 8],  // G4
+    [18, 65, 8],  // F4
+    [19, 63, 16], // Eb4
+    [20, 65, 8],  // F4
+    [20, 67, 8],  // G4
+    [21, 70, 16], // Bb4
+    [22, 69, 8],  // A4
+    [22, 67, 8],  // G4
+    [23, 65, 8],  // F4
+    [23, 62, 8],  // D4
+  ];
+  for (const [bar, note, dur] of melody) {
+    guitarPattern.push({ step: bar * 16, note, duration: dur, type: 'open' });
+  }
+
+  // 4. Section D: Climax & Outro (bars 24-31)
+  for (let b = 0; b < 6; b++) {
+    const off = (24 + b) * 16;
+    
+    // Screaming guitar chugs an octave up (D3 = 50)
+    const chugSteps = [0, 2, 3, 6, 8, 10, 11];
+    for (const s of chugSteps) {
+      guitarPattern.push({ step: off + s, note: 50, duration: 1, type: 'mute' });
+      bassPattern.push({ step: off + s, note: 26, duration: 1 });
+    }
+    guitarPattern.push({ step: off + 14, note: 50, duration: 2, type: 'open' });
+    guitarPattern.push({ step: off + 14, note: 57, duration: 2, type: 'open' });
+    bassPattern.push({ step: off + 14, note: 26, duration: 2 });
+    
+    // Intense driving kick and snare
+    for (let s = 0; s < 16; s += 2) drumPattern.set(off + s, 'kick');
     drumPattern.set(off + 4, 'snare');
-    drumPattern.set(off + 8, 'kick');
     drumPattern.set(off + 12, 'snare');
-    for (let s = 2; s < 16; s += 2) drumPattern.set(off + s, 'hat');
+    for (let s = 1; s < 16; s += 2) drumPattern.set(off + s, 'hat');
+    drumPattern.set(off, 'crash');
   }
-
-  chugPattern(24, 40, 2);
-  chugPattern(26, 43, 2);
-  chugPattern(28, 41, 2);
-
-  // Final bars
+  
+  // Outro (bars 30-31): heavy chromatic descending power chords
   const end = 30 * 16;
-  for (let s = 0; s < 32; s += 2) {
-    guitarPattern.push({ step: end + s, note: s < 16 ? 40 : 43, duration: 1, type: 'mute' });
-    bassPattern.push({ step: end + s, note: s < 16 ? 28 : 31, duration: 1 });
-    drumPattern.set(end + s, s % 4 === 0 ? 'kick' : s % 4 === 2 ? 'snare' : 'hat');
-  }
+  
+  // F5 power chord (41 + 48)
+  guitarPattern.push({ step: end, note: 41, duration: 4, type: 'open' });
+  guitarPattern.push({ step: end, note: 48, duration: 4, type: 'open' });
+  bassPattern.push({ step: end, note: 29, duration: 4 });
+  drumPattern.set(end, 'kick');
   drumPattern.set(end, 'crash');
+  drumPattern.set(end + 2, 'snare');
+  
+  // E5 power chord (40 + 47)
+  guitarPattern.push({ step: end + 4, note: 40, duration: 4, type: 'open' });
+  guitarPattern.push({ step: end + 4, note: 47, duration: 4, type: 'open' });
+  bassPattern.push({ step: end + 4, note: 28, duration: 4 });
+  drumPattern.set(end + 4, 'kick');
+  drumPattern.set(end + 4, 'crash');
+  drumPattern.set(end + 6, 'snare');
+  
+  // Eb5 power chord (39 + 46)
+  guitarPattern.push({ step: end + 8, note: 39, duration: 4, type: 'open' });
+  guitarPattern.push({ step: end + 8, note: 46, duration: 4, type: 'open' });
+  bassPattern.push({ step: end + 8, note: 27, duration: 4 });
+  drumPattern.set(end + 8, 'kick');
+  drumPattern.set(end + 8, 'crash');
+  drumPattern.set(end + 10, 'snare');
+  
+  // Eb5 quick repeat / final slide setup
+  guitarPattern.push({ step: end + 12, note: 39, duration: 4, type: 'open' });
+  guitarPattern.push({ step: end + 12, note: 46, duration: 4, type: 'open' });
+  bassPattern.push({ step: end + 12, note: 27, duration: 4 });
+  drumPattern.set(end + 12, 'kick');
+  drumPattern.set(end + 14, 'snare');
+  
+  // Bar 31 final chord: D5 (38 + 45) sustained out
+  const finalStep = end + 16;
+  guitarPattern.push({ step: finalStep, note: 38, duration: 16, type: 'open' });
+  guitarPattern.push({ step: finalStep, note: 45, duration: 16, type: 'open' });
+  bassPattern.push({ step: finalStep, note: 26, duration: 16 });
+  
+  drumPattern.set(finalStep, 'kick');
+  drumPattern.set(finalStep, 'crash');
+  drumPattern.set(finalStep + 8, 'snare');
 
   return { guitarPattern, bassPattern, drumPattern };
 }

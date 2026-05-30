@@ -17,6 +17,7 @@ class AudioManager {
   private menuSynth: MenuSynth | null = null;
   private menuMusicPlaying = false;
   private musicEngine: MusicEngine | null = null;
+  private menuMusicBuffer: AudioBuffer | null = null;
   
   private loaded = false;
 
@@ -169,23 +170,37 @@ class AudioManager {
     }
   }
 
-  // Play menu synth music (looping)
-  playMenuMusic(): void {
+  // Play menu music (pre-rendered buffer looping)
+  async playMenuMusic(): Promise<void> {
     if (!this.loaded || !this.audioContext || !this.musicGain || this.menuMusicPlaying) return;
 
     // Stop standard level music if playing
     this.stopMusic();
 
-    this.menuSynth ??= new MenuSynth();
+    try {
+      if (!this.menuMusicBuffer) {
+        this.menuSynth ??= new MenuSynth();
+        this.menuMusicBuffer = await this.menuSynth.render(this.audioContext.sampleRate);
+      }
 
-    this.menuSynth.start(this.audioContext, this.musicGain);
-    this.menuMusicPlaying = true;
+      this.musicSource = this.audioContext.createBufferSource();
+      this.musicSource.buffer = this.menuMusicBuffer;
+      this.musicSource.loop = true;
+      this.musicSource.connect(this.musicGain);
+      this.musicSource.start(0);
+      this.menuMusicPlaying = true;
+    } catch (e) {
+      console.warn("Failed to play menu music:", e);
+    }
   }
 
-  // Stop menu synth music
+  // Stop menu music
   stopMenuMusic(): void {
-    if (this.menuSynth && this.menuMusicPlaying) {
-      this.menuSynth.stop();
+    if (this.menuMusicPlaying) {
+      if (this.musicSource) {
+        try { this.musicSource.stop(); } catch { /* ignore */ }
+        this.musicSource = null;
+      }
       this.menuMusicPlaying = false;
     }
   }
