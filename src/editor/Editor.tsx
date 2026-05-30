@@ -18,7 +18,7 @@ import {
   TRACK_OPTIONS,
 } from './EditorTypes';
 import type {
-  SavedMapListItem} from '@/shared/storage/StorageHelpers';
+  SavedMapListItem, LevelLightingData} from '@/shared/storage/StorageHelpers';
 import {
   saveMapToStorage,
   loadMapFromStorage,
@@ -95,6 +95,7 @@ export default function Editor(): JSX.Element {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
+  const [customLighting, setCustomLighting] = useState<LevelLightingData | null>(null);
 
   // Auth and Preset Storage additions
   const [user, setUser] = useState<User | null>(null);
@@ -190,6 +191,7 @@ export default function Editor(): JSX.Element {
           setGrid(data.grid);
           setPlayerPos(data.playerPos);
           if (data.musicTrack) setMusicTrack(data.musicTrack);
+          if (data.lighting) setCustomLighting(data.lighting);
         }
       });
     } else {
@@ -463,7 +465,7 @@ export default function Editor(): JSX.Element {
   };
 
   const exportLevel = (): void => {
-    const code = buildExportCode(grid, playerPos);
+    const code = buildExportCode(grid, playerPos, customLighting ?? undefined);
     setExportCode(code);
     setShowExport(true);
   };
@@ -484,7 +486,7 @@ export default function Editor(): JSX.Element {
     const name = saveName.trim();
     if (!name) return;
     const isValid = saveValidation ? saveValidation.errors.length === 0 : false;
-    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack, 'draft');
+    await saveMapToStorage(name, grid, playerPos, isValid, musicTrack, 'draft', customLighting ?? undefined);
     setShowSaveDialog(false);
     setSaveName('');
   };
@@ -560,6 +562,8 @@ export default function Editor(): JSX.Element {
       updateGrid(data.grid, data.playerPos);
       if (track) setMusicTrack(track);
       else if (data.musicTrack) setMusicTrack(data.musicTrack);
+      if (data.lighting) setCustomLighting(data.lighting);
+      else setCustomLighting(null);
       setShowLoadDialog(false);
     }
   };
@@ -643,10 +647,10 @@ export default function Editor(): JSX.Element {
 
   const handlePlayMap = async (): Promise<void> => {
     // Save current map and level data so the game can load it
-    const ld = gridToLevelData(grid, playerPos, musicTrack);
+    const ld = gridToLevelData(grid, playerPos, musicTrack, customLighting ?? undefined);
     localStorage.setItem('doom-leveldata-__playing__', JSON.stringify(ld));
     // Also save grid data for the editor to restore
-    await saveMapToStorage('__playing__', grid, playerPos, false, musicTrack);
+    await saveMapToStorage('__playing__', grid, playerPos, false, musicTrack, 'draft', customLighting ?? undefined);
     // Navigate to game — use hash without reload so React picks it up
     window.location.hash = '';
   };
@@ -818,7 +822,7 @@ export default function Editor(): JSX.Element {
                         <button key={t} onClick={() => { setTool(t); setActiveTab('canvas'); }} style={{
                           background: tool === t ? CELL_COLORS[t] : '#222',
                           border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
-                          color: tool === t ? '#000' : over ? '#f44' : '#ccc',
+                          color: tool === t ? (['empty', 'cacodemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
                           padding: '4px 8px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                           opacity: over && tool !== t ? 0.6 : 1,
                         }}>
@@ -1128,7 +1132,7 @@ export default function Editor(): JSX.Element {
                     <button key={t} onClick={() => setTool(t)} style={{
                       background: tool === t ? CELL_COLORS[t] : '#222',
                       border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
-                      color: tool === t ? '#000' : over ? '#f44' : '#ccc',
+                      color: tool === t ? (['empty', 'cacodemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
                       padding: '2px 5px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                       opacity: over && tool !== t ? 0.6 : 1,
                     }}>
