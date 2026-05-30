@@ -13,6 +13,7 @@ import {
 } from "@/shared/Textures";
 import { LevelLights } from "./LevelLights";
 import { LevelDecorations } from "./LevelDecorations";
+import type { LevelLightingData } from "@/shared/storage/StorageHelpers";
 
 // Custom level data interface (matches editor format)
 export interface CustomWallData {
@@ -25,8 +26,12 @@ export interface CustomWallData {
 }
 
 interface LevelProps {
-  customWalls?: CustomWallData[] | null;
-  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }> | null;
+  customWalls?: CustomWallData[] | null | undefined;
+  specialFloors?: Array<{ x: number; z: number; type: 'lava' | 'slime' }> | null | undefined;
+  customLighting?: LevelLightingData | null | undefined;
+  editorModeActive?: boolean | undefined;
+  selectedLightId?: string | null | undefined;
+  onSelectLight?: ((id: string | null) => void) | undefined;
 }
 
 // E1M1-inspired level geometry
@@ -152,7 +157,14 @@ export function getWalls(wallDataOverride?: Array<{ x: number; y: number; z: num
   });
 }
 
-export default function Level({ customWalls, specialFloors }: LevelProps): React.JSX.Element {
+export default function Level({
+  customWalls,
+  specialFloors,
+  customLighting,
+  editorModeActive,
+  selectedLightId,
+  onSelectLight,
+}: LevelProps): React.JSX.Element {
   // Build wall data from custom or default
   const activeWallData = useMemo(() => {
     if (customWalls && customWalls.length > 0) {
@@ -204,7 +216,12 @@ export default function Level({ customWalls, specialFloors }: LevelProps): React
 
   return (
     <group>
-      <LevelLights />
+      <LevelLights
+        customLighting={customLighting}
+        editorModeActive={editorModeActive}
+        selectedLightId={selectedLightId}
+        onSelectLight={onSelectLight}
+      />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[levelSize / 2, 0, levelSize / 2]}>
