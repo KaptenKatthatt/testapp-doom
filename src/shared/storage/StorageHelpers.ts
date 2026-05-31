@@ -16,6 +16,23 @@ function withFirestoreTimeout<T>(promise: Promise<T>): Promise<T> {
   ]);
 }
 
+export interface PointLightData {
+  id: string;
+  position: [number, number, number];
+  color: string;
+  intensity: number;
+  distance: number;
+}
+
+export interface LevelLightingData {
+  ambientColor: string;
+  ambientIntensity: number;
+  hemisphereSkyColor: string;
+  hemisphereGroundColor: string;
+  hemisphereIntensity: number;
+  pointLights: PointLightData[];
+}
+
 export interface SavedMap {
   name: string;
   grid: CellType[][];
@@ -23,6 +40,7 @@ export interface SavedMap {
   timestamp: number;
   validated?: boolean | undefined;
   musicTrack?: TrackStyle | undefined;
+  lighting?: LevelLightingData | undefined;
   
   // Auth and Lifecycle properties (Issue #50)
   status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined;
@@ -53,6 +71,7 @@ interface FirestoreMapRecord {
   timestamp: number;
   validated?: boolean | undefined;
   musicTrack?: TrackStyle | undefined;
+  lighting?: LevelLightingData | undefined;
   
   // Auth and Lifecycle properties (Issue #50)
   status: 'draft' | 'pending' | 'approved' | 'rejected';
@@ -126,6 +145,11 @@ function readFirestoreMapRecord(value: unknown): FirestoreMapRecord | null {
     parsed.musicTrack = musicTrack;
   }
 
+  const lighting = record.lighting;
+  if (typeof lighting === 'object' && lighting !== null) {
+    parsed.lighting = lighting as LevelLightingData;
+  }
+
   return parsed;
 }
 
@@ -138,7 +162,8 @@ function mapRecordToLoadedMap(
   status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined,
   ownerId?: string | undefined,
   ownerName?: string | undefined,
-  reviewNotes?: string | undefined
+  reviewNotes?: string | undefined,
+  lighting?: LevelLightingData | undefined
 } {
   let gridTypes: CellType[][] = [];
   if (data.gridJson) {
@@ -158,6 +183,7 @@ function mapRecordToLoadedMap(
     ownerId: data.ownerId,
     ownerName: data.ownerName,
     reviewNotes: data.reviewNotes,
+    lighting: data.lighting,
   };
 }
 
@@ -188,7 +214,8 @@ function loadMapFromLocalStorage(
   musicTrack?: TrackStyle | undefined, 
   status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined, 
   ownerId?: string | undefined, 
-  ownerName?: string | undefined 
+  ownerName?: string | undefined,
+  lighting?: LevelLightingData | undefined
 } | null {
   const raw = localStorage.getItem(MAP_PREFIX + name);
   if (!raw) return null;
@@ -201,6 +228,7 @@ function loadMapFromLocalStorage(
       status: data.status,
       ownerId: data.ownerId,
       ownerName: data.ownerName,
+      lighting: data.lighting,
     };
   } catch {
     return null;
@@ -229,6 +257,7 @@ function syncMapToCloud(
     timestamp: localData.timestamp,
     validated,
     ...(musicTrack ? { musicTrack } : {}),
+    ...(localData.lighting ? { lighting: localData.lighting } : {}),
     
     // Auth and Lifecycle additions
     status,
@@ -256,13 +285,15 @@ export async function saveMapToStorage(
   playerPos: [number, number] | null,
   validated: boolean,
   musicTrack?: TrackStyle,
-  status: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft'
+  status: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft',
+  lighting?: LevelLightingData
 ): Promise<void> {
   const currentUser = auth?.currentUser;
 
   let currentOwnerId = currentUser?.uid ?? 'anonymous';
   let currentOwnerName = currentUser?.displayName ?? currentUser?.email ?? 'Anonymous';
   let currentStatus = status;
+  let currentLighting = lighting;
 
   // Preserve existing ownership/status details if we are updating a local copy
   const existingRaw = localStorage.getItem(MAP_PREFIX + name);
@@ -274,6 +305,9 @@ export async function saveMapToStorage(
       // Do not downgrade status to draft on minor edits unless explicitly intended
       if (parsed.status && status === 'draft') {
         currentStatus = parsed.status;
+      }
+      if (!currentLighting && parsed.lighting) {
+        currentLighting = parsed.lighting;
       }
     } catch { /* skip */ }
   }
@@ -288,6 +322,7 @@ export async function saveMapToStorage(
     status: currentStatus,
     ownerId: currentOwnerId,
     ownerName: currentOwnerName,
+    ...(currentLighting ? { lighting: currentLighting } : {}),
   };
 
   // 1. Always save to localStorage immediately for fast offline access
@@ -312,7 +347,8 @@ export async function loadMapFromStorage(
   musicTrack?: TrackStyle | undefined, 
   status?: 'draft' | 'pending' | 'approved' | 'rejected' | undefined, 
   ownerId?: string | undefined, 
-  ownerName?: string | undefined 
+  ownerName?: string | undefined,
+  lighting?: LevelLightingData | undefined
 } | null> {
   const cloudId = getFirestoreDocId(name);
   if (db && cloudId) {

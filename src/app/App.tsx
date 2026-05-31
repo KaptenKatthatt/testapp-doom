@@ -9,11 +9,12 @@ import type { PlayerState } from "@/game/types";
 import type { LevelData } from "@/shared/levelData";
 import { gridToLevelData } from "@/editor/EditorExport";
 import { E1M1_GRID } from "@/game/levels/E1M1Grid";
-import { listSavedMaps, loadMapFromStorage } from "@/shared/storage/StorageHelpers";
+import { listSavedMaps, loadMapFromStorage, saveMapToStorage, type LevelLightingData } from "@/shared/storage/StorageHelpers";
 import type { TrackStyle } from "@/editor/EditorTypes";
 import { patchE2EState } from "@/shared/e2eBridge";
 import { type CellType } from "@/editor/EditorTypes";
 import { formatTime, calcScore } from "@/game/gameStats";
+import LightingEditorHUD from "@/game/LightingEditorHUD";
 
 interface AppProps {
   levelData?: LevelData | null;
@@ -75,6 +76,10 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
 
   const [activeLevelData, setActiveLevelData] = useState<LevelData | null>(null);
 
+  const [lightingEditorActive, setLightingEditorActive] = useState(false);
+  const [customLighting, setCustomLighting] = useState<LevelLightingData | null>(null);
+  const [selectedLightId, setSelectedLightId] = useState<string | null>(null);
+
   // If we have levelData from the editor, use it; otherwise load saved map or E1M1 asynchronously
   useEffect(() => {
     let active = true;
@@ -87,7 +92,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         const mapName = selectedLevel.slice(6);
         const data = await loadMapFromStorage(mapName);
         if (data && active) {
-          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 2], data.musicTrack));
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 2], data.musicTrack, data.lighting));
         } else if (active) {
           setActiveLevelData(null);
         }
@@ -97,7 +102,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       if (selectedLevel === '__default__') {
         const data = await loadMapFromStorage('__e1m1__');
         if (data && active) {
-          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 3], data.musicTrack));
+          setActiveLevelData(gridToLevelData(data.grid, data.playerPos ?? [2, 3], data.musicTrack, data.lighting));
         } else if (active) {
           const grid = E1M1_GRID.map(row => row.map((t: CellType) => ({ type: t })));
           setActiveLevelData(gridToLevelData(grid, [2, 3] as [number, number], 'classic'));
@@ -109,6 +114,17 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     load();
     return () => { active = false; };
   }, [selectedLevel, levelData]);
+
+  // Sync activeLevelData to customLighting when loaded
+  useEffect(() => {
+    if (activeLevelData) {
+      setCustomLighting(activeLevelData.lighting ?? null);
+    } else {
+      setCustomLighting(null);
+    }
+    setLightingEditorActive(false);
+    setSelectedLightId(null);
+  }, [activeLevelData]);
 
   const handleStart = useCallback((): void => {
     setStarted(true);
@@ -172,6 +188,64 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
     };
   }, [gameOver, missionComplete, handleStart]);
+
+  // Listen to 'L' key to toggle lighting editor
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (!started || gameOver || missionComplete) return;
+      if (e.key === "l" || e.key === "L") {
+        setLightingEditorActive(prev => {
+          const next = !prev;
+          if (next) {
+            document.exitPointerLock?.();
+          } else {
+            if (!navigator.webdriver) {
+              document.body.requestPointerLock?.();
+            }
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [started, gameOver, missionComplete]);
+
+  const handleSaveLighting = useCallback(async (): Promise<void> => {
+    if (!customLighting) return;
+    
+    let mapName = '__playing__';
+    if (selectedLevel?.startsWith('saved:')) {
+      mapName = selectedLevel.slice(6);
+    } else if (selectedLevel === '__default__') {
+      mapName = '__e1m1__';
+    }
+
+    const data = await loadMapFromStorage(mapName);
+    if (data) {
+      await saveMapToStorage(
+        mapName,
+        data.grid,
+        data.playerPos,
+        false,
+        data.musicTrack,
+        data.status ?? 'draft',
+        customLighting
+      );
+      
+      // Update active level state with custom lighting
+      setActiveLevelData(prev => {
+        if (prev) {
+          return { ...prev, lighting: customLighting };
+        }
+        return prev;
+      });
+
+      alert("💡 Lighting configurations saved to map!");
+    } else {
+      alert("❌ Failed to find map data to save lighting to.");
+    }
+  }, [customLighting, selectedLevel]);
 
   // Restart menu music when returning to the main menu
   useEffect(() => {
@@ -241,6 +315,10 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           useActionRef={useActionRef}
           levelData={activeLevelData}
           paused={menuOpen}
+          customLighting={customLighting}
+          editorModeActive={lightingEditorActive}
+          selectedLightId={selectedLightId}
+          onSelectLight={setSelectedLightId}
         />
       </Canvas>
       <HUD 
@@ -625,6 +703,37 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                 CONTINUE
               </button>
 
+              {/* Lighting Editor Toggle Button */}
+              <button
+                onClick={() => {
+                  setLightingEditorActive(true);
+                  setMenuOpen(false);
+                  document.exitPointerLock?.();
+                }}
+                style={{
+                  padding: '12px 0',
+                  background: '#442255',
+                  border: '2px solid #9933cc',
+                  borderRadius: 4,
+                  color: '#dd88ff',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  letterSpacing: 1.5,
+                  transition: 'all 0.1s ease-in-out',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#663388';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#442255';
+                  e.currentTarget.style.color = '#dd88ff';
+                }}
+              >
+                💡 LIGHTS EDITOR
+              </button>
+
               {/* Exit Button */}
               <button
                 onClick={() => {
@@ -658,6 +767,21 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
             </div>
           </div>
         </div>
+      )}
+      {lightingEditorActive && (
+        <LightingEditorHUD
+          customLighting={customLighting}
+          onChangeLighting={setCustomLighting}
+          selectedLightId={selectedLightId}
+          onSelectLight={setSelectedLightId}
+          onClose={() => {
+            setLightingEditorActive(false);
+            if (!navigator.webdriver) {
+              document.body.requestPointerLock?.();
+            }
+          }}
+          onSave={handleSaveLighting}
+        />
       )}
     </div>
   );

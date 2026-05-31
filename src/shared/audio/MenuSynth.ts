@@ -531,6 +531,38 @@ export class MenuSynth {
     this.currentStep = (this.currentStep + 1) % 512; // loop 512 steps
   }
 
+  async render(sampleRate = 44100): Promise<AudioBuffer> {
+    const duration = 61.44;
+    const offlineCtx = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
+    
+    const origCtx = this.audioContext;
+    const origDest = this.destination;
+    
+    this.audioContext = offlineCtx as unknown as AudioContext;
+    
+    const masterGain = offlineCtx.createGain();
+    masterGain.gain.value = 1.0;
+    masterGain.connect(offlineCtx.destination);
+    this.destination = masterGain;
+
+    this.noiseBuffer = this.createNoiseBuffer();
+
+    const secondsPerBeat = 60.0 / this.bpm;
+    const stepDuration = secondsPerBeat / 4; // sixteenth notes
+
+    for (let step = 0; step < 512; step++) {
+      const time = step * stepDuration;
+      this.scheduleNextStep(step, time);
+    }
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    
+    this.audioContext = origCtx;
+    this.destination = origDest;
+    
+    return renderedBuffer;
+  }
+
   start(audioContext: AudioContext, destination: AudioNode): void {
     if (this.isPlaying) return;
 
