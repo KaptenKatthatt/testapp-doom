@@ -19,6 +19,7 @@ import type {
   WallBox,
   ProjectileData,
   EnemyType,
+  WeaponType,
 } from "./types";
 import { ENEMY_MAX_HEALTH } from "./types";
 import {
@@ -40,6 +41,8 @@ import { useGameInputs } from "./useGameInputs";
 import { patchE2EState, registerE2EHandlers } from "@/shared/e2eBridge";
 
 const COLLISION_MARGIN = 0.4;
+const PLAYER_STATE_PUBLISH_INTERVAL = 1 / 30;
+const VISUAL_STATE_SYNC_INTERVAL = 1 / 30;
 
 interface CustomLevelData {
   walls: Array<{ x: number; z: number; w: number; d: number; isDoor: boolean; isHalfWall?: boolean }>;
@@ -74,7 +77,7 @@ export interface PlayerData {
   ammo: number;
   bullets: number; // Revolver and Machine Gun ammo
   shells: number; // Shotgun ammo
-  currentWeapon: "revolver" | "shotgun" | "machinegun";
+  currentWeapon: WeaponType;
   revolverChamber: number;
   revolverReloadTimer: number;
   machinegunMag: number;
@@ -167,6 +170,39 @@ function findSafeSpawn(startX: number, startZ: number, walls: WallBox[]): THREE.
   }
 
   return new THREE.Vector3(initialX, 1.7, initialZ);
+}
+
+function switchPlayerWeapon(player: PlayerData, weapon: WeaponType): void {
+  if (weapon === "shotgun" && !player.unlockedShotgun) {
+    audioManager.play("noway");
+    return;
+  }
+
+  if (player.currentWeapon !== weapon) {
+    player.currentWeapon = weapon;
+    player.shooting = false;
+    player.hasPlayedEmptyClick = false;
+    audioManager.play("weapon_pickup");
+  }
+}
+
+function reloadCurrentWeapon(player: PlayerData): void {
+  if (player.currentWeapon === "revolver") {
+    if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > 0) {
+      player.revolverReloadTimer = 1.0;
+      player.shooting = false;
+      audioManager.play("shotgun_cock");
+    }
+    return;
+  }
+
+  if (player.currentWeapon === "machinegun") {
+    if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > 0) {
+      player.machinegunReloadTimer = 2.0;
+      player.shooting = false;
+      audioManager.play("shotgun_cock");
+    }
+  }
 }
 
 
@@ -279,11 +315,10 @@ export default function Game({
   const [pickups, setPickups] = useState<PickupData[]>(customPickups);
   const [doors, setDoors] = useState<DoorData[]>(customDoors);
   const doorsRef = useRef<DoorData[]>(customDoors);
-  // Keep doors ref in sync for collision checks
-  useEffect(() => {
-    doorsRef.current = doors;
-  }, [doors]);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
+  const lastPlayerStatePublishRef = useRef(0);
+  const lastPlayerStateSignatureRef = useRef("");
+  const lastVisualStateSyncRef = useRef(0);
 
   // Build wall data for Level component and collision
   // Doors are rendered separately by the door system, so exclude them from walls
@@ -328,11 +363,39 @@ export default function Game({
     return levelData?.specialFloors ?? [];
   }, [levelData]);
 
-  const handlePlayerState = useCallback((): void => {
+  const handlePlayerState = useCallback((force = false): void => {
     const p = playerRef.current;
     p.kills = enemiesRef.current.filter(e => !e.alive).length;
     // Set legacy ammo count based on active weapon
     p.ammo = p.currentWeapon === "shotgun" ? p.shells : p.bullets;
+    const now = performance.now() / 1000;
+    const damageFlash = Math.round(p.damageFlash * 100) / 100;
+    const signature = [
+      Math.round(p.health),
+      p.ammo,
+      p.bullets,
+      p.shells,
+      p.currentWeapon,
+      p.revolverChamber,
+      p.machinegunMag,
+      p.revolverReloadTimer > 0,
+      p.machinegunReloadTimer > 0,
+      p.unlockedShotgun,
+      p.kills,
+      p.shotsFired,
+      p.timesHit,
+      p.startTime,
+      p.endTime,
+      damageFlash,
+    ].join("|");
+
+    if (!force) {
+      const recentlyPublished = now - lastPlayerStatePublishRef.current < PLAYER_STATE_PUBLISH_INTERVAL;
+      if (signature === lastPlayerStateSignatureRef.current || recentlyPublished) return;
+    }
+
+    lastPlayerStatePublishRef.current = now;
+    lastPlayerStateSignatureRef.current = signature;
     onPlayerState({
       health: Math.round(p.health),
       ammo: p.ammo,
@@ -343,12 +406,13 @@ export default function Game({
       machinegunMag: p.machinegunMag,
       revolverReloading: p.revolverReloadTimer > 0,
       machinegunReloading: p.machinegunReloadTimer > 0,
+      unlockedShotgun: p.unlockedShotgun,
       kills: p.kills,
       shotsFired: p.shotsFired,
       timesHit: p.timesHit,
       startTime: p.startTime,
       endTime: p.endTime,
-      damageFlash: p.damageFlash,
+      damageFlash,
     });
   }, [onPlayerState]);
 
@@ -385,41 +449,43 @@ export default function Game({
     return () => window.removeEventListener("get-player-position", handler);
   }, []);
 
-  // Weapon switching keydown listener
+  // Weapon switching, reload, and touch command listener
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
+    const runIfActive = (action: (player: PlayerData) => void): void => {
       const player = playerRef.current;
       if (player.health <= 0 || !gameActiveRef.current || paused) return;
+      action(player);
+    };
 
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.code === "Digit1" || e.key === "1") {
-        player.currentWeapon = "revolver";
-        audioManager.play("weapon_pickup"); // Switch sound
+        runIfActive((player) => switchPlayerWeapon(player, "revolver"));
       } else if (e.code === "Digit2" || e.key === "2") {
-        if (player.unlockedShotgun) {
-          player.currentWeapon = "shotgun";
-          audioManager.play("weapon_pickup");
-        } else {
-          audioManager.play("noway"); // Denied sound
-        }
+        runIfActive((player) => switchPlayerWeapon(player, "shotgun"));
       } else if (e.code === "Digit3" || e.key === "3") {
-        player.currentWeapon = "machinegun";
-        audioManager.play("weapon_pickup");
+        runIfActive((player) => switchPlayerWeapon(player, "machinegun"));
       } else if (e.code === "KeyR" || e.key === "r" || e.key === "R") {
-        if (player.currentWeapon === "revolver") {
-          if (player.revolverReloadTimer === 0 && player.revolverChamber < 6 && player.bullets > 0) {
-            player.revolverReloadTimer = 1.0;
-            audioManager.play("shotgun_cock");
-          }
-        } else if (player.currentWeapon === "machinegun") {
-          if (player.machinegunReloadTimer === 0 && player.machinegunMag < 70 && player.bullets > 0) {
-            player.machinegunReloadTimer = 2.0;
-            audioManager.play("shotgun_cock");
-          }
-        }
+        runIfActive(reloadCurrentWeapon);
       }
     };
+
+    const handleWeaponCommand = ((e: Event): void => {
+      const detail = (e as CustomEvent<{ weapon: WeaponType }>).detail;
+      runIfActive((player) => switchPlayerWeapon(player, detail.weapon));
+    }) as EventListener;
+
+    const handleReloadCommand = (): void => {
+      runIfActive(reloadCurrentWeapon);
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("game-weapon", handleWeaponCommand);
+    window.addEventListener("game-reload", handleReloadCommand);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("game-weapon", handleWeaponCommand);
+      window.removeEventListener("game-reload", handleReloadCommand);
+    };
   }, [paused]);
 
   // Collision detection callbacks delegating to pure GameCollision helpers
@@ -461,6 +527,10 @@ export default function Game({
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
     const now = performance.now() / 1000;
+    const shouldSyncVisualState = now - lastVisualStateSyncRef.current >= VISUAL_STATE_SYNC_INTERVAL;
+    if (shouldSyncVisualState) {
+      lastVisualStateSyncRef.current = now;
+    }
 
     // Reset out-of-ammo click flag when player clicks down
     if (player.shooting && !prevShootingRef.current) {
@@ -584,7 +654,9 @@ export default function Game({
       projectileIdRef.current += spawnedProjectiles.length;
       projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
       enemiesRef.current = updatedEnemies;
-      setEnemies(updatedEnemies);
+      if (shouldSyncVisualState) {
+        setEnemies(updatedEnemies);
+      }
 
       // Update projectiles
       projectilesRef.current = updateProjectilesHelper(
@@ -596,7 +668,9 @@ export default function Game({
         onGameOver,
         (active) => { gameActiveRef.current = active; }
       );
-      setProjectiles([...projectilesRef.current]);
+      if (shouldSyncVisualState) {
+        setProjectiles([...projectilesRef.current]);
+      }
 
       // Pickup collection
       const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
@@ -637,16 +711,18 @@ export default function Game({
       audioManager.play('noway');
     }
 
-    setDoors((prev: DoorData[]): DoorData[] =>
-      prev.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct))
-    );
+    const updatedDoors = doorsRef.current.map((d: DoorData): DoorData => updateDoor(d, dt, playerPos, useAct));
+    doorsRef.current = updatedDoors;
+    if (shouldSyncVisualState) {
+      setDoors(updatedDoors);
+    }
 
     if (useAct && exitUsable) {
       missionCompleteRef.current = true;
       gameActiveRef.current = false;
       player.endTime = now;
       audioManager.play('switch');
-      handlePlayerState();
+      handlePlayerState(true);
       onMissionComplete();
     }
 
@@ -741,7 +817,7 @@ export default function Game({
         missionCompleteRef.current = true;
         gameActiveRef.current = false;
         player.endTime = now;
-        handlePlayerState();
+        handlePlayerState(true);
         onMissionComplete();
       }
     } else {
@@ -764,7 +840,7 @@ export default function Game({
     patchE2EState({
       currentWeapon: player.currentWeapon,
       unlockedShotgun: player.unlockedShotgun,
-      doors: doors.map((d) => ({ id: d.id, state: d.state })),
+      doors: doorsRef.current.map((d) => ({ id: d.id, state: d.state })),
       totalEnemies: enemiesRef.current.length,
       aliveEnemies: enemiesRef.current.filter((e) => e.alive).length,
     });
