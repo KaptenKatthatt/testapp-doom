@@ -304,23 +304,6 @@ export function checkSlimeDamageHelper(
     }
   }
 
-  if (!standingTileType) {
-    const SLIME_ZONES: Array<{ x: number; z: number; radius: number }> = [
-      { x: 12, z: 22, radius: 4 }, // Slime room center
-      { x: 8, z: 18, radius: 3 },  // Slime room west
-      { x: 18, z: 28, radius: 3 },  // Slime room east
-    ];
-
-    for (const zone of SLIME_ZONES) {
-      const sdx = player.position.x - zone.x;
-      const sdz = player.position.z - zone.z;
-      if (sdx * sdx + sdz * sdz < zone.radius * zone.radius) {
-        standingTileType = 'slime';
-        break;
-      }
-    }
-  }
-
   if (standingTileType) {
     if (now - player.lastEnvDmg > 1.0) {
       player.lastEnvDmg = now;

@@ -205,7 +205,6 @@ function reloadCurrentWeapon(player: PlayerData): void {
   }
 }
 
-
 export default function Game({
   onPlayerState,
   onGameOver,
