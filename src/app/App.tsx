@@ -5,7 +5,7 @@ import Game from "@/game/Game";
 import HUD from "@/game/HUD";
 import MobileControls from "@/game/MobileControls";
 import { audioManager } from "@/shared/audio/Audio";
-import type { PlayerState } from "@/game/types";
+import type { PlayerState, WeaponType } from "@/game/types";
 import type { LevelData } from "@/shared/levelData";
 import { gridToLevelData } from "@/editor/EditorExport";
 import { E1M1_GRID } from "@/game/levels/E1M1Grid";
@@ -39,6 +39,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     machinegunMag: 70,
     revolverReloading: false,
     machinegunReloading: false,
+    unlockedShotgun: false,
     kills: 0,
     shotsFired: 0,
     timesHit: 0,
@@ -142,6 +143,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       machinegunMag: 70,
       revolverReloading: false,
       machinegunReloading: false,
+      unlockedShotgun: false,
       kills: 0, 
       shotsFired: 0, 
       timesHit: 0, 
@@ -162,7 +164,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     if (!navigator.webdriver) {
       document.body.requestPointerLock?.();
     }
-  }, []);
+  }, [activeLevelData]);
 
   // Completion countdown timer removed in favor of Click to Continue interaction
 
@@ -275,6 +277,14 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     window.dispatchEvent(new CustomEvent("game-shoot", { detail: { shooting: false } }));
   }, []);
 
+  const handleMobileWeaponSelect = useCallback((weapon: WeaponType): void => {
+    window.dispatchEvent(new CustomEvent("game-weapon", { detail: { weapon } }));
+  }, []);
+
+  const handleMobileReload = useCallback((): void => {
+    window.dispatchEvent(new CustomEvent("game-reload"));
+  }, []);
+
   if (!started) {
     return (
       <MainMenu
@@ -352,6 +362,12 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         onShootStart={handleShootStart}
         onShootEnd={handleShootEnd}
         onUse={(): void => { useActionRef.current = true; }}
+        onWeaponSelect={handleMobileWeaponSelect}
+        onReload={handleMobileReload}
+        currentWeapon={playerState.currentWeapon}
+        unlockedShotgun={playerState.unlockedShotgun}
+        revolverReloading={playerState.revolverReloading}
+        machinegunReloading={playerState.machinegunReloading}
       />
       {gameOver && (
         <div
@@ -517,6 +533,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       {!gameOver && !missionComplete && (
         <button
           data-testid="pause-menu-button"
+          aria-label="Open game menu"
           onClick={(e) => {
             e.stopPropagation();
             setMenuOpen(true);
@@ -532,21 +549,28 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           onPointerDown={(e) => e.stopPropagation()}
           style={{
             position: 'fixed',
-            bottom: 60,
-            right: 12,
-            padding: '8px 16px',
+            top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+            right: 'calc(env(safe-area-inset-right, 0px) + 12px)',
+            width: 44,
+            height: 44,
+            padding: 0,
             background: 'rgba(20, 10, 10, 0.85)',
             border: '2px solid #c00',
-            borderRadius: 4,
+            borderRadius: '50%',
             color: '#ff4444',
             fontFamily: "'Courier New', monospace",
-            fontSize: 12,
+            fontSize: 18,
             fontWeight: 'bold',
-            letterSpacing: '1px',
             cursor: 'pointer',
             zIndex: 1002,
             boxShadow: '0 0 10px rgba(255, 0, 0, 0.2)',
             transition: 'all 0.15s ease-in-out',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#c00';
@@ -559,7 +583,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
             e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.2)';
           }}
         >
-          ⚙️ MENU
+          II
         </button>
       )}
 

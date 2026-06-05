@@ -13,6 +13,7 @@ function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
     machinegunMag: 70,
     revolverReloading: false,
     machinegunReloading: false,
+    unlockedShotgun: false,
     kills: 0,
     shotsFired: 0,
     timesHit: 0,
