@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-export const BASE_URL = "http://localhost:5174";
+export const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5174";
 
 export function acceptConfirmDialogs(page: Page): void {
   page.on("dialog", (dialog) => dialog.accept());

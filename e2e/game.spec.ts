@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { BASE_URL, gotoMenu, startGame } from "./helpers";
+import { BASE_URL, gotoMenu, startGame, waitForE2EState } from "./helpers";
 
 test.describe("DOOM - Core Game", () => {
   test("start screen renders", async ({ page }) => {
@@ -124,5 +124,16 @@ test.describe("DOOM - Mobile Controls", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await startGame(page);
     await expect(page.locator('[data-testid="shoot-button"]')).toBeAttached();
+  });
+
+  test("weapon and reload buttons exist, and weapon tap cycles available weapons", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await startGame(page);
+    await expect(page.locator('[data-testid="weapon-switch-button"]')).toBeAttached();
+    await expect(page.locator('[data-testid="reload-button"]')).toBeAttached();
+    await waitForE2EState(page, (s) => s.currentWeapon === "revolver", 10_000);
+
+    await page.locator('[data-testid="weapon-switch-button"]').click();
+    await waitForE2EState(page, (s) => s.currentWeapon === "machinegun", 10_000);
   });
 });

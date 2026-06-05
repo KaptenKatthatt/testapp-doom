@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from "react";
+import type { WeaponType } from "./types";
 
 interface MobileControlsProps {
   readonly onMove: (dx: number, dy: number) => void;
@@ -6,6 +7,12 @@ interface MobileControlsProps {
   readonly onShootStart: () => void;
   readonly onShootEnd: () => void;
   readonly onUse: () => void;
+  readonly onWeaponSelect: (weapon: WeaponType) => void;
+  readonly onReload: () => void;
+  readonly currentWeapon: WeaponType;
+  readonly unlockedShotgun: boolean;
+  readonly revolverReloading: boolean;
+  readonly machinegunReloading: boolean;
 }
 
 interface JoystickVisual {
@@ -19,6 +26,12 @@ interface JoystickVisual {
 const JOYSTICK_RADIUS = 55;
 const RING_SIZE = JOYSTICK_RADIUS * 2;
 const KNOB_SIZE = 46;
+const WEAPON_ORDER: WeaponType[] = ["revolver", "shotgun", "machinegun"];
+const WEAPON_LABELS: Record<WeaponType, string> = {
+  revolver: "REV",
+  shotgun: "SG",
+  machinegun: "MG",
+};
 
 function getZoneLocal(clientX: number, clientY: number, el: HTMLDivElement): [number, number] {
   const rect = el.getBoundingClientRect();
@@ -55,8 +68,15 @@ export default function MobileControls({
   onShootStart,
   onShootEnd,
   onUse,
+  onWeaponSelect,
+  onReload,
+  currentWeapon,
+  unlockedShotgun,
+  revolverReloading,
+  machinegunReloading,
 }: MobileControlsProps): React.JSX.Element {
   const [isMobile, setIsMobile] = useState(false);
+  const [weaponPickerOpen, setWeaponPickerOpen] = useState(false);
   const [moveJoystick, setMoveJoystick] = useState<JoystickVisual>({
     active: false, originX: 0, originY: 0, knobX: 0, knobY: 0,
   });
@@ -70,12 +90,94 @@ export default function MobileControls({
   const lookOriginRef = useRef<{ x: number; y: number } | null>(null);
   const moveZoneRef = useRef<HTMLDivElement>(null);
   const lookZoneRef = useRef<HTMLDivElement>(null);
+  const weaponLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const weaponLongPressTriggeredRef = useRef(false);
+  const lastWeaponPointerActionRef = useRef(0);
+  const lastReloadPointerActionRef = useRef(0);
 
   useEffect(() => {
-    setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0);
+    const updateMobileFlag = (): void => {
+      setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
+    };
+    updateMobileFlag();
+    window.addEventListener("resize", updateMobileFlag);
+    return () => window.removeEventListener("resize", updateMobileFlag);
   }, []);
 
   // ── Move zone handlers ──────────────────────────────────────────────────────
+
+  const getAvailableWeapons = useCallback((): WeaponType[] => {
+    return WEAPON_ORDER.filter((weapon) => weapon !== "shotgun" || unlockedShotgun);
+  }, [unlockedShotgun]);
+
+  const cycleWeapon = useCallback((): void => {
+    const availableWeapons = getAvailableWeapons();
+    const currentIndex = availableWeapons.indexOf(currentWeapon);
+    const nextWeapon = availableWeapons[(currentIndex + 1) % availableWeapons.length] ?? "revolver";
+    onWeaponSelect(nextWeapon);
+  }, [currentWeapon, getAvailableWeapons, onWeaponSelect]);
+
+  const clearWeaponLongPressTimer = useCallback((): void => {
+    if (weaponLongPressTimerRef.current) {
+      clearTimeout(weaponLongPressTimerRef.current);
+      weaponLongPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleWeaponPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    weaponLongPressTriggeredRef.current = false;
+    clearWeaponLongPressTimer();
+    weaponLongPressTimerRef.current = setTimeout(() => {
+      weaponLongPressTriggeredRef.current = true;
+      setWeaponPickerOpen(true);
+    }, 350);
+  }, [clearWeaponLongPressTimer]);
+
+  const handleWeaponPointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearWeaponLongPressTimer();
+    if (weaponLongPressTriggeredRef.current) return;
+    lastWeaponPointerActionRef.current = performance.now();
+    if (weaponPickerOpen) {
+      setWeaponPickerOpen(false);
+      return;
+    }
+    cycleWeapon();
+  }, [clearWeaponLongPressTimer, cycleWeapon, weaponPickerOpen]);
+
+  const handleWeaponPointerCancel = useCallback((e: React.PointerEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearWeaponLongPressTimer();
+  }, [clearWeaponLongPressTimer]);
+
+  const handleWeaponClick = useCallback((e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (performance.now() - lastWeaponPointerActionRef.current < 250) return;
+    if (weaponPickerOpen) {
+      setWeaponPickerOpen(false);
+      return;
+    }
+    cycleWeapon();
+  }, [cycleWeapon, weaponPickerOpen]);
+
+  const handleReloadAction = useCallback((): void => {
+    lastReloadPointerActionRef.current = performance.now();
+    onReload();
+  }, [onReload]);
+
+  const handleReloadClick = useCallback((e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (performance.now() - lastReloadPointerActionRef.current < 250) return;
+    onReload();
+  }, [onReload]);
+
+  useEffect(() => clearWeaponLongPressTimer, [clearWeaponLongPressTimer]);
 
   const handleMoveStart = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
     e.preventDefault();
@@ -171,6 +273,29 @@ export default function MobileControls({
     pointerEvents: "none",
   });
 
+  const commandButtonBase: React.CSSProperties = {
+    position: "absolute",
+    borderRadius: "50%",
+    color: "#fff",
+    cursor: "pointer",
+    zIndex: 21,
+    touchAction: "none",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    fontSize: 12,
+    fontWeight: "bold",
+    fontFamily: "monospace",
+    textShadow: "0 1px 2px #000",
+  };
+
+  const reloadActive = currentWeapon === "revolver"
+    ? revolverReloading
+    : currentWeapon === "machinegun" && machinegunReloading;
+
   return (
     <>
       {/* Left zone – movement */}
@@ -263,6 +388,111 @@ export default function MobileControls({
       >
         USE
       </button>
+
+      {/* Weapon and reload buttons */}
+      <button
+        data-testid="weapon-switch-button"
+        aria-label="Switch weapon"
+        onPointerDown={handleWeaponPointerDown}
+        onPointerUp={handleWeaponPointerUp}
+        onPointerCancel={handleWeaponPointerCancel}
+        onClick={handleWeaponClick}
+        style={{
+          ...commandButtonBase,
+          right: 24,
+          bottom: 204,
+          width: 56,
+          height: 56,
+          background: "rgba(255, 190, 40, 0.52)",
+          border: "2px solid rgba(255, 220, 90, 0.82)",
+          boxShadow: currentWeapon === "shotgun"
+            ? "0 0 14px rgba(255, 120, 40, 0.42)"
+            : currentWeapon === "machinegun"
+              ? "0 0 14px rgba(255, 220, 60, 0.42)"
+              : "0 0 14px rgba(255, 255, 255, 0.18)",
+        }}
+      >
+        {WEAPON_LABELS[currentWeapon]}
+      </button>
+
+      <button
+        data-testid="reload-button"
+        aria-label="Reload weapon"
+        onPointerDown={(e: React.PointerEvent<HTMLButtonElement>): void => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleReloadAction();
+        }}
+        onClick={handleReloadClick}
+        style={{
+          ...commandButtonBase,
+          right: 88,
+          bottom: 208,
+          width: 48,
+          height: 48,
+          background: reloadActive ? "rgba(255, 80, 30, 0.65)" : "rgba(40, 40, 40, 0.58)",
+          border: reloadActive ? "2px solid rgba(255, 130, 80, 0.9)" : "2px solid rgba(180, 180, 180, 0.58)",
+          opacity: currentWeapon === "shotgun" ? 0.48 : 1,
+        }}
+      >
+        RLD
+      </button>
+
+      {weaponPickerOpen && (
+        <div
+          data-testid="weapon-picker"
+          style={{
+            position: "absolute",
+            right: 18,
+            bottom: 266,
+            display: "flex",
+            gap: 8,
+            zIndex: 22,
+            touchAction: "none",
+          }}
+        >
+          {WEAPON_ORDER.map((weapon) => {
+            const locked = weapon === "shotgun" && !unlockedShotgun;
+            const active = weapon === currentWeapon;
+            return (
+              <button
+                key={weapon}
+                data-testid={`weapon-slot-${weapon}`}
+                aria-label={`Select ${weapon}`}
+                disabled={locked}
+                onPointerDown={(e: React.PointerEvent<HTMLButtonElement>): void => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!locked) {
+                    onWeaponSelect(weapon);
+                    setWeaponPickerOpen(false);
+                  }
+                }}
+                style={{
+                  ...commandButtonBase,
+                  position: "relative",
+                  width: 48,
+                  height: 48,
+                  background: locked
+                    ? "rgba(30, 30, 30, 0.52)"
+                    : active
+                      ? "rgba(255, 190, 40, 0.82)"
+                      : "rgba(20, 10, 10, 0.74)",
+                  border: active
+                    ? "2px solid rgba(255, 255, 180, 0.95)"
+                    : locked
+                      ? "2px solid rgba(100, 100, 100, 0.45)"
+                      : "2px solid rgba(255, 160, 60, 0.72)",
+                  color: locked ? "rgba(255, 255, 255, 0.42)" : "#fff",
+                  opacity: locked ? 0.62 : 1,
+                }}
+              >
+                {WEAPON_LABELS[weapon]}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Shoot button — CoD style: right side, above HUD */}
       <button
