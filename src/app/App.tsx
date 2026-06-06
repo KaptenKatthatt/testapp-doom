@@ -555,9 +555,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
             height: 44,
             padding: 0,
             background: 'rgba(20, 10, 10, 0.85)',
-            border: '2px solid #c00',
+            border: '2px solid #888',
             borderRadius: '50%',
-            color: '#ff4444',
+            color: '#aaa',
             fontFamily: "'Courier New', monospace",
             fontSize: 18,
             fontWeight: 'bold',
@@ -573,14 +573,14 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
             WebkitUserSelect: 'none',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#c00';
+            e.currentTarget.style.background = '#666';
             e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 0, 0, 0.5)';
+            e.currentTarget.style.boxShadow = '0 0 15px rgba(150, 150, 150, 0.5)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'rgba(20, 10, 10, 0.85)';
-            e.currentTarget.style.color = '#ff4444';
-            e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.2)';
+            e.currentTarget.style.color = '#aaa';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(150, 150, 150, 0.2)';
           }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
