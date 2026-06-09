@@ -645,6 +645,24 @@ export default function Editor(): JSX.Element {
     };
   }, [musicTrack]);
 
+  // Stop shared menu/game music on entry; tear down editor audio on exit
+  useEffect(() => {
+    audioManager.stopAllMusic();
+
+    return () => {
+      stopMusicPreview();
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        void audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+      musicEngineRef.current = null;
+    };
+  }, []);
+
   const handlePlayMap = async (): Promise<void> => {
     // Save current map and level data so the game can load it
     const ld = gridToLevelData(grid, playerPos, musicTrack, customLighting ?? undefined);
