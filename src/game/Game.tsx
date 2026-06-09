@@ -39,6 +39,11 @@ import {
 } from "./GameHelpers";
 import { useGameInputs } from "./useGameInputs";
 import { patchE2EState, registerE2EHandlers } from "@/shared/e2eBridge";
+import type { PlayerCommandHandlers } from "./playerCommands";
+import {
+  applyLightingEditorMovement,
+  getSimulationCapabilities,
+} from "./gameSimulationMode";
 
 const COLLISION_MARGIN = 0.4;
 const PLAYER_STATE_PUBLISH_INTERVAL = 1 / 30;
@@ -61,6 +66,7 @@ interface GameProps {
   readonly mobileLookRef: React.MutableRefObject<number>;
   readonly mobilePitchRef: React.MutableRefObject<number>;
   readonly useActionRef: React.MutableRefObject<boolean>;
+  readonly playerCommandRef?: React.MutableRefObject<PlayerCommandHandlers | null>;
   readonly levelData?: CustomLevelData | null;
   readonly paused?: boolean;
   readonly customLighting?: LevelLightingData | null;
@@ -213,6 +219,7 @@ export default function Game({
   mobileLookRef,
   mobilePitchRef,
   useActionRef,
+  playerCommandRef,
   levelData,
   paused,
   customLighting = null,
@@ -435,25 +442,13 @@ export default function Game({
     });
   }, []);
 
-  // Listen to get-player-position events for the lighting editor spawner
-  useEffect(() => {
-    const handler = (e: Event): void => {
-      const customEvent = e as CustomEvent<{ callback: (pos: [number, number, number]) => void }>;
-      if (playerRef.current) {
-        const pos = playerRef.current.position;
-        customEvent.detail.callback([pos.x, pos.y, pos.z]);
-      }
-    };
-    window.addEventListener("get-player-position", handler);
-    return () => window.removeEventListener("get-player-position", handler);
-  }, []);
-
-  // Weapon switching, reload, and touch command listener
+  // Weapon switching, reload, and player command bridge
   useEffect(() => {
     const runIfActive = (action: (player: PlayerData) => void): void => {
       const player = playerRef.current;
       if (player.health <= 0 || !gameActiveRef.current || paused) return;
       action(player);
+      handlePlayerState(true);
     };
 
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -468,24 +463,29 @@ export default function Game({
       }
     };
 
-    const handleWeaponCommand = ((e: Event): void => {
-      const detail = (e as CustomEvent<{ weapon: WeaponType }>).detail;
-      runIfActive((player) => switchPlayerWeapon(player, detail.weapon));
-    }) as EventListener;
-
-    const handleReloadCommand = (): void => {
-      runIfActive(reloadCurrentWeapon);
-    };
+    if (playerCommandRef) {
+      playerCommandRef.current = {
+        switchWeapon: (weapon: WeaponType): void => {
+          runIfActive((player) => switchPlayerWeapon(player, weapon));
+        },
+        reload: (): void => {
+          runIfActive(reloadCurrentWeapon);
+        },
+        getPosition: (): [number, number, number] | null => {
+          const pos = playerRef.current.position;
+          return [pos.x, pos.y, pos.z];
+        },
+      };
+    }
 
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("game-weapon", handleWeaponCommand);
-    window.addEventListener("game-reload", handleReloadCommand);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("game-weapon", handleWeaponCommand);
-      window.removeEventListener("game-reload", handleReloadCommand);
+      if (playerCommandRef) {
+        playerCommandRef.current = null;
+      }
     };
-  }, [paused]);
+  }, [paused, playerCommandRef, handlePlayerState]);
 
   // Collision detection callbacks delegating to pure GameCollision helpers
   const checkCollision = useCallback((pos: THREE.Vector3, radius: number = COLLISION_MARGIN): boolean => {
@@ -523,6 +523,7 @@ export default function Game({
       return;
     }
 
+    const sim = getSimulationCapabilities(editorModeActive);
     const dt = Math.min(delta, 0.05);
     const keys = keysRef.current;
     const now = performance.now() / 1000;
@@ -531,13 +532,68 @@ export default function Game({
       lastVisualStateSyncRef.current = now;
     }
 
+    if (gameActiveRef.current) {
+      if (sim.mode === "lightingEdit") {
+        handlePlayerMovementHelper(
+          dt,
+          player,
+          keys,
+          mobileMoveRef.current,
+          mobileLookRef.current,
+          mobilePitchRef.current,
+          () => false,
+          () => false,
+          enemiesRef.current
+        );
+        applyLightingEditorMovement(dt, player, keys);
+      } else {
+        handlePlayerMovementHelper(
+          dt,
+          player,
+          keys,
+          mobileMoveRef.current,
+          mobileLookRef.current,
+          mobilePitchRef.current,
+          checkCollision,
+          checkEnemyCollision,
+          enemiesRef.current
+        );
+        player.position.y = 1.7;
+      }
+    }
+
+    if (player.damageFlash > 0) {
+      player.damageFlash = Math.max(0, player.damageFlash - dt * 2);
+    }
+
+    camera.position.set(player.position.x, player.position.y, player.position.z);
+    _lookDir.set(
+      -Math.sin(player.rotation) * Math.cos(player.pitch),
+      Math.sin(player.pitch),
+      -Math.cos(player.rotation) * Math.cos(player.pitch),
+    );
+    _lookTarget.copy(camera.position).addScaledVector(_lookDir, 10);
+    camera.lookAt(_lookTarget);
+    camera.updateMatrixWorld(true);
+
+    if (sim.mode === "lightingEdit") {
+      handlePlayerState();
+      patchE2EState({
+        currentWeapon: player.currentWeapon,
+        unlockedShotgun: player.unlockedShotgun,
+        doors: doorsRef.current.map((d) => ({ id: d.id, state: d.state })),
+        totalEnemies: enemiesRef.current.length,
+        aliveEnemies: enemiesRef.current.filter((e) => e.alive).length,
+      });
+      return;
+    }
+
     // Reset out-of-ammo click flag when player clicks down
     if (player.shooting && !prevShootingRef.current) {
       player.hasPlayedEmptyClick = false;
     }
     prevShootingRef.current = player.shooting;
 
-    // Update weapon reload timers
     if (player.revolverReloadTimer > 0) {
       player.revolverReloadTimer = Math.max(0, player.revolverReloadTimer - dt);
       if (player.revolverReloadTimer === 0) {
@@ -555,148 +611,93 @@ export default function Game({
       }
     }
 
-    // Movement
-    if (gameActiveRef.current) {
-      handlePlayerMovementHelper(
-        dt,
-        player,
-        keys,
-        mobileMoveRef.current,
-        mobileLookRef.current,
-        mobilePitchRef.current,
-        editorModeActive ? () => false : checkCollision,
-        editorModeActive ? () => false : checkEnemyCollision,
-        enemiesRef.current
-      );
-
-      // Support vertical flying and height adjustments in lighting editor mode
-      if (editorModeActive) {
-        if (keys["KeyE"] || keys["Space"]) {
-          player.position.y += dt * 5; // Fly up
-        }
-        if (keys["KeyQ"] || keys["ShiftLeft"]) {
-          player.position.y = Math.max(0.2, player.position.y - dt * 5); // Fly down
-        }
-      } else {
-        // Enforce normal player height when not in editor mode
-        player.position.y = 1.7;
-      }
-    }
-
-    // Contact damage: if player is very close to any alive enemy, take damage
-    if (!editorModeActive) {
-      const contactRadius = 1.0;
-      for (const e of enemiesRef.current) {
-        if (!e.alive) continue;
-        const cdx = player.position.x - e.position[0];
-        const cdz = player.position.z - e.position[2];
-        if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
-          // Only damage if no wall between player and enemy
-          if (!hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z)) continue;
-          if (now - player.lastContactDmg > 0.5) {
-            player.lastContactDmg = now;
-            player.health = Math.max(0, player.health - 2);
-            player.timesHit++;
-            player.damageFlash = 1;
-            audioManager.play('player_pain');
-            if (player.health <= 0) {
-              gameActiveRef.current = false;
-              onGameOver();
-              audioManager.play('player_death');
-            }
+    const contactRadius = 1.0;
+    for (const e of enemiesRef.current) {
+      if (!e.alive) continue;
+      const cdx = player.position.x - e.position[0];
+      const cdz = player.position.z - e.position[2];
+      if (cdx * cdx + cdz * cdz < contactRadius * contactRadius) {
+        if (!hasLineOfSight(e.position[0], e.position[2], player.position.x, player.position.z)) continue;
+        if (now - player.lastContactDmg > 0.5) {
+          player.lastContactDmg = now;
+          player.health = Math.max(0, player.health - 2);
+          player.timesHit++;
+          player.damageFlash = 1;
+          audioManager.play('player_pain');
+          if (player.health <= 0) {
+            gameActiveRef.current = false;
+            onGameOver();
+            audioManager.play('player_death');
           }
-          break;
         }
+        break;
       }
     }
 
-    // Also trigger flash on ranged damage (already applied in setEnemies callback)
-    // Fade damage flash
-    if (player.damageFlash > 0) {
-      player.damageFlash = Math.max(0, player.damageFlash - dt * 2);
-    }
-
-    // Camera follow with pitch (reuse pre-allocated vectors)
-    camera.position.set(player.position.x, player.position.y, player.position.z);
-    _lookDir.set(
-      -Math.sin(player.rotation) * Math.cos(player.pitch),
-      Math.sin(player.pitch),
-      -Math.cos(player.rotation) * Math.cos(player.pitch),
+    handlePlayerShootingHelper(
+      player,
+      now,
+      camera,
+      projectilesRef,
+      projectileIdRef,
+      walls,
+      enemiesRef,
+      setEnemies,
+      barrelsRef,
+      setBarrels
     );
-    _lookTarget.copy(camera.position).addScaledVector(_lookDir, 10);
-    camera.lookAt(_lookTarget);
-    camera.updateMatrixWorld(true);
-
-    // Shooting & AI Updates (Only run if not in lighting editor mode!)
-    if (!editorModeActive) {
-      handlePlayerShootingHelper(
-        player,
-        now,
-        camera,
-        projectilesRef,
-        projectileIdRef,
-        walls,
-        enemiesRef,
-        setEnemies,
-        barrelsRef,
-        setBarrels
-      );
-      const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
-        dt,
-        now,
-        player,
-        enemiesRef.current,
-        checkCollision,
-        hasLineOfSight,
-        projectileIdRef.current
-      );
-      projectileIdRef.current += spawnedProjectiles.length;
-      projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
-      enemiesRef.current = updatedEnemies;
-      if (shouldSyncVisualState) {
-        setEnemies(updatedEnemies);
-      }
-
-      // Update projectiles
-      projectilesRef.current = updateProjectilesHelper(
-        dt,
-        projectilesRef.current,
-        player,
-        enemiesRef.current,
-        checkWallHit,
-        onGameOver,
-        (active) => { gameActiveRef.current = active; }
-      );
-      if (shouldSyncVisualState) {
-        setProjectiles([...projectilesRef.current]);
-      }
-
-      // Pickup collection
-      const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
-        player.position,
-        pickups,
-        player.health
-      );
-      setPickups(updatedPickups);
-      if (healthBonus > 0) { 
-        player.health = Math.min(100, player.health + healthBonus); 
-        audioManager.play('item_pickup'); 
-      }
-      if (ammoBonus > 0 && !shotgunPickup) {
-        player.bullets += 24;
-        audioManager.play('item_pickup');
-      }
-      if (shotgunPickup) {
-        player.shells += 8;
-        player.unlockedShotgun = true;
-        player.currentWeapon = "shotgun"; // Auto switch to newly found weapon!
-        audioManager.play('weapon_pickup');
-      }
+    const { updatedEnemies, spawnedProjectiles } = updateEnemyAIHelper(
+      dt,
+      now,
+      player,
+      enemiesRef.current,
+      checkCollision,
+      hasLineOfSight,
+      projectileIdRef.current
+    );
+    projectileIdRef.current += spawnedProjectiles.length;
+    projectilesRef.current = [...projectilesRef.current, ...spawnedProjectiles];
+    enemiesRef.current = updatedEnemies;
+    if (shouldSyncVisualState) {
+      setEnemies(updatedEnemies);
     }
 
-    // Update doors
+    projectilesRef.current = updateProjectilesHelper(
+      dt,
+      projectilesRef.current,
+      player,
+      enemiesRef.current,
+      checkWallHit,
+      onGameOver,
+      (active) => { gameActiveRef.current = active; }
+    );
+    if (shouldSyncVisualState) {
+      setProjectiles([...projectilesRef.current]);
+    }
+
+    const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
+      player.position,
+      pickups,
+      player.health
+    );
+    setPickups(updatedPickups);
+    if (healthBonus > 0) {
+      player.health = Math.min(100, player.health + healthBonus);
+      audioManager.play('item_pickup');
+    }
+    if (ammoBonus > 0 && !shotgunPickup) {
+      player.bullets += 24;
+      audioManager.play('item_pickup');
+    }
+    if (shotgunPickup) {
+      player.shells += 8;
+      player.unlockedShotgun = true;
+      player.currentWeapon = "shotgun";
+      audioManager.play('weapon_pickup');
+    }
+
     const playerPos: [number, number, number] = [player.position.x, 0, player.position.z];
-    const useAct = editorModeActive ? false : (useActionRef ? useActionRef.current : false);
+    const useAct = useActionRef ? useActionRef.current : false;
 
     // Exit Switch interaction — E1M1 exit pad at fixed coordinates
     const switchX = 16;
@@ -823,16 +824,13 @@ export default function Game({
       lastEnemyDeathTimeRef.current = null;
     }
 
-    // Nukage/slime damage — standing in custom lava or slime zones
-    if (!editorModeActive) {
-      player.health = checkSlimeDamageHelper(
-        now,
-        player,
-        onGameOver,
-        (active) => { gameActiveRef.current = active; },
-        specialFloors
-      );
-    }
+    player.health = checkSlimeDamageHelper(
+      now,
+      player,
+      onGameOver,
+      (active) => { gameActiveRef.current = active; },
+      specialFloors
+    );
 
     handlePlayerState();
 

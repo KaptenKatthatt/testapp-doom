@@ -9,12 +9,14 @@ import type { PlayerState, WeaponType } from "@/game/types";
 import type { LevelData } from "@/shared/levelData";
 import { gridToLevelData } from "@/editor/EditorExport";
 import { E1M1_GRID } from "@/game/levels/E1M1Grid";
-import { listSavedMaps, loadMapFromStorage, saveMapToStorage, type LevelLightingData } from "@/shared/storage/StorageHelpers";
+import { listSavedMaps, loadMapFromStorage, saveLightingForLevel, type LevelLightingData } from "@/shared/storage/StorageHelpers";
+import type { PlayerCommandHandlers } from "@/game/playerCommands";
+import { DEFAULT_LIGHTING } from "@/shared/lighting/defaults";
 import type { TrackStyle } from "@/editor/EditorTypes";
 import { patchE2EState } from "@/shared/e2eBridge";
 import { type CellType } from "@/editor/EditorTypes";
 import { formatTime, calcScore } from "@/game/gameStats";
-import LightingEditorHUD from "@/game/LightingEditorHUD";
+import LightingEditorHUD from "@/game/lighting/LightingEditorHUD";
 
 interface AppProps {
   levelData?: LevelData | null;
@@ -57,6 +59,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const mobileLookRef = useRef(0);
   const mobilePitchRef = useRef(0);
   const useActionRef = useRef(false);
+  const playerCommandRef = useRef<PlayerCommandHandlers | null>(null);
   const audioMenuOpenRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [musicVol, setMusicVol] = useState(audioManager.getMusicVolume());
@@ -214,40 +217,40 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   }, [started, gameOver, missionComplete]);
 
   const handleSaveLighting = useCallback(async (): Promise<void> => {
-    if (!customLighting) return;
-    
-    let mapName = '__playing__';
-    if (selectedLevel?.startsWith('saved:')) {
-      mapName = selectedLevel.slice(6);
-    } else if (selectedLevel === '__default__') {
-      mapName = '__e1m1__';
+    const lighting = customLighting ?? { ...DEFAULT_LIGHTING };
+    const result = await saveLightingForLevel(selectedLevel, lighting);
+
+    if (result === 'memory_only' || result === 'saved') {
+      setActiveLevelData((prev) => (prev ? { ...prev, lighting } : prev));
     }
 
-    const data = await loadMapFromStorage(mapName);
-    if (data) {
-      await saveMapToStorage(
-        mapName,
-        data.grid,
-        data.playerPos,
-        false,
-        data.musicTrack,
-        data.status ?? 'draft',
-        customLighting
-      );
-      
-      // Update active level state with custom lighting
-      setActiveLevelData(prev => {
-        if (prev) {
-          return { ...prev, lighting: customLighting };
-        }
-        return prev;
-      });
-
+    if (result === 'saved') {
       alert("💡 Lighting configurations saved to map!");
+    } else if (result === 'memory_only') {
+      alert("💡 Lighting updated for this play session (map not saved to storage yet).");
     } else {
       alert("❌ Failed to find map data to save lighting to.");
     }
   }, [customLighting, selectedLevel]);
+
+  const handleRequestPlayerPosition = useCallback((): Promise<[number, number, number]> => {
+    return new Promise((resolve, reject) => {
+      const deadline = performance.now() + 2000;
+      const tryGet = (): void => {
+        const pos = playerCommandRef.current?.getPosition();
+        if (pos) {
+          resolve(pos);
+          return;
+        }
+        if (performance.now() >= deadline) {
+          reject(new Error("Player position unavailable"));
+          return;
+        }
+        requestAnimationFrame(tryGet);
+      };
+      tryGet();
+    });
+  }, []);
 
   // Restart menu music when returning to the main menu
   useEffect(() => {
@@ -278,11 +281,11 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   }, []);
 
   const handleMobileWeaponSelect = useCallback((weapon: WeaponType): void => {
-    window.dispatchEvent(new CustomEvent("game-weapon", { detail: { weapon } }));
+    playerCommandRef.current?.switchWeapon(weapon);
   }, []);
 
   const handleMobileReload = useCallback((): void => {
-    window.dispatchEvent(new CustomEvent("game-reload"));
+    playerCommandRef.current?.reload();
   }, []);
 
   if (!started) {
@@ -323,6 +326,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           mobileLookRef={mobileLookRef}
           mobilePitchRef={mobilePitchRef}
           useActionRef={useActionRef}
+          playerCommandRef={playerCommandRef}
           levelData={activeLevelData}
           paused={menuOpen}
           customLighting={customLighting}
@@ -801,6 +805,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           onChangeLighting={setCustomLighting}
           selectedLightId={selectedLightId}
           onSelectLight={setSelectedLightId}
+          onRequestPlayerPosition={handleRequestPlayerPosition}
           onClose={() => {
             setLightingEditorActive(false);
             if (!navigator.webdriver) {

@@ -177,7 +177,7 @@ export default function MobileControls({
     onReload();
   }, [onReload]);
 
-  useEffect(() => clearWeaponLongPressTimer, [clearWeaponLongPressTimer]);
+  useEffect(() => () => clearWeaponLongPressTimer(), [clearWeaponLongPressTimer]);
 
   const handleMoveStart = useCallback((e: React.TouchEvent<HTMLDivElement>): void => {
     e.preventDefault();
