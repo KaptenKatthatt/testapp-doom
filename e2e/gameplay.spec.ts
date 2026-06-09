@@ -14,7 +14,6 @@ test.describe("Gameplay phase 3", () => {
   test("weapon keys 1–3 switch active weapon", async ({ page }) => {
     test.setTimeout(60_000);
     await startGame(page);
-    await page.waitForTimeout(1000);
     await waitForE2EState(page, (s) => s.currentWeapon === "revolver", 15_000);
 
     await pressWeaponKey(page, "3");

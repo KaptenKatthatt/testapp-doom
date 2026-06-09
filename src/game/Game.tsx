@@ -325,6 +325,10 @@ export default function Game({
   const [enemies, setEnemies] = useState<EnemyData[]>(customEnemies);
   const enemiesRef = useRef<EnemyData[]>(customEnemies);
   const [pickups, setPickups] = useState<PickupData[]>(customPickups);
+  const pickupsRef = useRef<PickupData[]>(customPickups);
+  useEffect(() => {
+    pickupsRef.current = pickups;
+  }, [pickups]);
   const [doors, setDoors] = useState<DoorData[]>(customDoors);
   const doorsRef = useRef<DoorData[]>(customDoors);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
@@ -461,7 +465,7 @@ export default function Game({
   useEffect(() => {
     const runIfActive = (action: (player: PlayerData) => void): void => {
       const player = playerRef.current;
-      if (player.health <= 0 || !gameActiveRef.current || (paused && readyToPlay)) return;
+      if (player.health <= 0 || !gameActiveRef.current || paused || !readyToPlay) return;
       action(player);
       handlePlayerState(true);
     };
@@ -697,12 +701,13 @@ export default function Game({
       setProjectiles([...projectilesRef.current]);
     }
 
-    const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
+    const { updatedPickups, changed: pickupsChanged, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
       player.position,
-      pickups,
+      pickupsRef.current,
       player.health
     );
-    if (updatedPickups !== pickups) {
+    if (pickupsChanged) {
+      pickupsRef.current = updatedPickups;
       setPickups(updatedPickups);
     }
     if (healthBonus > 0) {
@@ -788,12 +793,10 @@ export default function Game({
     const pullbackTarget = Math.max(0, Math.min(1, pullbackVal));
     pullbackRef.current = THREE.MathUtils.lerp(pullbackRef.current, pullbackTarget, Math.min(delta, 0.05) * 12);
 
-    const shouldUpdateBarrels = barrelsRef.current.some((b) => (
-      (!b.alive && b.explosionTimer > 0) || (b.alive && b.health <= 0)
-    ));
-
-    // Process barrel explosions and fade explosion timers
-    if (shouldUpdateBarrels) setBarrels((prevBarrels) => {
+    // Process barrel explosions and fade explosion timers.
+    // Always run via setBarrels so prevBarrels (authoritative React state) drives updates;
+    // gating on barrelsRef can skip frames when the ref lags behind mid-explosion state.
+    setBarrels((prevBarrels) => {
       let changed = false;
       let explodedBarrel: BarrelData | null = null;
 
@@ -810,6 +813,7 @@ export default function Game({
         return b;
       });
 
+      let result: BarrelData[];
       if (explodedBarrel) {
         audioManager.play('explosion');
         const { updatedEnemies, updatedBarrels } = explodeBarrelSplash(
@@ -824,14 +828,19 @@ export default function Game({
         enemiesRef.current = updatedEnemies;
         setEnemies(updatedEnemies);
 
-        return nextBarrels.map(b => {
+        result = nextBarrels.map(b => {
           if (b.id === (explodedBarrel as BarrelData).id) return b;
           const updated = updatedBarrels.find(u => u.id === b.id);
           return updated ? { ...b, health: updated.health } : b;
         });
+      } else {
+        result = changed ? nextBarrels : prevBarrels;
       }
 
-      return changed ? nextBarrels : prevBarrels;
+      if (result !== prevBarrels) {
+        barrelsRef.current = result;
+      }
+      return result;
     });
 
     // Centralized mission completion check: if all enemies are dead, player wins!
@@ -904,14 +913,14 @@ export default function Game({
       <Pickups pickups={pickups} />
       <Projectiles projectiles={projectiles} />
       {/* Barrels */}
-      {barrels.map((barrel, index) => {
+      {barrels.map((barrel) => {
         if (!barrel.alive && barrel.explosionTimer <= 0) return null;
         if (!barrel.alive) {
           const progress = 1 - barrel.explosionTimer;
           const scale = 0.5 + progress * 3.5;
           const opacity = barrel.explosionTimer;
           return (
-            <mesh key={`explosion-${barrel.id}-${index}`} position={barrel.position}>
+            <mesh key={`explosion-${barrel.id}`} position={barrel.position}>
               <sphereGeometry args={[scale, 16, 16]} />
               <meshBasicMaterial
                 color="#ff5500"
@@ -923,7 +932,7 @@ export default function Game({
           );
         }
         return (
-          <mesh key={`barrel-${barrel.id}-${index}`} position={barrel.position}>
+          <mesh key={`barrel-${barrel.id}`} position={barrel.position}>
             <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
             <meshLambertMaterial map={barrelTexture} />
           </mesh>
