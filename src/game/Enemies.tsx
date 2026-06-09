@@ -56,6 +56,7 @@ interface SpriteRow {
 }
 
 const textureCache = new Map<string, THREE.Texture>();
+const bodyTextureCache = new Map<EnemyType, THREE.Texture>();
 
 function isCyanKey(r: number, g: number, b: number): boolean {
   return (r < 120 && g > 150 && b > 150) || (g > r + 15 && b > r + 15);
@@ -148,6 +149,41 @@ function getRatmanBaseTexture(): THREE.Texture {
 
 function getCacodemonBaseTexture(): THREE.Texture {
   return createCacodemonTexture();
+}
+
+function getBodyTexture(type: EnemyType): THREE.Texture {
+  const cached = bodyTextureCache.get(type);
+  if (cached) return cached;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    const texture = new THREE.CanvasTexture(canvas);
+    bodyTextureCache.set(type, texture);
+    return texture;
+  }
+
+  const baseColor = type === "imp" ? [204, 102, 34] : type === "demon" ? [204, 17, 68] : [153, 170, 119];
+  ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
+  ctx.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 100; i++) {
+    const x = Math.random() * 64;
+    const y = Math.random() * 64;
+    const bright = Math.random() > 0.5;
+    const a = Math.random() * 0.3;
+    ctx.fillStyle = bright ? `rgba(255,255,255,${a * 0.3})` : `rgba(0,0,0,${a})`;
+    ctx.fillRect(x, y, 2 + Math.random() * 2, 1 + Math.random());
+  }
+  ctx.fillStyle = `rgba(255,200,100,0.3)`;
+  ctx.fillRect(16, 24, 32, 16);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  bodyTextureCache.set(type, texture);
+  return texture;
 }
 
 function applyUniformGridUV(
@@ -448,12 +484,16 @@ function EnemyLight({
   );
 }
 
+function EnemyEntry({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
+  return enemy.alive ? <Enemy enemy={enemy} /> : <Corpse enemy={enemy} />;
+}
+
 export default function Enemies({ enemies }: { readonly enemies: EnemyData[] }): React.JSX.Element {
   return (
     <group>
-      {enemies.map((e) =>
-        e.alive ? <Enemy key={e.id} enemy={e} /> : <Corpse key={e.id} enemy={e} />
-      )}
+      {enemies.map((e) => (
+        <EnemyEntry key={e.id} enemy={e} />
+      ))}
     </group>
   );
 }
@@ -474,33 +514,7 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const mancubusTexture = useMemo(() => (type === "mancubus" ? getMancubusBaseTexture().clone() : null), [type]);
   const ratmanTexture = useMemo(() => (type === "ratman" ? getRatmanBaseTexture().clone() : null), [type]);
   const cacodemonTexture = useMemo(() => (type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [type]);
-
-  const bodyTexture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      return new THREE.CanvasTexture(canvas);
-    }
-    const baseColor = type === "imp" ? [204, 102, 34] : type === "demon" ? [204, 17, 68] : [153, 170, 119];
-    ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
-    ctx.fillRect(0, 0, 64, 64);
-    for (let i = 0; i < 100; i++) {
-      const x = Math.random() * 64;
-      const y = Math.random() * 64;
-      const bright = Math.random() > 0.5;
-      const a = Math.random() * 0.3;
-      ctx.fillStyle = bright ? `rgba(255,255,255,${a * 0.3})` : `rgba(0,0,0,${a})`;
-      ctx.fillRect(x, y, 2 + Math.random() * 2, 1 + Math.random());
-    }
-    ctx.fillStyle = `rgba(255,200,100,0.3)`;
-    ctx.fillRect(16, 24, 32, 16);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    return texture;
-  }, [type]);
+  const bodyTexture = useMemo(() => getBodyTexture(type), [type]);
 
   useFrame((state) => {
     if (type === "mancubus" && mancubusTexture) {

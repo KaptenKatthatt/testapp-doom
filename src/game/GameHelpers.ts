@@ -332,7 +332,7 @@ export function updatePickupCollectionHelper(
   playerPos: THREE.Vector3,
   pickups: PickupData[],
   playerHealth: number
-): { updatedPickups: PickupData[]; healthBonus: number; ammoBonus: number; shotgunPickup: boolean } {
+): { updatedPickups: PickupData[]; changed: boolean; healthBonus: number; ammoBonus: number; shotgunPickup: boolean } {
   let healthBonus = 0;
   let ammoBonus = 0;
   let shotgunPickup = false;
@@ -353,7 +353,9 @@ export function updatePickupCollectionHelper(
     return p;
   });
 
-  return { updatedPickups, healthBonus, ammoBonus, shotgunPickup };
+  const changed = updatedPickups.some((p, i) => p.active !== pickups[i]?.active);
+
+  return { updatedPickups: changed ? updatedPickups : pickups, changed, healthBonus, ammoBonus, shotgunPickup };
 }
 
 export function handlePlayerMovementHelper(

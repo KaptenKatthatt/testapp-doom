@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import MainMenu, { type SavedMap } from "@/game/MainMenu";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import Game from "@/game/Game";
 import HUD from "@/game/HUD";
 import MobileControls from "@/game/MobileControls";
@@ -17,10 +17,84 @@ import { patchE2EState } from "@/shared/e2eBridge";
 import { type CellType } from "@/editor/EditorTypes";
 import { formatTime, calcScore } from "@/game/gameStats";
 import LightingEditorHUD from "@/game/lighting/LightingEditorHUD";
+import type * as THREE from "three";
 
 interface AppProps {
   levelData?: LevelData | null;
   onClearLevelData?: () => void;
+}
+
+function waitForFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    let remaining = count;
+    const tick = (): void => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+function waitForMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function requestGamePointerLock(): void {
+  if (navigator.webdriver) return;
+
+  try {
+    const result = document.body.requestPointerLock?.();
+    if (result && "catch" in result) {
+      void result.catch(() => {
+        // Pointer lock can be unavailable in embedded/test browsers.
+      });
+    }
+  } catch {
+    // Pointer lock can be unavailable in embedded/test browsers.
+  }
+}
+
+function LevelWarmup({ onReady }: { readonly onReady: () => void }): null {
+  const { gl, scene, camera } = useThree();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const warmup = async (): Promise<void> => {
+      await waitForFrames(1);
+      if (cancelled) return;
+
+      const renderer = gl as THREE.WebGLRenderer & {
+        compileAsync?: (scene: THREE.Scene, camera: THREE.Camera) => Promise<void>;
+      };
+
+      if (renderer.compileAsync) {
+        await Promise.race([
+          renderer.compileAsync(scene, camera),
+          waitForMs(1200),
+        ]);
+      } else {
+        renderer.compile(scene, camera);
+      }
+
+      await waitForFrames(2);
+      if (!cancelled) onReady();
+    };
+
+    void warmup();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [camera, gl, onReady, scene]);
+
+  return null;
 }
 
 export default function App({ levelData }: AppProps): React.JSX.Element {
@@ -64,6 +138,9 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [musicVol, setMusicVol] = useState(audioManager.getMusicVolume());
   const [sfxVol, setSfxVol] = useState(audioManager.getSfxVolume());
+  const [levelReady, setLevelReady] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+  const bootIdRef = useRef(0);
 
   // Load saved maps list on mount
   useEffect(() => {
@@ -131,6 +208,10 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   }, [activeLevelData]);
 
   const handleStart = useCallback((): void => {
+    const bootId = bootIdRef.current + 1;
+    bootIdRef.current = bootId;
+    setLevelReady(false);
+    setAudioReady(false);
     setStarted(true);
     setGameOver(false);
     setMissionComplete(false);
@@ -154,20 +235,38 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       endTime: 0, 
       damageFlash: 0 
     });
-    audioManager.init().then(() => {
-      audioManager.resume();
+    const audioBoot = audioManager.init().then(async () => {
+      await audioManager.resume();
       audioManager.stopMenuMusic();
       const track = activeLevelData?.musicTrack as TrackStyle | undefined;
       if (track) {
-        audioManager.playGameMusic(track);
+        await audioManager.playGameMusic(track);
       } else {
-        audioManager.playMusic();
+        await audioManager.playMusic();
       }
+    }).catch((err: unknown) => {
+      console.warn("Audio warmup failed; starting without blocking gameplay.", err);
     });
-    if (!navigator.webdriver) {
-      document.body.requestPointerLock?.();
+
+    if (navigator.webdriver) {
+      if (bootIdRef.current === bootId) {
+        setAudioReady(true);
+      }
+    } else {
+      void Promise.race([
+        audioBoot,
+        waitForMs(4500),
+      ]).then(() => {
+        if (bootIdRef.current === bootId) {
+          setAudioReady(true);
+        }
+      });
     }
   }, [activeLevelData]);
+
+  const handleLevelReady = useCallback((): void => {
+    setLevelReady(true);
+  }, []);
 
   // Completion countdown timer removed in favor of Click to Continue interaction
 
@@ -204,9 +303,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           if (next) {
             document.exitPointerLock?.();
           } else {
-            if (!navigator.webdriver) {
-              document.body.requestPointerLock?.();
-            }
+            requestGamePointerLock();
           }
           return next;
         });
@@ -262,6 +359,13 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     }
   }, [started]);
 
+  const levelBooting = started && (!levelReady || !audioReady);
+
+  useEffect(() => {
+    if (!started || levelBooting || menuOpen || gameOver || missionComplete || lightingEditorActive) return;
+    requestGamePointerLock();
+  }, [gameOver, levelBooting, lightingEditorActive, menuOpen, missionComplete, started]);
+
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];
   }, []);
@@ -310,7 +414,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         <color attach="background" args={["#3d2e1e"]} />
         <fog attach="fog" args={["#3d2e1e", 20, 120]} />
         <Game
-          key={gameKey}
+          key={`game-${gameKey}`}
           onPlayerState={setPlayerState}
           onGameOver={(): void => {
             setGameOver(true);
@@ -328,12 +432,14 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           useActionRef={useActionRef}
           playerCommandRef={playerCommandRef}
           levelData={activeLevelData}
-          paused={menuOpen}
+          paused={menuOpen || levelBooting}
           customLighting={customLighting}
           editorModeActive={lightingEditorActive}
           selectedLightId={selectedLightId}
           onSelectLight={setSelectedLightId}
+          readyToPlay={!levelBooting}
         />
+        <LevelWarmup key={`warmup-${gameKey}`} onReady={handleLevelReady} />
       </Canvas>
       <HUD 
         health={playerState.health} 
@@ -348,11 +454,13 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         kills={playerState.kills} 
       />
 
-      <div style={{
-        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: "4px", height: "4px", borderRadius: "50%", background: "rgba(255,255,255,0.7)",
-        pointerEvents: "none", zIndex: 15,
-      }} />
+      {!levelBooting && (
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: "4px", height: "4px", borderRadius: "50%", background: "rgba(255,255,255,0.7)",
+          pointerEvents: "none", zIndex: 15,
+        }} />
+      )}
 
       <div style={{
         position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
@@ -373,6 +481,47 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
         revolverReloading={playerState.revolverReloading}
         machinegunReloading={playerState.machinegunReloading}
       />
+      {levelBooting && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 2000,
+            background: "rgba(0, 0, 0, 0.88)",
+            color: "#ffcc00",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: '"DooM", Impact, monospace',
+            letterSpacing: "4px",
+            textAlign: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "clamp(30px, 7vw, 72px)",
+              color: "#cc0000",
+              textShadow: "0 0 24px #ff0000",
+              marginBottom: 14,
+            }}
+          >
+            LOADING
+          </div>
+          <div
+            style={{
+              fontSize: "clamp(11px, 2.2vw, 18px)",
+              color: "#ffcc00",
+              fontFamily: "monospace",
+              letterSpacing: "2px",
+              opacity: 0.85,
+            }}
+          >
+            PREPARING LEVEL
+          </div>
+        </div>
+      )}
       {gameOver && (
         <div
           style={{
@@ -706,9 +855,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               <button
                 onClick={() => {
                   setMenuOpen(false);
-                  if (!navigator.webdriver) {
-                    document.body.requestPointerLock?.();
-                  }
+                  requestGamePointerLock();
                 }}
                 style={{
                   padding: '12px 0',
@@ -808,9 +955,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           onRequestPlayerPosition={handleRequestPlayerPosition}
           onClose={() => {
             setLightingEditorActive(false);
-            if (!navigator.webdriver) {
-              document.body.requestPointerLock?.();
-            }
+            requestGamePointerLock();
           }}
           onSave={handleSaveLighting}
         />

@@ -7,7 +7,7 @@ export default function Pickups({ pickups }: { readonly pickups: PickupData[] })
   return (
     <group>
       {pickups.map(
-        (p) => p.active && <Pickup key={p.id} pickup={p} />,
+        (p, index) => p.active && <Pickup key={`pickup-${p.id}-${index}`} pickup={p} />,
       )}
     </group>
   );

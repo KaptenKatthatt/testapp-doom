@@ -11,10 +11,15 @@ export async function gotoMenu(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: /START GAME/ })).toBeVisible({ timeout: 5000 });
 }
 
+export async function waitForGameReady(page: Page, timeoutMs = 30_000): Promise<void> {
+  await expect(page.getByText("LOADING")).not.toBeVisible({ timeout: timeoutMs });
+}
+
 export async function startGame(page: Page): Promise<void> {
   await gotoMenu(page);
   await page.getByRole("button", { name: /START GAME/ }).click();
   await expect(page.locator("canvas").first()).toBeVisible({ timeout: 15_000 });
+  await waitForGameReady(page);
 }
 
 export async function openCustomMapsModal(page: Page): Promise<void> {
@@ -104,6 +109,7 @@ export async function selectSavedMapAndStart(page: Page, mapName: string): Promi
   await page.locator("div").filter({ hasText: new RegExp(`^► ${mapName.toUpperCase()}`) }).first().click();
   await page.getByRole("button", { name: /START GAME/ }).click();
   await expect(page.locator("canvas").first()).toBeVisible({ timeout: 5000 });
+  await waitForGameReady(page);
 }
 
 export async function openPauseMenu(page: Page): Promise<void> {

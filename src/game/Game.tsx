@@ -73,6 +73,7 @@ interface GameProps {
   readonly editorModeActive?: boolean;
   readonly selectedLightId?: string | null;
   readonly onSelectLight?: (id: string | null) => void;
+  readonly readyToPlay?: boolean;
 }
 
 export interface PlayerData {
@@ -226,15 +227,20 @@ export default function Game({
   editorModeActive = false,
   selectedLightId = null,
   onSelectLight,
+  readyToPlay = true,
 }: GameProps): React.JSX.Element {
   const barrelTexture = useMemo(() => createBarrelTexture(), []);
   // Use custom level data if provided, otherwise defaults
-  const customEnemies: EnemyData[] = levelData ? levelData.enemies.map(e => {
-    const hp = ENEMY_MAX_HEALTH[e.type as EnemyType] ?? 35;
-    return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as EnemyType, health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
-  }) : INITIAL_ENEMIES;
-  const customPickups: PickupData[] = levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS;
-  const customPlayerStart: [number, number] | null = levelData ? levelData.playerStart : null;
+  const customEnemies: EnemyData[] = useMemo(() => (
+    levelData ? levelData.enemies.map(e => {
+      const hp = ENEMY_MAX_HEALTH[e.type as EnemyType] ?? 35;
+      return { id: e.id, position: [e.x, 0, e.z] as [number, number, number], type: e.type as EnemyType, health: hp, maxHealth: hp, alive: true, lastAttack: 0, hitFlash: 0, rotation: Math.PI, stuckCounter: 0, lastPosition: [e.x, 0, e.z] as [number, number, number], hasAlerted: false };
+    }) : INITIAL_ENEMIES
+  ), [levelData]);
+  const customPickups: PickupData[] = useMemo(() => (
+    levelData ? levelData.pickups.map(p => ({ id: p.id, position: [p.x, 0.3, p.z] as [number, number, number], type: p.type as "health" | "ammo" | "shotgun", active: true })) : INITIAL_PICKUPS
+  ), [levelData]);
+  const customPlayerStart: [number, number] | null = useMemo(() => (levelData ? levelData.playerStart : null), [levelData]);
 
   const initialSpawn = useMemo(() => {
     const rawWalls = levelData && levelData.walls.length > 0
@@ -319,12 +325,17 @@ export default function Game({
   const [enemies, setEnemies] = useState<EnemyData[]>(customEnemies);
   const enemiesRef = useRef<EnemyData[]>(customEnemies);
   const [pickups, setPickups] = useState<PickupData[]>(customPickups);
+  const pickupsRef = useRef<PickupData[]>(customPickups);
+  useEffect(() => {
+    pickupsRef.current = pickups;
+  }, [pickups]);
   const [doors, setDoors] = useState<DoorData[]>(customDoors);
   const doorsRef = useRef<DoorData[]>(customDoors);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
   const lastPlayerStatePublishRef = useRef(0);
   const lastPlayerStateSignatureRef = useRef("");
   const lastVisualStateSyncRef = useRef(0);
+  const wasReadyToPlayRef = useRef(readyToPlay);
 
   // Build wall data for Level component and collision
   // Doors are rendered separately by the door system, so exclude them from walls
@@ -422,6 +433,14 @@ export default function Game({
     });
   }, [onPlayerState]);
 
+  useEffect(() => {
+    if (!wasReadyToPlayRef.current && readyToPlay) {
+      playerRef.current.startTime = performance.now() / 1000;
+      handlePlayerState(true);
+    }
+    wasReadyToPlayRef.current = readyToPlay;
+  }, [readyToPlay, handlePlayerState]);
+
   // Input handlers encapsulated in custom hook
   useGameInputs(keysRef, useActionRef, gameActiveRef, playerRef);
 
@@ -446,7 +465,7 @@ export default function Game({
   useEffect(() => {
     const runIfActive = (action: (player: PlayerData) => void): void => {
       const player = playerRef.current;
-      if (player.health <= 0 || !gameActiveRef.current || paused) return;
+      if (player.health <= 0 || !gameActiveRef.current || paused || !readyToPlay) return;
       action(player);
       handlePlayerState(true);
     };
@@ -485,7 +504,7 @@ export default function Game({
         playerCommandRef.current = null;
       }
     };
-  }, [paused, playerCommandRef, handlePlayerState]);
+  }, [paused, readyToPlay, playerCommandRef, handlePlayerState]);
 
   // Collision detection callbacks delegating to pure GameCollision helpers
   const checkCollision = useCallback((pos: THREE.Vector3, radius: number = COLLISION_MARGIN): boolean => {
@@ -509,7 +528,7 @@ export default function Game({
     const player = playerRef.current;
     if (player.health <= 0) return;
 
-    if (paused) {
+    if (paused || !readyToPlay) {
       // Pause camera setup - keep camera sync but skip all logic (reuse vectors)
       camera.position.set(player.position.x, player.position.y, player.position.z);
       _lookDir.set(
@@ -520,6 +539,13 @@ export default function Game({
       _lookTarget.copy(camera.position).addScaledVector(_lookDir, 10);
       camera.lookAt(_lookTarget);
       camera.updateMatrixWorld(true);
+      patchE2EState({
+        currentWeapon: player.currentWeapon,
+        unlockedShotgun: player.unlockedShotgun,
+        doors: doorsRef.current.map((d) => ({ id: d.id, state: d.state })),
+        totalEnemies: enemiesRef.current.length,
+        aliveEnemies: enemiesRef.current.filter((e) => e.alive).length,
+      });
       return;
     }
 
@@ -675,12 +701,15 @@ export default function Game({
       setProjectiles([...projectilesRef.current]);
     }
 
-    const { updatedPickups, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
+    const { updatedPickups, changed: pickupsChanged, healthBonus, ammoBonus, shotgunPickup } = updatePickupCollectionHelper(
       player.position,
-      pickups,
+      pickupsRef.current,
       player.health
     );
-    setPickups(updatedPickups);
+    if (pickupsChanged) {
+      pickupsRef.current = updatedPickups;
+      setPickups(updatedPickups);
+    }
     if (healthBonus > 0) {
       player.health = Math.min(100, player.health + healthBonus);
       audioManager.play('item_pickup');
@@ -764,7 +793,9 @@ export default function Game({
     const pullbackTarget = Math.max(0, Math.min(1, pullbackVal));
     pullbackRef.current = THREE.MathUtils.lerp(pullbackRef.current, pullbackTarget, Math.min(delta, 0.05) * 12);
 
-    // Process barrel explosions and fade explosion timers
+    // Process barrel explosions and fade explosion timers.
+    // Always run via setBarrels so prevBarrels (authoritative React state) drives updates;
+    // gating on barrelsRef can skip frames when the ref lags behind mid-explosion state.
     setBarrels((prevBarrels) => {
       let changed = false;
       let explodedBarrel: BarrelData | null = null;
@@ -782,6 +813,7 @@ export default function Game({
         return b;
       });
 
+      let result: BarrelData[];
       if (explodedBarrel) {
         audioManager.play('explosion');
         const { updatedEnemies, updatedBarrels } = explodeBarrelSplash(
@@ -796,14 +828,19 @@ export default function Game({
         enemiesRef.current = updatedEnemies;
         setEnemies(updatedEnemies);
 
-        return nextBarrels.map(b => {
+        result = nextBarrels.map(b => {
           if (b.id === (explodedBarrel as BarrelData).id) return b;
           const updated = updatedBarrels.find(u => u.id === b.id);
           return updated ? { ...b, health: updated.health } : b;
         });
+      } else {
+        result = changed ? nextBarrels : prevBarrels;
       }
 
-      return changed ? nextBarrels : prevBarrels;
+      if (result !== prevBarrels) {
+        barrelsRef.current = result;
+      }
+      return result;
     });
 
     // Centralized mission completion check: if all enemies are dead, player wins!
