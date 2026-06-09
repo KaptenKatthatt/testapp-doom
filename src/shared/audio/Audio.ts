@@ -4,6 +4,63 @@ import { MenuSynth } from "./MenuSynth";
 import type { TrackStyle } from "./MusicEngine";
 import { MusicEngine } from "./MusicEngine";
 
+const SOUND_DEFINITIONS = [
+  // Shotgun
+  { name: 'shotgun', file: 'dsshotgn' },
+  { name: 'shotgun_cock', file: 'dssgcock' },
+  // Doors
+  { name: 'door_open', file: 'dsdoropn' },
+  { name: 'door_close', file: 'dsdbcls' },
+  { name: 'door_open_fast', file: 'dsbdopn' },
+  { name: 'door_close_fast', file: 'dsbdcls' },
+  // Player
+  { name: 'player_hurt', file: 'dsoof' },
+  { name: 'player_death', file: 'dspldeth' },
+  { name: 'player_pain', file: 'dsplpain' },
+  // Imp
+  { name: 'imp_alert', file: 'dscacsit' },
+  { name: 'imp_death', file: 'dscacdth' },
+  // Zombie
+  { name: 'zombie_alert', file: 'dsposit1' },
+  { name: 'zombie_death', file: 'dspodth1' },
+  { name: 'pistol', file: 'dspistol' },
+  // Demon / monster
+  { name: 'demon_alert', file: 'dssgtsit' },
+  { name: 'demon_attack', file: 'dssgtatk' },
+  { name: 'demon_death', file: 'dssgtdth' },
+  // Pickups
+  { name: 'item_pickup', file: 'dsitemup' },
+  { name: 'powerup', file: 'dsgetpow' },
+  { name: 'weapon_pickup', file: 'dswpnup' },
+  // Fireball
+  { name: 'fireball', file: 'dsfirsht' },
+  { name: 'fireball_hit', file: 'dsfirxpl' },
+  { name: 'explosion', file: 'dsbarexp' },
+  // Environment
+  { name: 'switch', file: 'dsswtchn' },
+  { name: 'teleport', file: 'dstelept' },
+  { name: 'slime', file: 'dsslop' },
+  { name: 'metal_step', file: 'dsmetal' },
+  { name: 'footstep', file: 'dshoof' },
+  { name: 'noway', file: 'dsnoway' },
+] as const;
+
+const CRITICAL_SOUND_NAMES = new Set<string>([
+  'pistol',
+  'shotgun',
+  'shotgun_cock',
+  'door_open',
+  'door_close',
+  'item_pickup',
+  'weapon_pickup',
+  'player_pain',
+  'player_death',
+  'noway',
+  'switch',
+]);
+
+type SoundDefinition = (typeof SOUND_DEFINITIONS)[number];
+
 class AudioManager {
   private audioContext: AudioContext | null = null;
   private buffers = new Map<string, AudioBuffer>();
@@ -20,9 +77,13 @@ class AudioManager {
   private menuMusicBuffer: AudioBuffer | null = null;
   
   private loaded = false;
+  private initPromise: Promise<void> | null = null;
+  private backgroundLoadPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    if (this.audioContext) return;
+    if (this.loaded) return;
+    if (this.initPromise) return this.initPromise;
+
     this.audioContext = new AudioContext();
 
     // Create gain nodes
@@ -34,54 +95,22 @@ class AudioManager {
     this.sfxGain.gain.value = this.sfxVolume;
     this.sfxGain.connect(this.audioContext.destination);
 
-    // Load all sounds
-    await this.loadAll();
-    this.loaded = true;
+    this.initPromise = this.loadCriticalAudio();
+    return this.initPromise;
   }
 
-  private async loadAll(): Promise<void> {
-    const sounds = [
-      // Shotgun
-      { name: 'shotgun', file: 'dsshotgn' },
-      { name: 'shotgun_cock', file: 'dssgcock' },
-      // Doors
-      { name: 'door_open', file: 'dsdoropn' },
-      { name: 'door_close', file: 'dsdbcls' },
-      { name: 'door_open_fast', file: 'dsbdopn' },
-      { name: 'door_close_fast', file: 'dsbdcls' },
-      // Player
-      { name: 'player_hurt', file: 'dsoof' },
-      { name: 'player_death', file: 'dspldeth' },
-      { name: 'player_pain', file: 'dsplpain' },
-      // Imp
-      { name: 'imp_alert', file: 'dscacsit' },
-      { name: 'imp_death', file: 'dscacdth' },
-      // Zombie
-      { name: 'zombie_alert', file: 'dsposit1' },
-      { name: 'zombie_death', file: 'dspodth1' },
-      { name: 'pistol', file: 'dspistol' },
-      // Demon / monster
-      { name: 'demon_alert', file: 'dssgtsit' },
-      { name: 'demon_attack', file: 'dssgtatk' },
-      { name: 'demon_death', file: 'dssgtdth' },
-      // Pickups
-      { name: 'item_pickup', file: 'dsitemup' },
-      { name: 'powerup', file: 'dsgetpow' },
-      { name: 'weapon_pickup', file: 'dswpnup' },
-      // Fireball
-      { name: 'fireball', file: 'dsfirsht' },
-      { name: 'fireball_hit', file: 'dsfirxpl' },
-      { name: 'explosion', file: 'dsbarexp' },
-      // Environment
-      { name: 'switch', file: 'dsswtchn' },
-      { name: 'teleport', file: 'dstelept' },
-      { name: 'slime', file: 'dsslop' },
-      { name: 'metal_step', file: 'dsmetal' },
-      { name: 'footstep', file: 'dshoof' },
-      { name: 'noway', file: 'dsnoway' },
-    ];
+  private async loadCriticalAudio(): Promise<void> {
+    const criticalSounds = SOUND_DEFINITIONS.filter((sound) => CRITICAL_SOUND_NAMES.has(sound.name));
+    const backgroundSounds = SOUND_DEFINITIONS.filter((sound) => !CRITICAL_SOUND_NAMES.has(sound.name));
 
-    // Load OGG files (prefer OGG over WAV)
+    await this.loadSounds(criticalSounds);
+    this.loaded = true;
+
+    this.backgroundLoadPromise ??= this.loadSounds(backgroundSounds);
+    void this.backgroundLoadPromise;
+  }
+
+  private async loadSounds(sounds: readonly SoundDefinition[]): Promise<void> {
     const ctx = this.audioContext;
     if (!ctx) return;
 
