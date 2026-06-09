@@ -435,7 +435,6 @@ export default function Game({
 
   useEffect(() => {
     if (!wasReadyToPlayRef.current && readyToPlay) {
-      playerRef.current.startTime = performance.now() / 1000;
       handlePlayerState(true);
     }
     wasReadyToPlayRef.current = readyToPlay;
@@ -913,14 +912,14 @@ export default function Game({
       <Pickups pickups={pickups} />
       <Projectiles projectiles={projectiles} />
       {/* Barrels */}
-      {barrels.map((barrel, index) => {
+      {barrels.map((barrel) => {
         if (!barrel.alive && barrel.explosionTimer <= 0) return null;
         if (!barrel.alive) {
           const progress = 1 - barrel.explosionTimer;
           const scale = 0.5 + progress * 3.5;
           const opacity = barrel.explosionTimer;
           return (
-            <mesh key={`explosion-${barrel.id}-${index}`} position={barrel.position}>
+            <mesh key={`explosion-${barrel.id}`} position={barrel.position}>
               <sphereGeometry args={[scale, 16, 16]} />
               <meshBasicMaterial
                 color="#ff5500"
@@ -932,7 +931,7 @@ export default function Game({
           );
         }
         return (
-          <mesh key={`barrel-${barrel.id}-${index}`} position={barrel.position}>
+          <mesh key={`barrel-${barrel.id}`} position={barrel.position}>
             <cylinderGeometry args={[0.4, 0.4, 1, 8]} />
             <meshLambertMaterial map={barrelTexture} />
           </mesh>
