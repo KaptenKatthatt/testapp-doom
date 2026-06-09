@@ -9,7 +9,7 @@ export const TRACK_OPTIONS: Array<{ value: TrackStyle; label: string; emoji: str
   { value: 'classic', label: 'Classic', emoji: '🎸' },
 ];
 
-export type CellType = 'empty' | 'wall' | 'halfwall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'ratman' | 'mancubus' | 'cacodemon' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
+export type CellType = 'empty' | 'wall' | 'halfwall' | 'door' | 'player' | 'imp' | 'demon' | 'zombieman' | 'ratman' | 'mancubus' | 'cacodemon' | 'bloodimp' | 'horneddemon' | 'quaterniusdemon' | 'health' | 'ammo' | 'shotgun' | 'barrel' | 'lava' | 'slime';
 export type DrawMode = 'paint' | 'line' | 'rect' | 'hollowRect';
 
 export interface CellData {
@@ -32,6 +32,9 @@ export const CELL_COLORS: Record<CellType, string> = {
   ratman: '#CCAA44',
   mancubus: '#FF33AA',
   cacodemon: '#9400D3',
+  bloodimp: '#B00018',
+  horneddemon: '#C05235',
+  quaterniusdemon: '#A1003C',
   health: '#0044FF',
   ammo: '#FFAA00',
   shotgun: '#00AAFF',
@@ -52,6 +55,9 @@ export const CELL_LABELS: Record<CellType, string> = {
   ratman: '🐀 Ratman',
   mancubus: '🐘 Mancubus',
   cacodemon: '👿 Cacodemon',
+  bloodimp: '👹 Doom-Imp',
+  horneddemon: '🐂 Hellknight',
+  quaterniusdemon: '🔱 QuaterniusDemon',
   health: '💊 Health',
   ammo: '🔫 Ammo',
   shotgun: '🔫 Shotgun',
@@ -60,7 +66,7 @@ export const CELL_LABELS: Record<CellType, string> = {
   slime: '🤢 Slime',
 };
 
-export const ENTITY_TYPES = ['imp', 'demon', 'zombieman', 'ratman', 'mancubus', 'cacodemon'] as const;
+export const ENTITY_TYPES = ['imp', 'demon', 'zombieman', 'ratman', 'mancubus', 'cacodemon', 'bloodimp', 'horneddemon', 'quaterniusdemon'] as const;
 export const PICKUP_TYPES = ['health', 'ammo', 'shotgun'] as const;
 
 // Limits for performance (enemies have ~12 meshes + 1 pointlight each)
@@ -71,6 +77,9 @@ export const LIMITS: Record<string, number> = {
   ratman: 10,
   mancubus: 8,
   cacodemon: 8,
+  bloodimp: 10,
+  horneddemon: 8,
+  quaterniusdemon: 6,
   health: 20,
   ammo: 20,
   shotgun: 10,
@@ -85,7 +94,7 @@ export const LIMITS: Record<string, number> = {
 // Categories for the tool selector
 export const CELL_CATEGORIES: Array<{ label: string; types: CellType[] }> = [
   { label: '🏗️ Structure', types: ['empty', 'wall', 'door'] },
-  { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman', 'ratman', 'mancubus', 'cacodemon'] },
+  { label: '👹 Enemies', types: ['imp', 'demon', 'zombieman', 'ratman', 'mancubus', 'cacodemon', 'bloodimp', 'horneddemon', 'quaterniusdemon'] },
   { label: '🎒 Pickups', types: ['health', 'ammo', 'shotgun'] },
   { label: '🎯 Objects', types: ['player', 'barrel'] },
   { label: '🌋 Floors', types: ['lava', 'slime'] },

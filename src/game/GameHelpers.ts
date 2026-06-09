@@ -19,6 +19,9 @@ const ENEMY_SPEEDS: Record<string, number> = {
   ratman: 2.5,
   mancubus: 1.6,
   cacodemon: 3.5,
+  bloodimp: 3.2,
+  horneddemon: 2.8,
+  quaterniusdemon: 2.6,
 };
 
 const ENEMY_ATTACK_RANGES: Record<string, number> = {
@@ -28,6 +31,9 @@ const ENEMY_ATTACK_RANGES: Record<string, number> = {
   ratman: 30,
   mancubus: 20,
   cacodemon: 25,
+  bloodimp: 24,
+  horneddemon: 18,
+  quaterniusdemon: 22,
 };
 
 const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
@@ -37,6 +43,9 @@ const ENEMY_ATTACK_COOLDOWNS: Record<string, number> = {
   ratman: 2.5,
   mancubus: 3.5,
   cacodemon: 2.0,
+  bloodimp: 1.8,
+  horneddemon: 2.2,
+  quaterniusdemon: 2.0,
 };
 
 const PROJECTILE_COLORS: Record<string, string> = {
@@ -46,6 +55,9 @@ const PROJECTILE_COLORS: Record<string, string> = {
   ratman: "#ccaa44",
   mancubus: "#ffaa00",
   cacodemon: "#00ffff",
+  bloodimp: "#ff2222",
+  horneddemon: "#44ff55",
+  quaterniusdemon: "#ff3366",
 };
 
 /** Helper to update all projectiles in the game */
@@ -170,6 +182,9 @@ export function updateEnemyAIHelper(
         ratman: 'zombie_alert',
         mancubus: 'demon_alert',
         cacodemon: 'imp_alert',
+        bloodimp: 'imp_alert',
+        horneddemon: 'demon_alert',
+        quaterniusdemon: 'demon_alert',
       };
       audioManager.play(alertSounds[e.type] ?? 'zombie_alert', 0.02);
     }
@@ -660,7 +675,7 @@ export function handlePlayerShootingHelper(
           if (e.id !== targetEnemy.id) return e;
           const newHealth = e.health - closestDamage;
           if (newHealth <= 0) {
-            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
+            const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death', bloodimp: 'imp_death', horneddemon: 'demon_death', quaterniusdemon: 'demon_death' };
             audioManager.play(deathSounds[e.type] ?? 'imp_death');
             return { ...e, health: 0, alive: false, hitFlash: 0 };
           }
@@ -726,7 +741,7 @@ export function explodeBarrelSplash(
         const dmg = baseDmg * (1 - dist / maxRadius);
         const nextHP = Math.max(0, e.health - dmg);
         if (nextHP <= 0) {
-          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death' };
+          const deathSounds: Record<string, string> = { imp: 'imp_death', demon: 'demon_death', zombieman: 'zombie_death', ratman: 'zombie_death', mancubus: 'demon_death', cacodemon: 'demon_death', bloodimp: 'imp_death', horneddemon: 'demon_death', quaterniusdemon: 'demon_death' };
           audioManager.play(deathSounds[e.type] ?? 'imp_death');
           return { ...e, health: 0, alive: false, hitFlash: 0 };
         }

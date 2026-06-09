@@ -1,8 +1,9 @@
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Mesh, Group } from "three";
 import type { EnemyData, EnemyType } from "./types";
+import QuaterniusDemonModel from "./QuaterniusDemonModel";
 
 const ENEMY_CONFIG: Record<EnemyType, {
   bodyW: number; bodyH: number; bodyD: number;
@@ -39,6 +40,21 @@ const ENEMY_CONFIG: Record<EnemyType, {
     headSize: 0.8, color: 0x9400d3, speed: 3.5,
     attackRange: 25, attackCooldown: 2.0, attackDamage: 8,
   },
+  bloodimp: {
+    bodyW: 1.0, bodyH: 2.1, bodyD: 0.8,
+    headSize: 0.65, color: 0xb00018, speed: 3.2,
+    attackRange: 24, attackCooldown: 1.8, attackDamage: 4,
+  },
+  horneddemon: {
+    bodyW: 1.25, bodyH: 2.25, bodyD: 0.9,
+    headSize: 0.7, color: 0xc05235, speed: 2.8,
+    attackRange: 18, attackCooldown: 2.2, attackDamage: 6,
+  },
+  quaterniusdemon: {
+    bodyW: 1.4, bodyH: 2.6, bodyD: 1.0,
+    headSize: 0.8, color: 0xa1003c, speed: 2.6,
+    attackRange: 22, attackCooldown: 2.0, attackDamage: 8,
+  },
 };
 
 const CACODEMON_FLOAT_HEIGHT = 1.4;
@@ -55,6 +71,15 @@ interface SpriteRow {
   cols?: SpriteCol[];
 }
 
+interface SpriteFrame {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  w: number;
+  h: number;
+}
+
 const textureCache = new Map<string, THREE.Texture>();
 const bodyTextureCache = new Map<EnemyType, THREE.Texture>();
 
@@ -66,6 +91,76 @@ function isNeutralGrayKey(r: number, g: number, b: number): boolean {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   return max < 115 && max - min < 12;
+}
+
+function isBlackKey(r: number, g: number, b: number): boolean {
+  return Math.max(r, g, b) < 35;
+}
+
+function clearTransparentPixel(data: Uint8ClampedArray, idx: number): void {
+  data[idx] = 0;
+  data[idx + 1] = 0;
+  data[idx + 2] = 0;
+  data[idx + 3] = 0;
+}
+
+function zeroTransparentRgb(data: Uint8ClampedArray): void {
+  for (let i = 0; i < data.length; i += 4) {
+    if ((data[i + 3] ?? 0) === 0) {
+      clearTransparentPixel(data, i);
+    }
+  }
+}
+
+function erodeSilhouette(data: Uint8ClampedArray, width: number, height: number, passes = 2): void {
+  const pixelCount = width * height;
+  const transparent = new Uint8Array(pixelCount);
+
+  for (let i = 0; i < data.length; i += 4) {
+    if ((data[i + 3] ?? 0) === 0) transparent[i / 4] = 1;
+  }
+
+  for (let pass = 0; pass < passes; pass++) {
+    let changed = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const pi = y * width + x;
+        const idx = pi * 4;
+        if ((data[idx + 3] ?? 0) === 0) continue;
+
+        let nearTransparent = false;
+        for (let dy = -1; dy <= 1 && !nearTransparent; dy++) {
+          for (let dx = -1; dx <= 1 && !nearTransparent; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            if (transparent[ny * width + nx]) nearTransparent = true;
+          }
+        }
+
+        if (nearTransparent) {
+          clearTransparentPixel(data, idx);
+          transparent[pi] = 1;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+}
+
+function processSpriteSheetPixels(data: Uint8ClampedArray, width: number, height: number): void {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    if (isBlackKey(r, g, b)) {
+      clearTransparentPixel(data, i);
+    }
+  }
+  erodeSilhouette(data, width, height, 2);
+  zeroTransparentRgb(data);
 }
 
 function createChromaKeyTexture(src: string): THREE.Texture {
@@ -92,6 +187,34 @@ function createChromaKeyTexture(src: string): THREE.Texture {
           data[i + 3] = 0;
         }
       }
+      ctx.putImageData(imgData, 0, 0);
+      (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
+      texture.needsUpdate = true;
+    }
+  };
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  textureCache.set(src, texture);
+  return texture;
+}
+
+function createBlackKeyTexture(src: string): THREE.Texture {
+  const cached = textureCache.get(src);
+  if (cached) return cached;
+
+  const texture = new THREE.Texture();
+  const img = new Image();
+  img.src = src;
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      processSpriteSheetPixels(data, canvas.width, canvas.height);
       ctx.putImageData(imgData, 0, 0);
       (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
       texture.needsUpdate = true;
@@ -149,6 +272,14 @@ function getRatmanBaseTexture(): THREE.Texture {
 
 function getCacodemonBaseTexture(): THREE.Texture {
   return createCacodemonTexture();
+}
+
+function getBloodImpBaseTexture(): THREE.Texture {
+  return createBlackKeyTexture("/bloodimp.png?v=2");
+}
+
+function getHornedDemonBaseTexture(): THREE.Texture {
+  return createBlackKeyTexture("/horneddemon.png?v=2");
 }
 
 function getBodyTexture(type: EnemyType): THREE.Texture {
@@ -220,6 +351,22 @@ function applyVariableColUV(
   texture.offset.set(
     mirrored ? (colData.maxX + 1) / sheetW : colData.minX / sheetW,
     offsetY,
+  );
+}
+
+function applySpriteFrameUV(
+  texture: THREE.Texture,
+  sheetW: number,
+  sheetH: number,
+  frame: SpriteFrame,
+  mirrored: boolean,
+): void {
+  const repeatX = frame.w / sheetW;
+  const repeatY = frame.h / sheetH;
+  texture.repeat.set(mirrored ? -repeatX : repeatX, repeatY);
+  texture.offset.set(
+    mirrored ? (frame.maxX + 1) / sheetW : frame.minX / sheetW,
+    (sheetH - frame.maxY - 1) / sheetH,
   );
 }
 
@@ -428,6 +575,74 @@ const CACODEMON_ROWS: SpriteRow[] = [
   },
 ];
 
+const BLOODIMP_SHEET_W = 840;
+const BLOODIMP_SHEET_H = 859;
+
+const BLOODIMP_IDLE_FRAMES: SpriteFrame[] = [
+  { minX: 10, minY: 9, maxX: 83, maxY: 111, w: 74, h: 103 },
+  { minX: 89, minY: 11, maxX: 158, maxY: 111, w: 70, h: 101 },
+  { minX: 164, minY: 3, maxX: 234, maxY: 111, w: 71, h: 109 },
+  { minX: 240, minY: 9, maxX: 306, maxY: 111, w: 67, h: 103 },
+  { minX: 312, minY: 3, maxX: 400, maxY: 111, w: 89, h: 109 },
+  { minX: 406, minY: 12, maxX: 485, maxY: 111, w: 80, h: 100 },
+  { minX: 490, minY: 12, maxX: 548, maxY: 111, w: 59, h: 100 },
+];
+
+const BLOODIMP_ATTACK_FRAMES: SpriteFrame[] = [
+  { minX: 11, minY: 524, maxX: 85, maxY: 623, w: 75, h: 100 },
+  { minX: 90, minY: 522, maxX: 146, maxY: 623, w: 57, h: 102 },
+  { minX: 152, minY: 520, maxX: 213, maxY: 623, w: 62, h: 104 },
+  { minX: 218, minY: 522, maxX: 279, maxY: 623, w: 62, h: 102 },
+  { minX: 285, minY: 520, maxX: 355, maxY: 623, w: 71, h: 104 },
+];
+
+const BLOODIMP_DEATH_FRAMES: SpriteFrame[] = [
+  { minX: 9, minY: 632, maxX: 85, maxY: 740, w: 77, h: 109 },
+  { minX: 91, minY: 636, maxX: 164, maxY: 740, w: 74, h: 105 },
+  { minX: 171, minY: 654, maxX: 243, maxY: 740, w: 73, h: 87 },
+  { minX: 249, minY: 672, maxX: 335, maxY: 740, w: 87, h: 69 },
+  { minX: 341, minY: 695, maxX: 445, maxY: 735, w: 105, h: 41 },
+  { minX: 759, minY: 708, maxX: 832, maxY: 740, w: 74, h: 33 },
+];
+
+const HORNEDDEMON_SHEET_W = 1024;
+const HORNEDDEMON_SHEET_H = 1024;
+
+const HORNEDDEMON_IDLE_FRAMES: SpriteFrame[] = [
+  { minX: 0, minY: 0, maxX: 81, maxY: 145, w: 82, h: 146 },
+  { minX: 95, minY: 0, maxX: 179, maxY: 141, w: 85, h: 142 },
+  { minX: 183, minY: 0, maxX: 287, maxY: 137, w: 105, h: 138 },
+  { minX: 305, minY: 0, maxX: 395, maxY: 133, w: 91, h: 134 },
+  { minX: 405, minY: 0, maxX: 487, maxY: 133, w: 83, h: 134 },
+  { minX: 503, minY: 0, maxX: 601, maxY: 147, w: 99, h: 148 },
+  { minX: 611, minY: 0, maxX: 693, maxY: 143, w: 83, h: 144 },
+  { minX: 703, minY: 0, maxX: 791, maxY: 139, w: 89, h: 140 },
+  { minX: 811, minY: 0, maxX: 899, maxY: 135, w: 89, h: 136 },
+  { minX: 905, minY: 0, maxX: 999, maxY: 133, w: 95, h: 134 },
+];
+
+const HORNEDDEMON_ATTACK_FRAMES: SpriteFrame[] = [
+  { minX: 0, minY: 323, maxX: 129, maxY: 463, w: 130, h: 141 },
+  { minX: 147, minY: 323, maxX: 215, maxY: 467, w: 69, h: 145 },
+  { minX: 231, minY: 329, maxX: 343, maxY: 461, w: 113, h: 133 },
+  { minX: 359, minY: 323, maxX: 475, maxY: 455, w: 117, h: 133 },
+  { minX: 483, minY: 325, maxX: 611, maxY: 467, w: 129, h: 143 },
+  { minX: 621, minY: 323, maxX: 719, maxY: 475, w: 99, h: 153 },
+  { minX: 741, minY: 323, maxX: 825, maxY: 477, w: 85, h: 155 },
+  { minX: 837, minY: 323, maxX: 961, maxY: 481, w: 125, h: 159 },
+];
+
+const HORNEDDEMON_DEATH_FRAMES: SpriteFrame[] = [
+  { minX: 0, minY: 655, maxX: 105, maxY: 783, w: 106, h: 129 },
+  { minX: 113, minY: 655, maxX: 229, maxY: 783, w: 117, h: 129 },
+  { minX: 237, minY: 667, maxX: 335, maxY: 791, w: 99, h: 125 },
+  { minX: 345, minY: 673, maxX: 443, maxY: 791, w: 99, h: 119 },
+  { minX: 453, minY: 677, maxX: 575, maxY: 791, w: 123, h: 115 },
+  { minX: 579, minY: 675, maxX: 683, maxY: 791, w: 105, h: 117 },
+  { minX: 699, minY: 669, maxX: 791, maxY: 791, w: 93, h: 123 },
+  { minX: 807, minY: 671, maxX: 919, maxY: 791, w: 113, h: 121 },
+];
+
 function updateSpriteScale(
   sprite: THREE.Sprite,
   bodyW: number,
@@ -509,11 +724,13 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const eyeColor = isDemon ? "#ff0044" : "#ff4400";
   const healthPct = enemy.health / enemy.maxHealth;
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
-  const isSpriteEnemy = type === "mancubus" || type === "ratman" || type === "cacodemon";
+  const isSpriteEnemy = type === "mancubus" || type === "ratman" || type === "cacodemon" || type === "bloodimp" || type === "horneddemon";
 
   const mancubusTexture = useMemo(() => (type === "mancubus" ? getMancubusBaseTexture().clone() : null), [type]);
   const ratmanTexture = useMemo(() => (type === "ratman" ? getRatmanBaseTexture().clone() : null), [type]);
   const cacodemonTexture = useMemo(() => (type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [type]);
+  const bloodImpTexture = useMemo(() => (type === "bloodimp" ? getBloodImpBaseTexture().clone() : null), [type]);
+  const hornedDemonTexture = useMemo(() => (type === "horneddemon" ? getHornedDemonBaseTexture().clone() : null), [type]);
   const bodyTexture = useMemo(() => getBodyTexture(type), [type]);
 
   useFrame((state) => {
@@ -604,6 +821,40 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
       }
     }
 
+    if (type === "bloodimp" && bloodImpTexture) {
+      let frame = BLOODIMP_IDLE_FRAMES[Math.floor(state.clock.getElapsedTime() * 7) % BLOODIMP_IDLE_FRAMES.length];
+      if (hitFlash > 0.1) {
+        frame = BLOODIMP_IDLE_FRAMES[5] ?? frame;
+      } else if (state.clock.getElapsedTime() - enemy.lastAttack < 0.55) {
+        const fireFrame = Math.floor((state.clock.getElapsedTime() - enemy.lastAttack) / 0.11) % BLOODIMP_ATTACK_FRAMES.length;
+        frame = BLOODIMP_ATTACK_FRAMES[fireFrame] ?? frame;
+      }
+
+      if (!frame) return;
+      applySpriteFrameUV(bloodImpTexture, BLOODIMP_SHEET_W, BLOODIMP_SHEET_H, frame, false);
+
+      if (spriteRef.current) {
+        updateSpriteScale(spriteRef.current, config.bodyW, config.bodyH, frame.h, 104, 0);
+      }
+    }
+
+    if (type === "horneddemon" && hornedDemonTexture) {
+      let frame = HORNEDDEMON_IDLE_FRAMES[Math.floor(state.clock.getElapsedTime() * 6) % HORNEDDEMON_IDLE_FRAMES.length];
+      if (hitFlash > 0.1) {
+        frame = HORNEDDEMON_IDLE_FRAMES[5] ?? frame;
+      } else if (state.clock.getElapsedTime() - enemy.lastAttack < 0.7) {
+        const fireFrame = Math.floor((state.clock.getElapsedTime() - enemy.lastAttack) / 0.1) % HORNEDDEMON_ATTACK_FRAMES.length;
+        frame = HORNEDDEMON_ATTACK_FRAMES[fireFrame] ?? frame;
+      }
+
+      if (!frame) return;
+      applySpriteFrameUV(hornedDemonTexture, HORNEDDEMON_SHEET_W, HORNEDDEMON_SHEET_H, frame, false);
+
+      if (spriteRef.current) {
+        updateSpriteScale(spriteRef.current, config.bodyW, config.bodyH, frame.h, 145, 0);
+      }
+    }
+
     if (meshRef.current && !isSpriteEnemy) {
       meshRef.current.position.y =
         Math.sin(state.clock.getElapsedTime() * 3 + enemy.id) * 0.05;
@@ -671,6 +922,58 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         </sprite>
         <HealthBar healthPct={healthPct} y={config.bodyH + CACODEMON_FLOAT_HEIGHT + 0.5} width={1.2} />
         <EnemyLight lightRef={lightRef} bodyH={config.bodyH + CACODEMON_FLOAT_HEIGHT} color="#cc44ff" />
+      </group>
+    );
+  }
+
+  if (type === "bloodimp") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
+          <spriteMaterial
+            map={bloodImpTexture}
+            transparent
+            alphaTest={0.01}
+            color={hitFlash > 0.05 ? "#ff5555" : "#ffffff"}
+          />
+        </sprite>
+        <HealthBar healthPct={healthPct} y={config.bodyH + 0.3} width={1.2} />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color="#ff2222" />
+      </group>
+    );
+  }
+
+  if (type === "horneddemon") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
+          <spriteMaterial
+            map={hornedDemonTexture}
+            transparent
+            alphaTest={0.01}
+            color={hitFlash > 0.05 ? "#ff5555" : "#ffffff"}
+          />
+        </sprite>
+        <HealthBar healthPct={healthPct} y={config.bodyH + 0.3} width={1.3} />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color="#44ff55" />
+      </group>
+    );
+  }
+
+  if (type === "quaterniusdemon") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <Suspense fallback={null}>
+          <QuaterniusDemonModel
+            rotation={rotation}
+            hitFlash={hitFlash}
+            lastAttack={enemy.lastAttack}
+            alerted={enemy.hasAlerted}
+            dead={false}
+          />
+        </Suspense>
+        <HealthBar healthPct={healthPct} y={config.bodyH + 0.4} width={1.5} />
+        <EnemyLight lightRef={lightRef} bodyH={config.bodyH} color="#ff3366" />
       </group>
     );
   }
@@ -746,6 +1049,8 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const mancubusTexture = useMemo(() => (enemy.type === "mancubus" ? getMancubusBaseTexture().clone() : null), [enemy.type]);
   const ratmanTexture = useMemo(() => (enemy.type === "ratman" ? getRatmanBaseTexture().clone() : null), [enemy.type]);
   const cacodemonTexture = useMemo(() => (enemy.type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [enemy.type]);
+  const bloodImpTexture = useMemo(() => (enemy.type === "bloodimp" ? getBloodImpBaseTexture().clone() : null), [enemy.type]);
+  const hornedDemonTexture = useMemo(() => (enemy.type === "horneddemon" ? getHornedDemonBaseTexture().clone() : null), [enemy.type]);
   const spriteRef = useRef<THREE.Sprite>(null);
 
   useFrame(() => {
@@ -793,6 +1098,28 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         updateSpriteScale(spriteRef.current, config.bodyW, config.bodyH, rowData.height, 78, yOffset);
       }
     }
+
+    if (enemy.type === "bloodimp" && bloodImpTexture) {
+      const deathFrame = Math.min(BLOODIMP_DEATH_FRAMES.length - 1, Math.floor(elapsed / 0.12));
+      const frame = BLOODIMP_DEATH_FRAMES[deathFrame] ?? BLOODIMP_DEATH_FRAMES[BLOODIMP_DEATH_FRAMES.length - 1];
+      if (!frame) return;
+      applySpriteFrameUV(bloodImpTexture, BLOODIMP_SHEET_W, BLOODIMP_SHEET_H, frame, false);
+
+      if (spriteRef.current) {
+        updateSpriteScale(spriteRef.current, config.bodyW, config.bodyH, frame.h, 104, 0);
+      }
+    }
+
+    if (enemy.type === "horneddemon" && hornedDemonTexture) {
+      const deathFrame = Math.min(HORNEDDEMON_DEATH_FRAMES.length - 1, Math.floor(elapsed / 0.12));
+      const frame = HORNEDDEMON_DEATH_FRAMES[deathFrame] ?? HORNEDDEMON_DEATH_FRAMES[HORNEDDEMON_DEATH_FRAMES.length - 1];
+      if (!frame) return;
+      applySpriteFrameUV(hornedDemonTexture, HORNEDDEMON_SHEET_W, HORNEDDEMON_SHEET_H, frame, false);
+
+      if (spriteRef.current) {
+        updateSpriteScale(spriteRef.current, config.bodyW, config.bodyH, frame.h, 145, 0);
+      }
+    }
   });
 
   if (enemy.type === "mancubus") {
@@ -821,6 +1148,42 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
         <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
           <spriteMaterial map={cacodemonTexture} transparent alphaTest={0.01} />
         </sprite>
+      </group>
+    );
+  }
+
+  if (enemy.type === "bloodimp") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
+          <spriteMaterial map={bloodImpTexture} transparent alphaTest={0.01} />
+        </sprite>
+      </group>
+    );
+  }
+
+  if (enemy.type === "horneddemon") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <sprite ref={spriteRef} scale={[config.bodyW * 2.2, config.bodyH, 1]}>
+          <spriteMaterial map={hornedDemonTexture} transparent alphaTest={0.01} />
+        </sprite>
+      </group>
+    );
+  }
+
+  if (enemy.type === "quaterniusdemon") {
+    return (
+      <group position={[position[0], 0, position[2]]}>
+        <Suspense fallback={null}>
+          <QuaterniusDemonModel
+            rotation={enemy.rotation}
+            hitFlash={0}
+            lastAttack={0}
+            alerted={false}
+            dead
+          />
+        </Suspense>
       </group>
     );
   }
