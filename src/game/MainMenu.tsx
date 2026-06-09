@@ -54,6 +54,7 @@ export default function MainMenu({
   const [musicActive, setMusicActive] = React.useState(false);
   const [menuIndex, setMenuIndex] = React.useState(0);
   const [modalIndex, setModalIndex] = React.useState(0);
+  const [mapsRefreshing, setMapsRefreshing] = React.useState(false);
   const musicStartingRef = React.useRef(false);
 
   const mapModalItems = React.useMemo((): MapModalItem[] => {
@@ -81,10 +82,18 @@ export default function MainMenu({
   }, [levelData, savedMaps]);
 
   const openMapModal = React.useCallback((): void => {
-    listSavedMaps().then((maps) => {
-      setSavedMaps(maps);
-      setShowMapModal(true);
-    });
+    setShowMapModal(true);
+    setMapsRefreshing(true);
+    listSavedMaps()
+      .then((maps) => {
+        setSavedMaps(maps);
+      })
+      .catch((err: unknown) => {
+        console.warn('Failed to refresh saved maps:', err);
+      })
+      .finally(() => {
+        setMapsRefreshing(false);
+      });
   }, [listSavedMaps, setSavedMaps, setShowMapModal]);
 
   React.useEffect(() => {
@@ -313,6 +322,12 @@ export default function MainMenu({
             minWidth: "300px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
           }}>
             <h2 style={{ color: "#c00", marginTop: 0, letterSpacing: "3px", fontSize: "28px" }}>SELECT MAP</h2>
+
+            {mapsRefreshing && (
+              <p style={{ color: "#888", fontSize: "12px", margin: "0 0 8px", fontFamily: 'monospace' }}>
+                Refreshing...
+              </p>
+            )}
 
             {savedMaps.filter(m => m.validated || m.status === 'approved' || m.status === 'pending' || m.status === 'rejected').length === 0 && !levelData && (
               <p style={{ color: "#555", fontSize: "13px", marginTop: "12px", fontFamily: 'monospace' }}>

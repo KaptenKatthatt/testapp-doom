@@ -145,9 +145,13 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
   // Load saved maps list on mount
   useEffect(() => {
     let active = true;
-    listSavedMaps().then(maps => {
-      if (active) setSavedMaps(maps);
-    });
+    listSavedMaps()
+      .then(maps => {
+        if (active) setSavedMaps(maps);
+      })
+      .catch((err: unknown) => {
+        console.warn('Failed to load saved maps:', err);
+      });
     return () => { active = false; };
   }, []);
 
