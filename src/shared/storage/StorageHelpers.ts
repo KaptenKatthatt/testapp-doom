@@ -89,6 +89,30 @@ function isTrackStyle(value: unknown): value is TrackStyle {
     || value === 'classic';
 }
 
+function isPointLightData(value: unknown): value is PointLightData {
+  if (typeof value !== 'object' || value === null) return false;
+  const light = value as Record<string, unknown>;
+  if (typeof light.id !== 'string') return false;
+  if (!Array.isArray(light.position) || light.position.length !== 3) return false;
+  if (!light.position.every((n: unknown) => typeof n === 'number')) return false;
+  if (typeof light.color !== 'string') return false;
+  if (typeof light.intensity !== 'number') return false;
+  if (typeof light.distance !== 'number') return false;
+  return true;
+}
+
+function isLevelLightingData(value: unknown): value is LevelLightingData {
+  if (typeof value !== 'object' || value === null) return false;
+  const lighting = value as Record<string, unknown>;
+  if (typeof lighting.ambientColor !== 'string') return false;
+  if (typeof lighting.ambientIntensity !== 'number') return false;
+  if (typeof lighting.hemisphereSkyColor !== 'string') return false;
+  if (typeof lighting.hemisphereGroundColor !== 'string') return false;
+  if (typeof lighting.hemisphereIntensity !== 'number') return false;
+  if (!Array.isArray(lighting.pointLights)) return false;
+  return lighting.pointLights.every(isPointLightData);
+}
+
 function isPlayerPos(value: unknown): value is [number, number] | null {
   if (value === null) return true;
   if (!Array.isArray(value) || value.length !== 2) return false;
@@ -146,8 +170,8 @@ function readFirestoreMapRecord(value: unknown): FirestoreMapRecord | null {
   }
 
   const lighting = record.lighting;
-  if (typeof lighting === 'object' && lighting !== null) {
-    parsed.lighting = lighting as LevelLightingData;
+  if (isLevelLightingData(lighting)) {
+    parsed.lighting = lighting;
   }
 
   return parsed;
@@ -286,7 +310,8 @@ export async function saveMapToStorage(
   validated: boolean,
   musicTrack?: TrackStyle,
   status: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft',
-  lighting?: LevelLightingData
+  lighting?: LevelLightingData,
+  options?: { cloudSync?: boolean }
 ): Promise<void> {
   const currentUser = auth?.currentUser;
 
@@ -329,10 +354,66 @@ export async function saveMapToStorage(
   localStorage.setItem(MAP_PREFIX + name, JSON.stringify(localData));
 
   // 2. Cloud sync runs in the background if logged in (per user instruction)
+  const cloudSync = options?.cloudSync !== false;
   const cloudId = getFirestoreDocId(name);
-  if (cloudId && currentUser) {
+  if (cloudSync && cloudId && currentUser) {
     syncMapToCloud(cloudId, name, localData, validated, musicTrack);
   }
+}
+
+/**
+ * Maps in-game level selection to the localStorage map key used for persistence.
+ */
+export function resolveMapStorageKey(selectedLevel: string): string | null {
+  if (selectedLevel.startsWith('saved:')) return selectedLevel.slice(6);
+  if (selectedLevel === '__default__') return '__e1m1__';
+  if (selectedLevel === '__custom__') return '__playing__';
+  return null;
+}
+
+export type SaveLightingResult = 'saved' | 'no_map' | 'memory_only';
+
+/**
+ * Persists lighting for the active level, preserving validation/status and avoiding
+ * accidental cloud writes for the shared default E1M1 override.
+ */
+export async function saveLightingForLevel(
+  selectedLevel: string,
+  lighting: LevelLightingData
+): Promise<SaveLightingResult> {
+  const mapName = resolveMapStorageKey(selectedLevel);
+  if (!mapName) return 'no_map';
+
+  const data = await loadMapFromStorage(mapName);
+  if (!data) {
+    return selectedLevel === '__custom__' ? 'memory_only' : 'no_map';
+  }
+
+  let validated = false;
+  let status: SavedMap['status'] = 'draft';
+  const existingRaw = localStorage.getItem(MAP_PREFIX + mapName);
+  if (existingRaw) {
+    try {
+      const parsed = JSON.parse(existingRaw) as SavedMap;
+      validated = !!parsed.validated;
+      status = parsed.status ?? 'draft';
+    } catch { /* skip */ }
+  }
+
+  const cloudSync = mapName !== '__e1m1__';
+
+  await saveMapToStorage(
+    mapName,
+    data.grid,
+    data.playerPos,
+    validated,
+    data.musicTrack,
+    status ?? 'draft',
+    lighting,
+    { cloudSync }
+  );
+
+  return 'saved';
 }
 
 /**
@@ -399,6 +480,7 @@ export async function submitMapForApproval(name: string): Promise<void> {
       timestamp: localData.timestamp,
       validated: !!localData.validated,
       ...(localData.musicTrack ? { musicTrack: localData.musicTrack } : {}),
+      ...(localData.lighting ? { lighting: localData.lighting } : {}),
       status: 'pending',
       ownerId: currentUser.uid,
       ownerName: localData.ownerName,

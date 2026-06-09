@@ -8,6 +8,9 @@ import {
   deleteMapFromStorage,
   autosave,
   loadAutosave,
+  saveLightingForLevel,
+  resolveMapStorageKey,
+  type LevelLightingData,
 } from "./StorageHelpers";
 import type { CellData } from "@/editor/EditorTypes";
 
@@ -94,5 +97,33 @@ describe("localStorage map storage", () => {
     expect(loaded).not.toBeNull();
     expect(loaded?.playerPos).toEqual([1, 1]);
     expect(loaded?.grid[1]?.[1]?.type).toBe("wall");
+  });
+
+  it("saveLightingForLevel preserves validated flag", async () => {
+    const grid = makeGrid();
+    const lighting: LevelLightingData = {
+      ambientColor: "#ffffff",
+      ambientIntensity: 0.5,
+      hemisphereSkyColor: "#88aaff",
+      hemisphereGroundColor: "#443322",
+      hemisphereIntensity: 0.4,
+      pointLights: [],
+    };
+    await saveMapToStorage("LitMap", grid, [2, 2], true);
+
+    const result = await saveLightingForLevel("saved:LitMap", lighting);
+    expect(result).toBe("saved");
+
+    const raw = localStorage.getItem(MAP_PREFIX + "LitMap");
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw ?? "") as { validated: boolean; lighting?: LevelLightingData };
+    expect(parsed.validated).toBe(true);
+    expect(parsed.lighting?.ambientColor).toBe("#ffffff");
+  });
+
+  it("resolveMapStorageKey maps level selectors to storage keys", () => {
+    expect(resolveMapStorageKey("saved:MyMap")).toBe("MyMap");
+    expect(resolveMapStorageKey("__default__")).toBe("__e1m1__");
+    expect(resolveMapStorageKey("__custom__")).toBe("__playing__");
   });
 });
