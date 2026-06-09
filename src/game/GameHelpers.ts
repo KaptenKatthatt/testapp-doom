@@ -336,6 +336,7 @@ export function updatePickupCollectionHelper(
   let healthBonus = 0;
   let ammoBonus = 0;
   let shotgunPickup = false;
+  let changed = false;
 
   const updatedPickups = pickups.map((p: PickupData): PickupData => {
     if (!p.active) return p;
@@ -348,12 +349,13 @@ export function updatePickupCollectionHelper(
       }
       else if (p.type === "ammo") ammoBonus = 20;
       else if (p.type === "shotgun") { ammoBonus = 8; shotgunPickup = true; }
+      changed = true;
       return { ...p, active: false };
     }
     return p;
   });
 
-  return { updatedPickups, healthBonus, ammoBonus, shotgunPickup };
+  return { updatedPickups: changed ? updatedPickups : pickups, healthBonus, ammoBonus, shotgunPickup };
 }
 
 export function handlePlayerMovementHelper(

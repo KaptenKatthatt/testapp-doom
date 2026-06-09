@@ -1,5 +1,7 @@
 import * as THREE from "three";
 
+const textureCache = new Map<string, THREE.Texture>();
+
 function getCtx(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Failed to get 2d context");
@@ -18,6 +20,9 @@ function addNoise(ctx: CanvasRenderingContext2D, count: number, maxOpacity: numb
 
 /** Create a procedural wall texture - brownish brick/stone pattern */
 export function createWallTexture(): THREE.Texture {
+  const cached = textureCache.get("wall");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -62,11 +67,15 @@ export function createWallTexture(): THREE.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(2, 2);
+  textureCache.set("wall", texture);
   return texture;
 }
 
 /** Create a procedural floor texture - dark stone tiles */
 export function createFloorTexture(): THREE.Texture {
+  const cached = textureCache.get("floor");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -112,11 +121,15 @@ export function createFloorTexture(): THREE.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(8, 8);
+  textureCache.set("floor", texture);
   return texture;
 }
 
 /** Create a procedural ceiling texture - dark gray concrete */
 export function createCeilingTexture(): THREE.Texture {
+  const cached = textureCache.get("ceiling");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -153,11 +166,15 @@ export function createCeilingTexture(): THREE.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(6, 6);
+  textureCache.set("ceiling", texture);
   return texture;
 }
 
 /** Create a door texture - reddish-brown with a panel */
 export function createDoorTexture(): THREE.Texture {
+  const cached = textureCache.get("door");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 128;
@@ -196,11 +213,15 @@ export function createDoorTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  textureCache.set("door", texture);
   return texture;
 }
 
 /** Create a metal texture - for pillars and steps */
 export function createMetalTexture(): THREE.Texture {
+  const cached = textureCache.get("metal");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -234,11 +255,15 @@ export function createMetalTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  textureCache.set("metal", texture);
   return texture;
 }
 
 /** Create a slime texture - for pools and green walls */
 export function createSlimeTexture(): THREE.Texture {
+  const cached = textureCache.get("slime");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -263,11 +288,15 @@ export function createSlimeTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  textureCache.set("slime", texture);
   return texture;
 }
 
 /** Create a barrel/crate texture */
 export function createBarrelTexture(): THREE.Texture {
+  const cached = textureCache.get("barrel");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 32;
   canvas.height = 64;
@@ -301,11 +330,15 @@ export function createBarrelTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  textureCache.set("barrel", texture);
   return texture;
 }
 
 /** Create blood pool texture */
 export function createBloodTexture(): THREE.Texture {
+  const cached = textureCache.get("blood");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -328,11 +361,15 @@ export function createBloodTexture(): THREE.Texture {
   }
 
   const texture = new THREE.CanvasTexture(canvas);
+  textureCache.set("blood", texture);
   return texture;
 }
 
 /** Create lava pool texture */
 export function createLavaTexture(): THREE.Texture {
+  const cached = textureCache.get("lava");
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -375,5 +412,6 @@ export function createLavaTexture(): THREE.Texture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  textureCache.set("lava", texture);
   return texture;
 }
