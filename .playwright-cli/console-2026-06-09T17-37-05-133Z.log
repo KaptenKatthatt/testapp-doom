@@ -1,2 +1,0 @@
-[     174ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5177/node_modules/.vite/deps/react-dom_client.js?v=b5f24f2b:19834
-[     448ms] [LOG] Firebase Cloud Firestore & Auth initialized successfully! @ http://localhost:5177/src/shared/storage/firebase.ts:27
