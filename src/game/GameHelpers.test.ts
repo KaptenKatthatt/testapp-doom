@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { checkSlimeDamageHelper } from "./GameHelpers";
+import { checkSlimeDamageHelper, updatePickupCollectionHelper } from "./GameHelpers";
+import type { PickupData } from "./types";
 import type { PlayerData } from "./Game";
 
 vi.mock("@/shared/audio/Audio", () => ({
@@ -70,5 +71,53 @@ describe("checkSlimeDamageHelper", () => {
     expect(player.health).toBe(95);
     expect(player.timesHit).toBe(1);
     expect(player.damageFlash).toBe(1);
+  });
+});
+
+describe("updatePickupCollectionHelper", () => {
+  function makePickup(overrides: Partial<PickupData> = {}): PickupData {
+    return {
+      id: 1,
+      position: [0, 0.3, 0],
+      type: "ammo",
+      active: true,
+      ...overrides,
+    };
+  }
+
+  it("reports changed and deactivates a pickup within range", () => {
+    const pickups = [makePickup()];
+    const playerPos = new THREE.Vector3(0, 1.7, 0);
+
+    const result = updatePickupCollectionHelper(playerPos, pickups, 100);
+
+    expect(result.changed).toBe(true);
+    expect(result.updatedPickups[0]?.active).toBe(false);
+    expect(result.ammoBonus).toBe(20);
+    expect(result.updatedPickups).not.toBe(pickups);
+  });
+
+  it("reports unchanged when no pickup is collected", () => {
+    const pickups = [makePickup({ position: [10, 0.3, 10] })];
+    const playerPos = new THREE.Vector3(0, 1.7, 0);
+
+    const result = updatePickupCollectionHelper(playerPos, pickups, 100);
+
+    expect(result.changed).toBe(false);
+    expect(result.updatedPickups).toBe(pickups);
+    expect(result.ammoBonus).toBe(0);
+  });
+
+  it("does not treat reference equality as unchanged when active state differs", () => {
+    const pickups = [makePickup()];
+    const pickup = pickups[0];
+    if (!pickup) throw new Error("expected pickup");
+    pickup.active = false;
+    const playerPos = new THREE.Vector3(0, 1.7, 0);
+
+    const result = updatePickupCollectionHelper(playerPos, pickups, 100);
+
+    expect(result.changed).toBe(false);
+    expect(result.updatedPickups).toBe(pickups);
   });
 });
