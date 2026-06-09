@@ -435,6 +435,7 @@ export default function Game({
 
   useEffect(() => {
     if (!wasReadyToPlayRef.current && readyToPlay) {
+      playerRef.current.startTime = performance.now() / 1000;
       handlePlayerState(true);
     }
     wasReadyToPlayRef.current = readyToPlay;
