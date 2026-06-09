@@ -377,6 +377,24 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     requestGamePointerLock();
   }, [gameOver, levelBooting, lightingEditorActive, menuOpen, missionComplete, started]);
 
+  // Release pointer lock when the tab loses focus so the OS cursor is never left trapped.
+  useEffect(() => {
+    const releasePointerLock = (): void => {
+      if (document.pointerLockElement) {
+        document.exitPointerLock?.();
+      }
+    };
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "hidden") releasePointerLock();
+    };
+    window.addEventListener("blur", releasePointerLock);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", releasePointerLock);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   const handleMobileMove = useCallback((dx: number, dy: number): void => {
     mobileMoveRef.current = [dx, dy];
   }, []);

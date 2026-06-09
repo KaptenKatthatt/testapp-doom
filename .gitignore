@@ -15,8 +15,12 @@ test-results/
 playwright-report/
 blob-report/
 .playwright-cli/
+playwright-cli.json
 e2e/*.png
 e2e/*.cjs
+
+# Local debug screenshots (playwright/QA, project root only)
+/qd*.png
 
 # Logs
 *.log

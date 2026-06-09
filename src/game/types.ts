@@ -36,7 +36,7 @@ export interface EnemyData {
   lastLosResult?: boolean | undefined;
 }
 
-export type EnemyType = "imp" | "demon" | "zombieman" | "ratman" | "mancubus" | "cacodemon";
+export type EnemyType = "imp" | "demon" | "zombieman" | "ratman" | "mancubus" | "cacodemon" | "bloodimp" | "horneddemon" | "quaterniusdemon";
 
 export const ENEMY_MAX_HEALTH: Record<EnemyType, number> = {
   imp: 45,
@@ -45,6 +45,9 @@ export const ENEMY_MAX_HEALTH: Record<EnemyType, number> = {
   ratman: 35,
   mancubus: 150,
   cacodemon: 100,
+  bloodimp: 60,
+  horneddemon: 90,
+  quaterniusdemon: 200,
 };
 
 export interface PickupData {
