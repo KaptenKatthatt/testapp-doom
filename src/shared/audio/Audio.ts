@@ -64,7 +64,6 @@ class AudioManager {
       { name: 'demon_alert', file: 'dssgtsit' },
       { name: 'demon_attack', file: 'dssgtatk' },
       { name: 'demon_death', file: 'dssgtdth' },
-      { name: 'monster_alert', file: 'dssgtdth' },
       // Pickups
       { name: 'item_pickup', file: 'dsitemup' },
       { name: 'powerup', file: 'dsgetpow' },

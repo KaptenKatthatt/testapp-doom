@@ -17,6 +17,6 @@ export default defineConfig({
   webServer: {
     command: `npx vite --host ${PLAYWRIGHT_HOST} --port ${PLAYWRIGHT_PORT} --strictPort`,
     url: PLAYWRIGHT_BASE_URL,
-    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "1",
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER !== "0",
   },
 });
