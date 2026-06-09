@@ -429,7 +429,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
           onPlayerState={setPlayerState}
           onGameOver={(): void => {
             setGameOver(true);
-            audioManager.stopMusic();
+            audioManager.stopGameMusic();
             document.exitPointerLock();
           }}
           onMissionComplete={(): void => {

@@ -476,11 +476,18 @@ export class MusicEngine {
 
   private scheduler(): void {
     if (!this.isPlaying || !this.audioContext) return;
-    while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
+
+    let catchUpSteps = 0;
+    const maxCatchUpSteps = 2;
+    while (
+      catchUpSteps < maxCatchUpSteps &&
+      this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime
+    ) {
       this.scheduleNote(this.currentStep, this.nextNoteTime);
       const secondsPerStep = 60.0 / this.bpm / 4;
       this.nextNoteTime += secondsPerStep;
       this.currentStep = (this.currentStep + 1) % this.totalSteps;
+      catchUpSteps++;
     }
     this.timerId = setTimeout(() => this.scheduler(), this.lookahead);
   }

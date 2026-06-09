@@ -183,14 +183,19 @@ export default function MainMenu({
   }, [showMapModal, menuIndex, modalIndex, mapModalItems, activateMainMenuItem, activateMapModalItem, setShowMapModal]);
 
   React.useEffect(() => {
-    let disposed = false;
+    if (audioManager.isMenuMusicPlaying()) {
+      setMusicActive(true);
+      return;
+    }
 
     const removeGestureListeners = (): void => {
       window.removeEventListener('pointerdown', onGesture);
       window.removeEventListener('keydown', onGesture);
     };
 
-    const onGesture = (): void => {
+    const onGesture = (e: Event): void => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, a, input, textarea, select')) return;
       if (audioManager.isMenuMusicPlaying()) {
         setMusicActive(true);
         removeGestureListeners();
@@ -201,21 +206,10 @@ export default function MainMenu({
       });
     };
 
-    if (audioManager.isLoaded() && audioManager.isMenuMusicPlaying()) {
-      setMusicActive(true);
-      return;
-    }
-
-    void activateMenuMusic().then((playing) => {
-      if (disposed) return;
-      if (!playing) {
-        window.addEventListener('pointerdown', onGesture, { passive: true });
-        window.addEventListener('keydown', onGesture);
-      }
-    });
+    window.addEventListener('pointerdown', onGesture, { passive: true });
+    window.addEventListener('keydown', onGesture);
 
     return () => {
-      disposed = true;
       removeGestureListeners();
     };
   }, [activateMenuMusic]);
@@ -239,7 +233,7 @@ export default function MainMenu({
     })();
   };
 
-  const handleMenuBackgroundPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+  const handleMenuBackgroundActivate = (e: React.MouseEvent<HTMLDivElement> | React.PointerEvent<HTMLDivElement>): void => {
     const target = e.target as HTMLElement;
     if (target.closest('button, a, input, textarea, select')) return;
     if (!audioManager.isMenuMusicPlaying()) {
@@ -249,7 +243,8 @@ export default function MainMenu({
 
   return (
     <div
-      onPointerDown={handleMenuBackgroundPointerDown}
+      onPointerDown={handleMenuBackgroundActivate}
+      onClick={handleMenuBackgroundActivate}
       style={{
         width: "100vw",
         height: "100dvh",
@@ -455,6 +450,7 @@ export default function MainMenu({
       {/* Floating retro metal volume controller */}
       <button
         onClick={toggleMusic}
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.1)';
           e.currentTarget.style.boxShadow = musicActive ? '0 0 25px #ff0000' : '0 0 15px rgba(255,255,255,0.3)';

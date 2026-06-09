@@ -515,9 +515,15 @@ export class MenuSynth {
   private scheduler(): void {
     if (!this.audioContext || !this.isPlaying) return;
 
-    while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
+    let catchUpSteps = 0;
+    const maxCatchUpSteps = 2;
+    while (
+      catchUpSteps < maxCatchUpSteps &&
+      this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime
+    ) {
       this.scheduleNextStep(this.currentStep, this.nextNoteTime);
       this.advanceStep();
+      catchUpSteps++;
     }
 
     this.timerId = setTimeout(() => this.scheduler(), this.lookahead);

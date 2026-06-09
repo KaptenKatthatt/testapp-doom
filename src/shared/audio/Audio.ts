@@ -74,8 +74,6 @@ class AudioManager {
   private menuSynth: MenuSynth | null = null;
   private menuMusicPlaying = false;
   private musicEngine: MusicEngine | null = null;
-  private menuMusicBuffer: AudioBuffer | null = null;
-  private menuMusicRenderPromise: Promise<AudioBuffer> | null = null;
 
   private loaded = false;
   private initPromise: Promise<void> | null = null;
@@ -199,38 +197,15 @@ class AudioManager {
     }
   }
 
-  private async ensureMenuMusicBuffer(): Promise<AudioBuffer | null> {
-    if (this.menuMusicBuffer) return this.menuMusicBuffer;
-    if (!this.audioContext) return null;
-
-    if (!this.menuMusicRenderPromise) {
-      this.menuSynth ??= new MenuSynth();
-      const sampleRate = this.audioContext.sampleRate;
-      this.menuMusicRenderPromise = this.menuSynth.render(sampleRate).finally(() => {
-        this.menuMusicRenderPromise = null;
-      });
-    }
-
-    this.menuMusicBuffer = await this.menuMusicRenderPromise;
-    return this.menuMusicBuffer;
-  }
-
-  // Play menu music (pre-rendered buffer looping)
+  // Play menu music (live procedural synth — instant start, no offline render)
   async playMenuMusic(): Promise<void> {
     if (!this.loaded || !this.audioContext || !this.musicGain || this.menuMusicPlaying) return;
 
-    // Stop standard level music if playing
     this.stopMusic();
 
     try {
-      const buffer = await this.ensureMenuMusicBuffer();
-      if (!buffer) return;
-
-      this.musicSource = this.audioContext.createBufferSource();
-      this.musicSource.buffer = buffer;
-      this.musicSource.loop = true;
-      this.musicSource.connect(this.musicGain);
-      this.musicSource.start(0);
+      this.menuSynth ??= new MenuSynth();
+      this.menuSynth.start(this.audioContext, this.musicGain);
       this.menuMusicPlaying = true;
     } catch (e) {
       console.warn("Failed to play menu music:", e);
@@ -240,6 +215,7 @@ class AudioManager {
   // Stop menu music
   stopMenuMusic(): void {
     if (this.menuMusicPlaying) {
+      this.menuSynth?.stop();
       if (this.musicSource) {
         try { this.musicSource.stop(); } catch { /* ignore */ }
         this.musicSource = null;
@@ -301,6 +277,12 @@ class AudioManager {
       this.musicEngine.stop();
     }
     this.stopMusic();
+  }
+
+  // Stop all music (menu + game) — use when leaving gameplay/menu routes
+  stopAllMusic(): void {
+    this.stopMenuMusic();
+    this.stopGameMusic();
   }
 
   // Set music volume (0-1)

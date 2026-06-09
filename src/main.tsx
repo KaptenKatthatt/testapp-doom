@@ -3,6 +3,7 @@ import { StrictMode, Suspense, lazy, useState, useEffect, Component } from "reac
 import type { ErrorInfo, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { initE2EBridge } from "@/shared/e2eBridge";
+import { audioManager } from "@/shared/audio/Audio";
 import type { LevelData } from "@/shared/levelData";
 import type { JSX } from "react";
 
@@ -89,6 +90,13 @@ function Router(): JSX.Element {
   useEffect(() => {
     if (route !== '#editor') {
       void import("@/editor/Editor");
+    }
+  }, [route]);
+
+  // Stop menu/game music as soon as we route to the editor (before Editor chunk mounts)
+  useEffect(() => {
+    if (route === '#editor') {
+      audioManager.stopAllMusic();
     }
   }, [route]);
 
