@@ -15,7 +15,7 @@ export interface PresetMap {
 }
 
 const PRESETS_CACHE_KEY = 'doom-presets-cache';
-const FIRESTORE_TIMEOUT_MS = 15000;
+const FIRESTORE_TIMEOUT_MS = 5000;
 
 function withTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
