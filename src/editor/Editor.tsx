@@ -645,6 +645,24 @@ export default function Editor(): JSX.Element {
     };
   }, [musicTrack]);
 
+  // Stop shared menu/game music on entry; tear down editor audio on exit
+  useEffect(() => {
+    audioManager.stopAllMusic();
+
+    return () => {
+      stopMusicPreview();
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        void audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+      musicEngineRef.current = null;
+    };
+  }, []);
+
   const handlePlayMap = async (): Promise<void> => {
     // Save current map and level data so the game can load it
     const ld = gridToLevelData(grid, playerPos, musicTrack, customLighting ?? undefined);
@@ -822,7 +840,7 @@ export default function Editor(): JSX.Element {
                         <button key={t} onClick={() => { setTool(t); setActiveTab('canvas'); }} style={{
                           background: tool === t ? CELL_COLORS[t] : '#222',
                           border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
-                          color: tool === t ? (['empty', 'cacodemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
+                          color: tool === t ? (['empty', 'cacodemon', 'bloodimp', 'horneddemon', 'quaterniusdemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
                           padding: '4px 8px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                           opacity: over && tool !== t ? 0.6 : 1,
                         }}>
@@ -1132,7 +1150,7 @@ export default function Editor(): JSX.Element {
                     <button key={t} onClick={() => setTool(t)} style={{
                       background: tool === t ? CELL_COLORS[t] : '#222',
                       border: tool === t ? '1.5px solid #fff' : over ? '1px solid #f44' : '1px solid #444',
-                      color: tool === t ? (['empty', 'cacodemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
+                      color: tool === t ? (['empty', 'cacodemon', 'bloodimp', 'horneddemon', 'quaterniusdemon', 'health', 'slime', 'barrel', 'halfwall'].includes(t) ? '#fff' : '#000') : over ? '#f44' : '#ccc',
                       padding: '2px 5px', cursor: over ? 'not-allowed' : 'pointer', fontSize: 10, borderRadius: 3,
                       opacity: over && tool !== t ? 0.6 : 1,
                     }}>
