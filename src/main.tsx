@@ -1,14 +1,16 @@
 import "./style.css";
-import { StrictMode, useState, useEffect } from "react";
+import { StrictMode, Suspense, lazy, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import App from "@/app/App";
-import Editor from "@/editor/Editor";
 import { initE2EBridge } from "@/shared/e2eBridge";
 import type { LevelData } from "@/shared/levelData";
+import type { JSX } from "react";
+
+const App = lazy(() => import("@/app/App"));
+const Editor = lazy(() => import("@/editor/Editor"));
 
 initE2EBridge();
 
-function Router(): React.JSX.Element {
+function Router(): JSX.Element {
   const [route, setRoute] = useState(window.location.hash);
   const [levelData, setLevelData] = useState<LevelData | null>(null);
 
@@ -28,13 +30,38 @@ function Router(): React.JSX.Element {
     }
   }, [route]);
 
-  if (route === '#editor') return <Editor />;
+  const fallback = (
+    <div
+      style={{
+        width: "100vw",
+        height: "100dvh",
+        background: "#000",
+        color: "#c00",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: '"DooM", Impact, monospace',
+        fontSize: "clamp(24px, 6vw, 56px)",
+        letterSpacing: "4px",
+      }}
+    >
+      LOADING
+    </div>
+  );
 
-  return <App levelData={levelData} onClearLevelData={() => {
-    setLevelData(null);
-    localStorage.removeItem('doom-map-__playing__');
-    localStorage.removeItem('doom-leveldata-__playing__');
-  }} />;
+  return (
+    <Suspense fallback={fallback}>
+      {route === '#editor' ? (
+        <Editor />
+      ) : (
+        <App levelData={levelData} onClearLevelData={() => {
+          setLevelData(null);
+          localStorage.removeItem('doom-map-__playing__');
+          localStorage.removeItem('doom-leveldata-__playing__');
+        }} />
+      )}
+    </Suspense>
+  );
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(
