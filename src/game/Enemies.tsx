@@ -484,12 +484,16 @@ function EnemyLight({
   );
 }
 
+function EnemyEntry({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
+  return enemy.alive ? <Enemy enemy={enemy} /> : <Corpse enemy={enemy} />;
+}
+
 export default function Enemies({ enemies }: { readonly enemies: EnemyData[] }): React.JSX.Element {
   return (
     <group>
-      {enemies.map((e, index) =>
-        e.alive ? <Enemy key={`enemy-${e.id}-${index}`} enemy={e} /> : <Corpse key={`corpse-${e.id}-${index}`} enemy={e} />
-      )}
+      {enemies.map((e) => (
+        <EnemyEntry key={e.id} enemy={e} />
+      ))}
     </group>
   );
 }

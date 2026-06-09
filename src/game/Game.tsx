@@ -326,6 +326,9 @@ export default function Game({
   const enemiesRef = useRef<EnemyData[]>(customEnemies);
   const [pickups, setPickups] = useState<PickupData[]>(customPickups);
   const pickupsRef = useRef<PickupData[]>(customPickups);
+  useEffect(() => {
+    pickupsRef.current = pickups;
+  }, [pickups]);
   const [doors, setDoors] = useState<DoorData[]>(customDoors);
   const doorsRef = useRef<DoorData[]>(customDoors);
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
