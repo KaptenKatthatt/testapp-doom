@@ -1,8 +1,34 @@
-node_modules
-dist
-*.local
+# Dependencies
+node_modules/
+
+# Build
+dist/
+*.tsbuildinfo
+
+# Environment
 .env
 .env.*
 !.env.example
-e2e/*.png
+
+# Playwright / E2E artifacts
 test-results/
+playwright-report/
+blob-report/
+.playwright-cli/
+e2e/*.png
+e2e/*.cjs
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tool caches (local)
+.claude/
+.fallow/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor (project rules under .cursor/rules/ may be tracked intentionally)
+.vscode/
