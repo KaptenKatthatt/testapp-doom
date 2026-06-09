@@ -57,6 +57,28 @@ export default function MainMenu({
   const [mapsRefreshing, setMapsRefreshing] = React.useState(false);
   const musicStartingRef = React.useRef(false);
 
+  const activateMenuMusic = React.useCallback(async (): Promise<boolean> => {
+    if (musicStartingRef.current) {
+      return audioManager.isMenuMusicPlaying();
+    }
+    musicStartingRef.current = true;
+    try {
+      await audioManager.init();
+      await audioManager.resume();
+      if (!audioManager.isMenuMusicPlaying()) {
+        await audioManager.playMenuMusic();
+      }
+      const playing = audioManager.isMenuMusicPlaying();
+      setMusicActive(playing);
+      return playing;
+    } catch (err: unknown) {
+      console.log("Autoplay blocked, waiting for user interaction.", err);
+      return false;
+    } finally {
+      musicStartingRef.current = false;
+    }
+  }, []);
+
   const mapModalItems = React.useMemo((): MapModalItem[] => {
     const items: MapModalItem[] = [
       { kind: 'level', id: '__default__', label: '► E1M1 - ENTRYWAY' },
@@ -151,6 +173,8 @@ export default function MainMenu({
         e.preventDefault();
         const item = MAIN_MENU_ITEMS[menuIndex];
         if (item) activateMainMenuItem(item);
+      } else if (key === 'escape') {
+        document.exitPointerLock?.();
       }
     };
 
@@ -160,31 +184,6 @@ export default function MainMenu({
 
   React.useEffect(() => {
     let disposed = false;
-
-    const startAudio = (): Promise<boolean> => {
-      if (disposed || musicStartingRef.current) {
-        return Promise.resolve(audioManager.isMenuMusicPlaying());
-      }
-      musicStartingRef.current = true;
-      return audioManager.init()
-        .then(() => audioManager.resume())
-        .then(() => {
-          if (disposed) return false;
-          if (!audioManager.isMenuMusicPlaying()) {
-            audioManager.playMenuMusic();
-          }
-          const playing = audioManager.isMenuMusicPlaying();
-          setMusicActive(playing);
-          return playing;
-        })
-        .catch((err: unknown) => {
-          console.log("Autoplay blocked, waiting for user interaction.", err);
-          return false;
-        })
-        .finally(() => {
-          musicStartingRef.current = false;
-        });
-    };
 
     const removeGestureListeners = (): void => {
       window.removeEventListener('pointerdown', onGesture);
@@ -197,7 +196,7 @@ export default function MainMenu({
         removeGestureListeners();
         return;
       }
-      void startAudio().then((playing) => {
+      void activateMenuMusic().then((playing) => {
         if (playing) removeGestureListeners();
       });
     };
@@ -207,7 +206,8 @@ export default function MainMenu({
       return;
     }
 
-    void startAudio().then((playing) => {
+    void activateMenuMusic().then((playing) => {
+      if (disposed) return;
       if (!playing) {
         window.addEventListener('pointerdown', onGesture, { passive: true });
         window.addEventListener('keydown', onGesture);
@@ -218,24 +218,38 @@ export default function MainMenu({
       disposed = true;
       removeGestureListeners();
     };
-  }, []);
+  }, [activateMenuMusic]);
 
   const toggleMusic = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    audioManager.init().then(() => {
-      audioManager.resume();
-      if (audioManager.isMenuMusicPlaying()) {
-        audioManager.stopMenuMusic();
-        setMusicActive(false);
-      } else {
-        audioManager.playMenuMusic();
-        setMusicActive(true);
+    void (async (): Promise<void> => {
+      try {
+        await audioManager.init();
+        await audioManager.resume();
+        if (audioManager.isMenuMusicPlaying()) {
+          audioManager.stopMenuMusic();
+          setMusicActive(false);
+        } else {
+          await audioManager.playMenuMusic();
+          setMusicActive(audioManager.isMenuMusicPlaying());
+        }
+      } catch (err: unknown) {
+        console.warn("Failed to toggle menu music:", err);
       }
-    });
+    })();
+  };
+
+  const handleMenuBackgroundPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, select')) return;
+    if (!audioManager.isMenuMusicPlaying()) {
+      void activateMenuMusic();
+    }
   };
 
   return (
     <div
+      onPointerDown={handleMenuBackgroundPointerDown}
       style={{
         width: "100vw",
         height: "100dvh",

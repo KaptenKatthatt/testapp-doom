@@ -75,7 +75,8 @@ class AudioManager {
   private menuMusicPlaying = false;
   private musicEngine: MusicEngine | null = null;
   private menuMusicBuffer: AudioBuffer | null = null;
-  
+  private menuMusicRenderPromise: Promise<AudioBuffer> | null = null;
+
   private loaded = false;
   private initPromise: Promise<void> | null = null;
   private backgroundLoadPromise: Promise<void> | null = null;
@@ -198,6 +199,22 @@ class AudioManager {
     }
   }
 
+  private async ensureMenuMusicBuffer(): Promise<AudioBuffer | null> {
+    if (this.menuMusicBuffer) return this.menuMusicBuffer;
+    if (!this.audioContext) return null;
+
+    if (!this.menuMusicRenderPromise) {
+      this.menuSynth ??= new MenuSynth();
+      const sampleRate = this.audioContext.sampleRate;
+      this.menuMusicRenderPromise = this.menuSynth.render(sampleRate).finally(() => {
+        this.menuMusicRenderPromise = null;
+      });
+    }
+
+    this.menuMusicBuffer = await this.menuMusicRenderPromise;
+    return this.menuMusicBuffer;
+  }
+
   // Play menu music (pre-rendered buffer looping)
   async playMenuMusic(): Promise<void> {
     if (!this.loaded || !this.audioContext || !this.musicGain || this.menuMusicPlaying) return;
@@ -206,13 +223,11 @@ class AudioManager {
     this.stopMusic();
 
     try {
-      if (!this.menuMusicBuffer) {
-        this.menuSynth ??= new MenuSynth();
-        this.menuMusicBuffer = await this.menuSynth.render(this.audioContext.sampleRate);
-      }
+      const buffer = await this.ensureMenuMusicBuffer();
+      if (!buffer) return;
 
       this.musicSource = this.audioContext.createBufferSource();
-      this.musicSource.buffer = this.menuMusicBuffer;
+      this.musicSource.buffer = buffer;
       this.musicSource.loop = true;
       this.musicSource.connect(this.musicGain);
       this.musicSource.start(0);

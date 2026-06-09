@@ -272,10 +272,25 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     setLevelReady(true);
   }, []);
 
+  const returnToMainMenu = useCallback((): void => {
+    document.exitPointerLock?.();
+    audioManager.stopGameMusic();
+    audioManager.stopMusic();
+    setStarted(false);
+    setGameOver(false);
+    setMissionComplete(false);
+    setShowStats(false);
+    setMenuOpen(false);
+    setShowMapModal(false);
+    setLevelReady(false);
+    setAudioReady(false);
+  }, []);
+
   // Completion countdown timer removed in favor of Click to Continue interaction
 
   useEffect(() => {
     const handleRestartKey = (e: KeyboardEvent): void => {
+      if (!started) return;
       if (!gameOver && !missionComplete) return;
       if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
         document.exitPointerLock();
@@ -295,7 +310,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
       window.removeEventListener("keydown", handleRestartKey);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
     };
-  }, [gameOver, missionComplete, handleStart]);
+  }, [started, gameOver, missionComplete, handleStart]);
 
   // Listen to 'L' key to toggle lighting editor
   useEffect(() => {
@@ -353,15 +368,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
     });
   }, []);
 
-  // Restart menu music when returning to the main menu
-  useEffect(() => {
-    if (!started) {
-      if (audioManager.isLoaded()) {
-        audioManager.stopMusic();
-        audioManager.playMenuMusic();
-      }
-    }
-  }, [started]);
+  // MainMenu handles menu music bootstrap on mount; no duplicate playMenuMusic here.
 
   const levelBooting = started && (!levelReady || !audioReady);
 
@@ -550,10 +557,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
               RESTART GAME
             </button>
             <button
-              onClick={(): void => {
-                document.exitPointerLock();
-                setStarted(false);
-              }}
+              onClick={(): void => { returnToMainMenu(); }}
               style={{
                 fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
                 background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
@@ -667,10 +671,7 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
                   RESTART GAME
                 </button>
                 <button
-                  onClick={(): void => {
-                    document.exitPointerLock();
-                    setStarted(false);
-                  }}
+                  onClick={(): void => { returnToMainMenu(); }}
                   style={{
                     fontFamily: '"DooM", monospace', fontSize: "clamp(14px, 2.5vw, 18px)", padding: "12px 32px",
                     background: "#551111", color: "#ff4444", border: "2px solid #bb2222", cursor: "url(/doom-cursor.png) 16 16, crosshair",
@@ -918,10 +919,8 @@ export default function App({ levelData }: AppProps): React.JSX.Element {
 
               {/* Exit Button */}
               <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  setStarted(false);
-                  document.exitPointerLock?.();
+                onClick={(): void => {
+                  returnToMainMenu();
                 }}
                 style={{
                   padding: '12px 0',
