@@ -80,8 +80,21 @@ interface SpriteFrame {
   h: number;
 }
 
-const textureCache = new Map<string, THREE.Texture>();
 const bodyTextureCache = new Map<EnemyType, THREE.Texture>();
+
+type SpriteTextureProcessor = (data: Uint8ClampedArray, width: number, height: number) => void;
+
+interface SpriteTextureState {
+  canvas?: HTMLCanvasElement;
+  loading: boolean;
+  textures: Set<THREE.Texture>;
+}
+
+const spriteTextureCache = new Map<string, SpriteTextureState>();
+
+function setTextureImage(texture: THREE.Texture, image: HTMLCanvasElement | HTMLImageElement): void {
+  (texture as unknown as { image: HTMLCanvasElement | HTMLImageElement }).image = image;
+}
 
 function isCyanKey(r: number, g: number, b: number): boolean {
   return (r < 120 && g > 150 && b > 150) || (g > r + 15 && b > r + 15);
@@ -93,173 +106,95 @@ function isNeutralGrayKey(r: number, g: number, b: number): boolean {
   return max < 115 && max - min < 12;
 }
 
-function isBlackKey(r: number, g: number, b: number): boolean {
-  return Math.max(r, g, b) < 35;
-}
-
-function clearTransparentPixel(data: Uint8ClampedArray, idx: number): void {
-  data[idx] = 0;
-  data[idx + 1] = 0;
-  data[idx + 2] = 0;
-  data[idx + 3] = 0;
-}
-
-function zeroTransparentRgb(data: Uint8ClampedArray): void {
-  for (let i = 0; i < data.length; i += 4) {
-    if ((data[i + 3] ?? 0) === 0) {
-      clearTransparentPixel(data, i);
-    }
-  }
-}
-
-function erodeSilhouette(data: Uint8ClampedArray, width: number, height: number, passes = 2): void {
-  const pixelCount = width * height;
-  const transparent = new Uint8Array(pixelCount);
-
-  for (let i = 0; i < data.length; i += 4) {
-    if ((data[i + 3] ?? 0) === 0) transparent[i / 4] = 1;
-  }
-
-  for (let pass = 0; pass < passes; pass++) {
-    let changed = false;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const pi = y * width + x;
-        const idx = pi * 4;
-        if ((data[idx + 3] ?? 0) === 0) continue;
-
-        let nearTransparent = false;
-        for (let dy = -1; dy <= 1 && !nearTransparent; dy++) {
-          for (let dx = -1; dx <= 1 && !nearTransparent; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-            if (transparent[ny * width + nx]) nearTransparent = true;
-          }
-        }
-
-        if (nearTransparent) {
-          clearTransparentPixel(data, idx);
-          transparent[pi] = 1;
-          changed = true;
-        }
-      }
-    }
-    if (!changed) break;
-  }
-}
-
-function processSpriteSheetPixels(data: Uint8ClampedArray, width: number, height: number): void {
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] ?? 0;
-    const g = data[i + 1] ?? 0;
-    const b = data[i + 2] ?? 0;
-    if (isBlackKey(r, g, b)) {
-      clearTransparentPixel(data, i);
-    }
-  }
-  erodeSilhouette(data, width, height, 2);
-  zeroTransparentRgb(data);
-}
-
-function createChromaKeyTexture(src: string): THREE.Texture {
-  const cached = textureCache.get(src);
-  if (cached) return cached;
-
+function createProcessedSpriteTexture(src: string, processPixels: SpriteTextureProcessor): THREE.Texture {
   const texture = new THREE.Texture();
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+
+  const cached = spriteTextureCache.get(src);
+  if (cached?.canvas) {
+    setTextureImage(texture, cached.canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  const state = cached ?? { loading: false, textures: new Set<THREE.Texture>() };
+  state.textures.add(texture);
+  spriteTextureCache.set(src, state);
+
+  if (state.loading) return texture;
+
+  state.loading = true;
   const img = new Image();
-  img.src = src;
   img.onload = () => {
     const canvas = document.createElement("canvas");
     canvas.width = img.width;
     canvas.height = img.height;
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.drawImage(img, 0, 0);
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i] ?? 0;
-        const g = data[i + 1] ?? 0;
-        const b = data[i + 2] ?? 0;
-        if (isCyanKey(r, g, b)) {
-          data[i + 3] = 0;
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-      (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
-      texture.needsUpdate = true;
-    }
+    if (!ctx) return;
+
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    processPixels(imgData.data, canvas.width, canvas.height);
+    ctx.putImageData(imgData, 0, 0);
+
+    state.canvas = canvas;
+    state.loading = false;
+    state.textures.forEach((waitingTexture) => {
+      setTextureImage(waitingTexture, canvas);
+      waitingTexture.needsUpdate = true;
+    });
+    state.textures.clear();
   };
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  textureCache.set(src, texture);
+  img.onerror = () => {
+    state.loading = false;
+    state.textures.delete(texture);
+  };
+  img.src = src;
+
   return texture;
 }
 
-function createBlackKeyTexture(src: string): THREE.Texture {
-  const cached = textureCache.get(src);
-  if (cached) return cached;
-
-  const texture = new THREE.Texture();
-  const img = new Image();
-  img.src = src;
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.drawImage(img, 0, 0);
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-      processSpriteSheetPixels(data, canvas.width, canvas.height);
-      ctx.putImageData(imgData, 0, 0);
-      (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
-      texture.needsUpdate = true;
+function createChromaKeyTexture(src: string): THREE.Texture {
+  return createProcessedSpriteTexture(src, (data) => {
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i] ?? 0;
+      const g = data[i + 1] ?? 0;
+      const b = data[i + 2] ?? 0;
+      if (isCyanKey(r, g, b)) {
+        data[i + 3] = 0;
+      }
     }
-  };
+  });
+}
+
+function createBlackKeyTexture(src: string): THREE.Texture {
+  const texture = new THREE.Texture();
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
-  textureCache.set(src, texture);
+
+  const img = new Image();
+  setTextureImage(texture, img);
+  img.onload = () => {
+    texture.needsUpdate = true;
+  };
+  img.src = src;
+
   return texture;
 }
 
 function createCacodemonTexture(): THREE.Texture {
   const src = "/cacodemon.png";
-  const cached = textureCache.get(src);
-  if (cached) return cached;
-
-  const texture = new THREE.Texture();
-  const img = new Image();
-  img.src = src;
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.drawImage(img, 0, 0);
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i] ?? 0;
-        const g = data[i + 1] ?? 0;
-        const b = data[i + 2] ?? 0;
-        if (isCyanKey(r, g, b) || isNeutralGrayKey(r, g, b)) {
-          data[i + 3] = 0;
-        }
+  return createProcessedSpriteTexture(src, (data) => {
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i] ?? 0;
+      const g = data[i + 1] ?? 0;
+      const b = data[i + 2] ?? 0;
+      if (isCyanKey(r, g, b) || isNeutralGrayKey(r, g, b)) {
+        data[i + 3] = 0;
       }
-      ctx.putImageData(imgData, 0, 0);
-      (texture as unknown as { image: HTMLCanvasElement }).image = canvas;
-      texture.needsUpdate = true;
     }
-  };
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  textureCache.set(src, texture);
-  return texture;
+  });
 }
 
 function getMancubusBaseTexture(): THREE.Texture {
@@ -726,11 +661,11 @@ function Enemy({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const flashIntensity = hitFlash > 0 ? hitFlash : 0;
   const isSpriteEnemy = type === "mancubus" || type === "ratman" || type === "cacodemon" || type === "bloodimp" || type === "horneddemon";
 
-  const mancubusTexture = useMemo(() => (type === "mancubus" ? getMancubusBaseTexture().clone() : null), [type]);
-  const ratmanTexture = useMemo(() => (type === "ratman" ? getRatmanBaseTexture().clone() : null), [type]);
-  const cacodemonTexture = useMemo(() => (type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [type]);
-  const bloodImpTexture = useMemo(() => (type === "bloodimp" ? getBloodImpBaseTexture().clone() : null), [type]);
-  const hornedDemonTexture = useMemo(() => (type === "horneddemon" ? getHornedDemonBaseTexture().clone() : null), [type]);
+  const mancubusTexture = useMemo(() => (type === "mancubus" ? getMancubusBaseTexture() : null), [type]);
+  const ratmanTexture = useMemo(() => (type === "ratman" ? getRatmanBaseTexture() : null), [type]);
+  const cacodemonTexture = useMemo(() => (type === "cacodemon" ? getCacodemonBaseTexture() : null), [type]);
+  const bloodImpTexture = useMemo(() => (type === "bloodimp" ? getBloodImpBaseTexture() : null), [type]);
+  const hornedDemonTexture = useMemo(() => (type === "horneddemon" ? getHornedDemonBaseTexture() : null), [type]);
   const bodyTexture = useMemo(() => getBodyTexture(type), [type]);
 
   useFrame((state) => {
@@ -1046,11 +981,11 @@ function Corpse({ enemy }: { readonly enemy: EnemyData }): React.JSX.Element {
   const { position } = enemy;
   const config = ENEMY_CONFIG[enemy.type];
   const [deathTime] = useState(() => performance.now() / 1000);
-  const mancubusTexture = useMemo(() => (enemy.type === "mancubus" ? getMancubusBaseTexture().clone() : null), [enemy.type]);
-  const ratmanTexture = useMemo(() => (enemy.type === "ratman" ? getRatmanBaseTexture().clone() : null), [enemy.type]);
-  const cacodemonTexture = useMemo(() => (enemy.type === "cacodemon" ? getCacodemonBaseTexture().clone() : null), [enemy.type]);
-  const bloodImpTexture = useMemo(() => (enemy.type === "bloodimp" ? getBloodImpBaseTexture().clone() : null), [enemy.type]);
-  const hornedDemonTexture = useMemo(() => (enemy.type === "horneddemon" ? getHornedDemonBaseTexture().clone() : null), [enemy.type]);
+  const mancubusTexture = useMemo(() => (enemy.type === "mancubus" ? getMancubusBaseTexture() : null), [enemy.type]);
+  const ratmanTexture = useMemo(() => (enemy.type === "ratman" ? getRatmanBaseTexture() : null), [enemy.type]);
+  const cacodemonTexture = useMemo(() => (enemy.type === "cacodemon" ? getCacodemonBaseTexture() : null), [enemy.type]);
+  const bloodImpTexture = useMemo(() => (enemy.type === "bloodimp" ? getBloodImpBaseTexture() : null), [enemy.type]);
+  const hornedDemonTexture = useMemo(() => (enemy.type === "horneddemon" ? getHornedDemonBaseTexture() : null), [enemy.type]);
   const spriteRef = useRef<THREE.Sprite>(null);
 
   useFrame(() => {
